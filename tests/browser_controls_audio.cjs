@@ -454,10 +454,10 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().charging === true, { timeout: 1200 });
       await sleep(260);
       await page.touchscreen.touchEnd();
-      await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().stats.playerShots === 5, { timeout: 3000 });
+      await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().stats.playerShots === 3, { timeout: 3000 });
       const s = await snapshot(page);
       assert.equal(s.phase, 'flight');
-      assert.equal(s.stats.playerShots, 5, 'one touch hold must launch five scatter shells');
+      assert.equal(s.stats.playerShots, 3, 'one touch hold must launch three scatter shells');
       const fireSounds = await audioEvents(page, 'fire');
       assert.equal(fireSounds.length, 1, 'scatter must play launch once, not once per shell');
       assert.equal(fireSounds[0].sample, '114');

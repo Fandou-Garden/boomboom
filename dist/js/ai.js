@@ -1,8 +1,8 @@
 /** New browser-only opponent. It solves with the same physics/terrain modules. */
-import { AI, CONTROLS, PHYSICS, COMBAT, BATTLE } from './config.js?v=16';
+import { AI, CONTROLS, PHYSICS, COMBAT, BATTLE } from './config.js?v=17';
 
 const COMBAT_TARGET_RADIUS = COMBAT.targetHitRadius;
-import { blastDamageFor, clamp, muzzlePoint, simulateShot } from './physics.js?v=16';
+import { blastDamageFor, clamp, muzzlePoint, simulateShot } from './physics.js?v=17';
 
 function triangularNoise(random) {
   // Range roughly [-1, 1], denser near zero.
@@ -113,9 +113,10 @@ export function evaluateVolleyForForce({
   const direction = Math.sign(target.x - shooter.x) || 1;
   const def = skill ? skillDefs[skill] : null;
   const offsets = def?.offsets ?? [0];
-  const forceScale = def?.forceScale ?? 1;
-  const damageScale = (def?.damageScale ?? 1)
-    + buffs.reduce((sum, id) => sum + (skillDefs[id]?.damageBonus ?? 0), 0);
+  const forceScales = def?.forceScales ?? [def?.forceScale ?? 1];
+  const attackPenalty = def?.damageScale ?? 1;
+  const damageBonus = buffs.reduce((sum, id) => sum + (skillDefs[id]?.damageBonus ?? 0), 0);
+  const damageScale = attackPenalty * (1 + damageBonus);
   const blastCfg = pow ? { ...COMBAT, blastRadius: BATTLE.powBlastRadius } : COMBAT;
   let direct = false;
   let splash = false;
@@ -124,13 +125,14 @@ export function evaluateVolleyForForce({
   let bestImpact = null;
   let representative = null;
 
-  for (const offset of offsets) {
+  for (let i = 0; i < offsets.length; i += 1) {
+    const offset = offsets[i];
     const elevation = clamp(angle + offset, angleMin, angleMax);
     const muzzle = muzzlePoint(shooter, elevation, direction);
     const result = simulateShot({
       origin: { x: muzzle.x, y: muzzle.y },
       angle: elevation,
-      force: force * forceScale,
+      force: force * (forceScales[i] ?? forceScales[0] ?? 1),
       direction,
       wind,
       target,
@@ -193,15 +195,33 @@ export function solveForceForAngle({
 }) {
   const direction = Math.sign(target.x - shooter.x) || 1;
   const minPct = clamp(Math.ceil(CONTROLS.minFireForce / cfg.forceMax * 100), 1, 100);
-  const evals = [];
-  for (let pct = minPct; pct <= 100; pct += 1) {
-    const force = pct / 100 * cfg.forceMax;
-    const value = evaluateVolleyForForce({
-      shooter, target, wind, terrain, angle, force, skill,
-      buffs, angleMin, angleMax, pow, cfg,
-    });
-    evals.push({ pct, force, ...value });
-  }
+  // A 1% sweep costs 100 exact trajectories and blocks the animation frame on
+  // phones. Most angles produce a wide hit window, so scan every 2% first and
+  // only fall back to the full 1% sweep when the coarse pass misses entirely.
+  // The returned point is always evaluated; the band is a verified 2% window.
+  const scan = (step) => {
+    const out = [];
+    for (let pct = minPct; pct <= 100; pct += step) {
+      const force = pct / 100 * cfg.forceMax;
+      const value = evaluateVolleyForForce({
+        shooter, target, wind, terrain, angle, force, skill,
+        buffs, angleMin, angleMax, pow, cfg,
+      });
+      out.push({ pct, force, ...value });
+    }
+    if (out[out.length - 1]?.pct !== 100) {
+      const pct = 100;
+      const force = cfg.forceMax;
+      const value = evaluateVolleyForForce({
+        shooter, target, wind, terrain, angle, force, skill,
+        buffs, angleMin, angleMax, pow, cfg,
+      });
+      out.push({ pct, force, ...value });
+    }
+    return out;
+  };
+  let evals = scan(2);
+  if (!evals.some((item) => item.hit)) evals = scan(1);
 
   const runsOf = (hitType) => {
     const runs = [];
@@ -234,7 +254,17 @@ export function solveForceForAngle({
     const minPctWin = run[0].pct;
     const maxPctWin = run[run.length - 1].pct;
     const pct = Math.round((minPctWin + maxPctWin) / 2);
-    const chosen = evals.find((item) => item.pct === pct);
+    let chosen = evals.find((item) => item.pct === pct);
+    if (!chosen) {
+      const force = pct / 100 * cfg.forceMax;
+      chosen = {
+        pct, force,
+        ...evaluateVolleyForForce({
+          shooter, target, wind, terrain, angle, force, skill,
+          buffs, angleMin, angleMax, pow, cfg,
+        }),
+      };
+    }
     // Never expose a recommendation that was not re-evaluated as a hit.
     if (chosen?.hit) {
       return {

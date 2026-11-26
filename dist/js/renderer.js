@@ -1,7 +1,7 @@
 /** Canvas renderer. World layers use world coordinates; HUD stays in DOM. */
-import { PHYSICS, COMBAT, WORLD, COLORS } from './config.js?v=16';
-import { clamp, muzzlePoint, weaponGripPoint } from './physics.js?v=16';
-import { projectPoint } from './camera.js?v=16';
+import { PHYSICS, COMBAT, WORLD, COLORS } from './config.js?v=17';
+import { clamp, muzzlePoint, weaponGripPoint } from './physics.js?v=17';
+import { projectPoint } from './camera.js?v=17';
 
 // SOURCE: GameCharacter.as action frame arrays. The 3×13 sheet is a frame atlas,
 // not three independent suit rows: STAND/WALK/SHOWGUN/SHOT/HIT all index into it.

@@ -108,13 +108,14 @@ export const BATTLE = Object.freeze({
     extra2: 1, scatter: 1, extra1: 1,
     boost50: 1, boost40: 1, boost30: 1, boost20: 1, boost10: 1,
   },
-  // SOURCE geometry from Living.ShootImp: bombCount=2 -> 0°×1.0 and
-  // -5°×0.9. Slot 1 = primary + two extra shells; slot 3 = primary + one.
-  // The five-shell fan is browser-only and composed from ±5°/±10°.
+  // SOURCE TemplateAlllist 10001/10003/10002 and the matching game-logic
+  // spells. +2 and +1 are counted shots (DamageScale 0.6/0.9); the 10003
+  // item is a three-ray fan (DamageScale 0.5) with Living.ShootImp's
+  // 0°/-5°/+5° force scales.
   skillDefs: {
-    extra2: { label: '附加攻击2次', kind: 'attack', badge: '3', offsets: [0, -2, 2], damageScale: 1 },
-    scatter: { label: '散弹', kind: 'attack', badge: '5', offsets: [-10, -5, 0, 5, 10], damageScale: 1 },
-    extra1: { label: '附加攻击1次', kind: 'attack', badge: '2', offsets: [0, -5], damageScale: 1 },
+    extra2: { label: '攻击 +2', kind: 'attack', badge: '+2', offsets: [0, 0, 0], forceScales: [1, 1, 1], damageScale: 0.6 },
+    scatter: { label: '三向散射', kind: 'attack', badge: '×3', offsets: [0, -5, 5], forceScales: [1, 0.9, 1.1], damageScale: 0.5 },
+    extra1: { label: '攻击 +1', kind: 'attack', badge: '+1', offsets: [0, 0], forceScales: [1, 1], damageScale: 0.9 },
     boost50: { label: '伤害增幅 50%', kind: 'boost', badge: '50', damageBonus: 0.5 },
     boost40: { label: '伤害增幅 40%', kind: 'boost', badge: '40', damageBonus: 0.4 },
     boost30: { label: '伤害增幅 30%', kind: 'boost', badge: '30', damageBonus: 0.3 },

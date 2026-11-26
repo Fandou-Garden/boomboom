@@ -44,7 +44,7 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 	weapon := m.weaponForActor(index)
 	offsets := []float64{0}
 	scales := []float64{1}
-	damageScale := 1.0
+	attackPenalty := 1.0
 	firedSkill := ""
 	pow := index == 0 && m.PowSelected && m.Energy >= EnergyMax
 	if pow {
@@ -53,19 +53,22 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 		if def, ok := SkillDefs[m.SelectedSkill]; ok && def.Kind == "attack" && m.SkillUses[m.SelectedSkill] > 0 {
 			offsets = def.Offsets
 			scales = def.ForceScales
-			damageScale = def.DamageScale
+			attackPenalty = def.DamageScale
 			firedSkill = def.ID
 		}
 	}
-	// 4–8 are additive damage amplifiers. They can be stacked before firing;
-	// each selected amplifier is spent with the volley.
+	// 4–8 are additive damage amplifiers. SOURCE AddWoudSpell adds
+	// CurrentDamagePlus, while the attack items scale CurrentShootMinus;
+	// the two multipliers therefore apply multiplicatively.
+	damageBonus := 0.0
 	if index == 0 && !pow {
 		for _, id := range m.SelectedBuffs {
 			if def, ok := SkillDefs[id]; ok && def.Kind == "boost" && m.SkillUses[id] > 0 {
-				damageScale += def.DamageBonus
+				damageBonus += def.DamageBonus
 			}
 		}
 	}
+	damageScale := (1 + damageBonus) * attackPenalty
 
 	safeForce := Clamp(force, 1, ForceMax)
 	baseAngle := Clamp(angle, weapon.AngleMin, weapon.AngleMax)

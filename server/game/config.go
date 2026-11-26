@@ -200,13 +200,16 @@ func WeaponFor(id string) WeaponDef {
 }
 
 // SkillDef maps one battle-item slot to its effect. The eight slots follow the
-// classic 1–8 battle-item bar:
+// classic right-side battle-item bar (SharedManager.KEY_SET_ABLE):
 //
-//	1 附加攻击2次 (three shells)   2 散弹 (five-shell fan)
-//	3 附加攻击1次 (two shells)     4–8 伤害增幅 50/40/30/20/10%
+//	10001 攻击 +2: 3 shots, one at 0° each, damage ×0.6
+//	10003 三向散射: 3 shots at 0°/-5°/+5°, force ×1.0/×0.9/×1.1, damage ×0.5
+//	10002 攻击 +1: 2 shots, one at 0° each, damage ×0.9
+//	10004–10008 伤害增幅 50/40/30/20/10%
 //
-// SOURCE Living.ShootImp: bombCount=2 -> (0°, 1.0) and (-5°, 0.9);
-// bombCount=3 adds (+5°, 1.1). The five-shell fan is a browser extension.
+// SOURCE AddAttackSpell.cs multiplies CurrentShootMinus by 0.6/0.9.
+// SOURCE AddBallSpell.cs sets BallCount=3 and CurrentDamagePlus *= 0.5.
+// SOURCE Living.ShootImp offsets the extra two scatter shells by -5°/+5°.
 type SkillDef struct {
 	ID          string    `json:"id"`
 	Label       string    `json:"label"`
@@ -227,19 +230,19 @@ var SkillOrder = []string{
 
 var SkillDefs = map[string]SkillDef{
 	"extra2": {
-		ID: "extra2", Label: "附加攻击2次", Kind: "attack", Badge: "3",
-		Offsets: []float64{0, -2, 2}, ForceScales: []float64{1.0, 1.0, 1.0},
-		DamageScale: 1.0, CraterArt: "401", Source: true,
+		ID: "extra2", Label: "攻击 +2", Kind: "attack", Badge: "+2",
+		Offsets: []float64{0, 0, 0}, ForceScales: []float64{1.0, 1.0, 1.0},
+		DamageScale: 0.6, CraterArt: "401", Source: true,
 	},
 	"scatter": {
-		ID: "scatter", Label: "散弹", Kind: "attack", Badge: "5",
-		Offsets: []float64{-10, -5, 0, 5, 10}, ForceScales: []float64{0.8, 0.9, 1.0, 1.1, 1.2},
-		DamageScale: 1.0, CraterArt: "401", Source: false,
+		ID: "scatter", Label: "三向散射", Kind: "attack", Badge: "×3",
+		Offsets: []float64{0, -5, 5}, ForceScales: []float64{1.0, 0.9, 1.1},
+		DamageScale: 0.5, CraterArt: "401", Source: true,
 	},
 	"extra1": {
-		ID: "extra1", Label: "附加攻击1次", Kind: "attack", Badge: "2",
-		Offsets: []float64{0, -5}, ForceScales: []float64{1.0, 0.9},
-		DamageScale: 1.0, CraterArt: "401", Source: true,
+		ID: "extra1", Label: "攻击 +1", Kind: "attack", Badge: "+1",
+		Offsets: []float64{0, 0}, ForceScales: []float64{1.0, 1.0},
+		DamageScale: 0.9, CraterArt: "401", Source: true,
 	},
 	"boost50": {
 		ID: "boost50", Label: "伤害增幅 50%", Kind: "boost", Badge: "50",

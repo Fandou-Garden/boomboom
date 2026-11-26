@@ -673,7 +673,9 @@ svg { display: block; }
   color: #e1f6fa;
   box-shadow: 0 3px 9px rgba(1, 15, 22, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   cursor: pointer;
-  transition: border-color 130ms ease, background 130ms ease, transform 120ms ease, opacity 130ms ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 110ms ease, background 110ms ease, transform 90ms ease, opacity 110ms ease;
 }
 .skill-button:hover { background: linear-gradient(180deg, rgba(19, 81, 96, 0.94), rgba(5, 37, 49, 0.9)); border-color: rgba(152, 240, 255, 0.58); }
 .skill-button:active { transform: scale(0.94); }
@@ -695,30 +697,39 @@ svg { display: block; }
   height: 23px;
   overflow: visible;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  transition: transform 110ms ease, filter 110ms ease;
 }
 .skill-button svg.skill-icon { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-.icon-flame { fill: #ff963b !important; stroke: #ffe08b !important; }
-.icon-splash { fill: #42c7ff !important; stroke: #c9f5ff !important; }
-.icon-bolt { fill: #ffe35e !important; stroke: #fff7b8 !important; }
-.icon-cloud { fill: #e2f2ff !important; stroke: #89bdd4 !important; opacity: 0.96; }
+/* Icon language follows the original 10001–10008 art: double red bolts for
+   +2, a blue three-ray fan for ×3, one amber bolt for +1, and an upward
+   power arrow for the damage amplifiers. */
+.skill-button svg.icon-double-bolt path { fill: #ff7a32; stroke: #ffe0a3; stroke-width: 1.1; }
+.skill-button svg.icon-double-bolt path + path { fill: #ef3f2f; }
+.skill-button svg.icon-trispark { stroke: #63ddff; stroke-width: 2.2; }
+.skill-button svg.icon-trispark path + path { stroke: #d8f8ff; stroke-width: 1.7; }
+.skill-button svg.icon-single-bolt path { fill: #ffd84a; stroke: #fff4b5; stroke-width: 1.1; }
+.skill-button svg.icon-power path:first-child { fill: #ffb33f; stroke: #ffe3a6; stroke-width: 1.1; }
+.skill-button svg.icon-power path + path { stroke: #ffcf76; stroke-width: 2.4; }
+.skill-button.is-selected .skill-icon { transform: translateY(-1px) scale(1.06); filter: drop-shadow(0 0 5px rgba(255, 228, 142, 0.62)); }
 .skill-copy { max-width: 100%; color: currentColor; font-size: 6px; font-weight: 700; line-height: 1; letter-spacing: 0; white-space: nowrap; opacity: 0.88; }
 .skill-badge {
   position: absolute;
-  right: -4px;
+  right: -5px;
   bottom: -4px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 2px;
+  min-width: 18px;
+  height: 15px;
+  padding: 0 3px;
   border: 1px solid rgba(255, 225, 180, 0.72);
   border-radius: 9px;
   background: #dc3d2b;
   color: #fff8e8;
-  font: 800 8px/14px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 800 7.5px/13px ui-monospace, SFMono-Regular, Menlo, monospace;
   text-align: center;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
   pointer-events: none;
 }
 .boost-skill .skill-badge { background: #b72e24; }
+.skill-button[data-skill="scatter"] .skill-badge { border-color: rgba(180, 236, 255, 0.8); background: #176fae; }
 .skill-key {
   position: absolute;
   top: -5px;

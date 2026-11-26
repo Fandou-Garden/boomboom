@@ -72,23 +72,67 @@ func TestWindStaysInSourceRange(t *testing.T) {
 }
 
 func TestClassicSkillBar(t *testing.T) {
+	// SOURCE TemplateAlllist 10001/10003/10002 and AddAttackSpell/AddBallSpell.
 	extra1 := SkillDefs["extra1"]
-	if len(extra1.Offsets) != 2 || extra1.Offsets[0] != 0 || extra1.Offsets[1] != -5 {
-		t.Fatalf("extra1 offsets = %v", extra1.Offsets)
+	if len(extra1.Offsets) != 2 || extra1.Offsets[0] != 0 || extra1.Offsets[1] != 0 {
+		t.Fatalf("extra1 offsets = %v, want two centred shots", extra1.Offsets)
+	}
+	if extra1.DamageScale != 0.9 || !extra1.Source {
+		t.Fatalf("extra1 = %+v, want ×0.9 source attack", extra1)
 	}
 	extra2 := SkillDefs["extra2"]
 	if len(extra2.Offsets) != 3 {
 		t.Fatalf("extra2 offsets = %v", extra2.Offsets)
 	}
+	if extra2.DamageScale != 0.6 || !extra2.Source {
+		t.Fatalf("extra2 = %+v, want ×0.6 source attack", extra2)
+	}
 	scatter := SkillDefs["scatter"]
-	if len(scatter.Offsets) != 5 || scatter.Offsets[4] != 10 {
-		t.Fatalf("scatter = %+v", scatter)
+	if len(scatter.Offsets) != 3 || scatter.Offsets[0] != 0 || scatter.Offsets[1] != -5 || scatter.Offsets[2] != 5 {
+		t.Fatalf("scatter = %+v, want three rays at 0/-5/+5", scatter)
+	}
+	if len(scatter.ForceScales) != 3 || scatter.ForceScales[0] != 1 || scatter.ForceScales[1] != 0.9 || scatter.ForceScales[2] != 1.1 {
+		t.Fatalf("scatter force scales = %v", scatter.ForceScales)
+	}
+	if scatter.DamageScale != 0.5 || !scatter.Source {
+		t.Fatalf("scatter = %+v, want ×0.5 source attack", scatter)
 	}
 	for i, id := range []string{"boost50", "boost40", "boost30", "boost20", "boost10"} {
 		def := SkillDefs[id]
 		want := []float64{0.5, 0.4, 0.3, 0.2, 0.1}[i]
 		if def.Kind != "boost" || def.DamageBonus != want {
 			t.Fatalf("%s = %+v", id, def)
+		}
+	}
+}
+
+func TestClassicAttackItemsApplySourceDamagePenalty(t *testing.T) {
+	cases := []struct {
+		id    string
+		buffs []string
+		shots int
+		scale float64
+	}{
+		{"extra2", nil, 3, 0.6},
+		{"scatter", nil, 3, 0.5},
+		{"extra1", nil, 2, 0.9},
+		// AddAttackSpell scales ShootMinus; AddWoudSpell adds DamagePlus.
+		{"extra2", []string{"boost50"}, 3, 0.9},
+	}
+	for _, tc := range cases {
+		m := NewMatch(testTerrain(t), 7, false)
+		m.SelectedSkill = tc.id
+		m.SelectedBuffs = tc.buffs
+		if !m.fireLocked(0, AngleMax, ForceMax) {
+			t.Fatalf("%s fire rejected", tc.id)
+		}
+		if len(m.Shots) != tc.shots {
+			t.Fatalf("%s shells = %d, want %d", tc.id, len(m.Shots), tc.shots)
+		}
+		for i, shot := range m.Shots {
+			if shot.Skill != tc.id || math.Abs(shot.DamageScale-tc.scale) > 1e-9 {
+				t.Fatalf("%s shot %d = skill %q scale %v, want %q ×%v", tc.id, i, shot.Skill, shot.DamageScale, tc.id, tc.scale)
+			}
 		}
 	}
 }

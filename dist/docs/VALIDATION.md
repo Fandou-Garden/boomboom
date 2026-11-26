@@ -58,7 +58,7 @@ MOBILE ADAPTATION PASS
 | 倒计时 | 默认关闭；开启 1 s 后只显示秒数，`playerShots` 不变 |
 | 不可达角度 | 15° 顺风远距离：`reachable=false`，显示“推荐 — / 调角”，角度仍为 15°，不发射 |
 | POW | 能量未满时 disabled；点击只选中，`phase=player`、炮弹数不变 |
-| 散弹 | 5 枚全部 `resolved && !alive` 后回合才从 0 变 1，电脑此前 0 发 |
+| 三向散射 | 3 枚全部 `resolved && !alive` 后回合才从 0 变 1，电脑此前 0 发 |
 | 玩家记录 | 电脑完整出手后，上一发站位/落点仍为玩家数据 |
 | 落点标记 | 相机拖动后仍与地形世界坐标投影一致（< 1.5 px） |
 
@@ -89,12 +89,15 @@ MOBILE ADAPTATION PASS
 - 开炮后：必须是 `SHOT` 帧（`22/23/26/27`），且 `weaponVisible=true`。
 
 帧序来自 `GameCharacter.as`；武器显隐与 `body → weaponMovie` 层级来自 `GamePlayer.as`。
-开炮动画固定 0.28 s，一次齐射（附加攻击/散弹）只触发一轮，不按炮弹数重复抬手。
+开炮动画固定 0.28 s，一次齐射（多发战斗道具）只触发一轮，不按炮弹数重复抬手。
 
 流畅度方面：服务器快照 25 Hz，前端用本地 `visualTime` 驱动动画，角色位置按
 `tau=22 ms` 指数平滑，炮弹用 `x+v·t+½a·t²` 外推（上限 60 ms）。小地图限制在约 30 Hz，
 天空渐变按高度缓存，不再每帧分配；开炮前选择的武器会短暂锁定，避免飞行中的旧快照把 HUD
-回退到默认武器。本机 headless Chromium 启用 GPU 时实测约 120 fps；触摸设备/小窗口将
+回退到默认武器。技能按钮和风力条只查询一次 DOM，技能状态变化才写 `disabled/class`；
+推荐力度常态按 2% 扫描，整段无命中时才回退到 1%，避免每次调角都同步模拟 100 条弹道；
+帮助/武器/竖屏遮罩打开时，画布与 HUD 重绘降到约 10 Hz，避免 `backdrop-filter` 下继续
+满帧绘制战场。本机 headless Chromium 启用 GPU 时实测约 120 fps；触摸设备/小窗口将
 画布 backing store 限制在 1.5× DPR。挖坑后服务端会重算角色所在列的真实地表高度并立即
 刷新支撑点，回归测试 `TestCraterReseatsActorAndWalkStaysOnSurface` 已覆盖角色不陷入弹坑、
 行走时脚底贴合地形。

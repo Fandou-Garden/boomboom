@@ -10,10 +10,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="风场弹道">
   <title>风场弹道 · Gunny Wind Arena</title>
-  <link rel="icon" href="assets/favicon.svg?v=16" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=16">
-  <link rel="manifest" href="manifest.webmanifest?v=16">
-  <link rel="stylesheet" href="styles.css?v=16">
+  <link rel="icon" href="assets/favicon.svg?v=17" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=17">
+  <link rel="manifest" href="manifest.webmanifest?v=17">
+  <link rel="stylesheet" href="styles.css?v=17">
 </head>
 <body>
   <div id="app" class="app">
@@ -22,7 +22,7 @@
     <header id="topbar" class="topbar">
       <section class="battle-hud" aria-label="双方状态与风力">
         <article class="combatant player-card" aria-label="玩家状态">
-          <span class="portrait"><img src="assets/portrait-player.png?v=16" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-player.png?v=17" alt=""></span>
           <div class="combatant-copy">
             <div class="name-row"><span class="team-dot"></span><strong>蓝波</strong><span class="role">你</span></div>
             <div class="hp-track"><i id="hpBar0"></i></div>
@@ -48,7 +48,7 @@
             <div class="hp-track"><i id="hpBar1"></i></div>
             <div class="hp-number" id="hp1">2000</div>
           </div>
-          <span class="portrait"><img src="assets/portrait-enemy.png?v=16" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-enemy.png?v=17" alt=""></span>
         </article>
       </section>
 
@@ -153,45 +153,45 @@
       </section>
 
       <section class="skill-rail" aria-label="战斗道具栏 1 到 8">
-        <button id="skillExtra2" class="skill-button attack-skill" type="button" data-skill="extra2" data-kind="attack" aria-label="1 附加攻击2次：主炮后额外追加2发，共3发" aria-keyshortcuts="1">
+        <button id="skillExtra2" class="skill-button attack-skill" type="button" data-skill="extra2" data-kind="attack" aria-label="1 攻击+2：原版 10001，共3发，每发伤害60%" aria-keyshortcuts="1">
           <kbd class="skill-key" aria-hidden="true">1</kbd>
-          <svg class="skill-icon icon-flame" viewBox="0 0 32 32" aria-hidden="true"><path d="M17.4 2.8c.9 5.6-4.1 7.1-4.1 12.1 0 2.1 1.5 3.6 3.4 3.6 2.2 0 3.7-1.8 3.3-4.3 3.6 2.4 5.8 5.7 5.8 9.2A9.8 9.8 0 0 1 16 29.2a9.8 9.8 0 0 1-9.8-9.8c0-6.7 5.4-10.2 11.2-16.6Z"/></svg>
-          <span class="skill-copy">附加×2</span><b class="skill-badge" id="skillExtra2Count">3</b>
+          <svg class="skill-icon icon-double-bolt" viewBox="0 0 32 32" aria-hidden="true"><path d="M14.2 2 5.6 17.2h6.1L9.4 30l9.4-15.4h-6.2L14.2 2Z"/><path d="M26.8 2 18.2 17.2h6.1L20.6 30l9.4-15.4h-6.2L26.8 2Z"/></svg>
+          <span class="skill-copy">攻击</span><b class="skill-badge" id="skillExtra2Count">+2</b>
         </button>
-        <button id="skillScatter" class="skill-button attack-skill" type="button" data-skill="scatter" data-kind="attack" aria-label="2 散弹：五枚宽角炮弹覆盖落点" aria-keyshortcuts="2">
+        <button id="skillScatter" class="skill-button attack-skill" type="button" data-skill="scatter" data-kind="attack" aria-label="2 三向散射：原版 10003，0°、-5°、+5°各一发，每发伤害50%" aria-keyshortcuts="2">
           <kbd class="skill-key" aria-hidden="true">2</kbd>
-          <svg class="skill-icon icon-splash" viewBox="0 0 32 32" aria-hidden="true"><path d="M17 3.2c4.1 5.6 7.6 8.8 7.6 13.8a8.6 8.6 0 1 1-17.2 0C7.4 12 10.8 8.8 17 3.2Z"/><circle cx="8.2" cy="8.4" r="2.1"/><circle cx="24.8" cy="10.4" r="1.6"/><circle cx="6.2" cy="17" r="1.2"/></svg>
-          <span class="skill-copy">散弹</span><b class="skill-badge" id="skillScatterCount">5</b>
+          <svg class="skill-icon icon-trispark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 28 6 12M16 28V4M16 28l10-16"/><path d="m3 16 3-4 4 3M13 8V4h6v4M22 12l4 3 3-4"/></svg>
+          <span class="skill-copy">三向</span><b class="skill-badge" id="skillScatterCount">×3</b>
         </button>
-        <button id="skillExtra1" class="skill-button attack-skill" type="button" data-skill="extra1" data-kind="attack" aria-label="3 附加攻击1次：主炮后额外追加1发，共2发" aria-keyshortcuts="3">
+        <button id="skillExtra1" class="skill-button attack-skill" type="button" data-skill="extra1" data-kind="attack" aria-label="3 攻击+1：原版 10002，共2发，每发伤害90%" aria-keyshortcuts="3">
           <kbd class="skill-key" aria-hidden="true">3</kbd>
-          <svg class="skill-icon icon-bolt" viewBox="0 0 32 32" aria-hidden="true"><path d="M18.4 2 6.8 18.2h7.3L12 30l12-17h-7.2L18.4 2Z"/></svg>
-          <span class="skill-copy">附加×1</span><b class="skill-badge" id="skillExtra1Count">2</b>
+          <svg class="skill-icon icon-single-bolt" viewBox="0 0 32 32" aria-hidden="true"><path d="M18.8 2 6.6 18.4h7.2L12.4 30l12.2-16.6h-7.2L18.8 2Z"/></svg>
+          <span class="skill-copy">攻击</span><b class="skill-badge" id="skillExtra1Count">+1</b>
         </button>
-        <button id="skillBoost50" class="skill-button boost-skill" type="button" data-skill="boost50" data-kind="boost" aria-label="4 伤害增幅50%" aria-keyshortcuts="4">
+        <button id="skillBoost50" class="skill-button boost-skill" type="button" data-skill="boost50" data-kind="boost" aria-label="4 伤害增幅50%，原版 10004，可与其他增幅叠加" aria-keyshortcuts="4">
           <kbd class="skill-key" aria-hidden="true">4</kbd>
-          <svg class="skill-icon icon-cloud" viewBox="0 0 32 32" aria-hidden="true"><path d="M9.4 26.2h14.7a5.4 5.4 0 0 0 .5-10.8 8.7 8.7 0 0 0-16.6-1.1 6.1 6.1 0 0 0 1.4 11.9Z"/></svg>
-          <span class="skill-copy">增幅</span><b class="skill-badge" id="skillBoost50Count">50</b>
+          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.6 29 16h-7.2v10.2H10.2V16H3L16 2.6Z"/><path d="M6.5 29.4h19"/></svg>
+          <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost50Count">50%</b>
         </button>
-        <button id="skillBoost40" class="skill-button boost-skill" type="button" data-skill="boost40" data-kind="boost" aria-label="5 伤害增幅40%" aria-keyshortcuts="5">
+        <button id="skillBoost40" class="skill-button boost-skill" type="button" data-skill="boost40" data-kind="boost" aria-label="5 伤害增幅40%，原版 10005，可与其他增幅叠加" aria-keyshortcuts="5">
           <kbd class="skill-key" aria-hidden="true">5</kbd>
-          <svg class="skill-icon icon-cloud" viewBox="0 0 32 32" aria-hidden="true"><path d="M9.4 26.2h14.7a5.4 5.4 0 0 0 .5-10.8 8.7 8.7 0 0 0-16.6-1.1 6.1 6.1 0 0 0 1.4 11.9Z"/></svg>
-          <span class="skill-copy">增幅</span><b class="skill-badge" id="skillBoost40Count">40</b>
+          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.6 29 16h-7.2v10.2H10.2V16H3L16 2.6Z"/><path d="M6.5 29.4h19"/></svg>
+          <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost40Count">40%</b>
         </button>
-        <button id="skillBoost30" class="skill-button boost-skill" type="button" data-skill="boost30" data-kind="boost" aria-label="6 伤害增幅30%" aria-keyshortcuts="6">
+        <button id="skillBoost30" class="skill-button boost-skill" type="button" data-skill="boost30" data-kind="boost" aria-label="6 伤害增幅30%，原版 10006，可与其他增幅叠加" aria-keyshortcuts="6">
           <kbd class="skill-key" aria-hidden="true">6</kbd>
-          <svg class="skill-icon icon-cloud" viewBox="0 0 32 32" aria-hidden="true"><path d="M9.4 26.2h14.7a5.4 5.4 0 0 0 .5-10.8 8.7 8.7 0 0 0-16.6-1.1 6.1 6.1 0 0 0 1.4 11.9Z"/></svg>
-          <span class="skill-copy">增幅</span><b class="skill-badge" id="skillBoost30Count">30</b>
+          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.6 29 16h-7.2v10.2H10.2V16H3L16 2.6Z"/><path d="M6.5 29.4h19"/></svg>
+          <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost30Count">30%</b>
         </button>
-        <button id="skillBoost20" class="skill-button boost-skill" type="button" data-skill="boost20" data-kind="boost" aria-label="7 伤害增幅20%" aria-keyshortcuts="7">
+        <button id="skillBoost20" class="skill-button boost-skill" type="button" data-skill="boost20" data-kind="boost" aria-label="7 伤害增幅20%，原版 10007，可与其他增幅叠加" aria-keyshortcuts="7">
           <kbd class="skill-key" aria-hidden="true">7</kbd>
-          <svg class="skill-icon icon-cloud" viewBox="0 0 32 32" aria-hidden="true"><path d="M9.4 26.2h14.7a5.4 5.4 0 0 0 .5-10.8 8.7 8.7 0 0 0-16.6-1.1 6.1 6.1 0 0 0 1.4 11.9Z"/></svg>
-          <span class="skill-copy">增幅</span><b class="skill-badge" id="skillBoost20Count">20</b>
+          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.6 29 16h-7.2v10.2H10.2V16H3L16 2.6Z"/><path d="M6.5 29.4h19"/></svg>
+          <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost20Count">20%</b>
         </button>
-        <button id="skillBoost10" class="skill-button boost-skill" type="button" data-skill="boost10" data-kind="boost" aria-label="8 伤害增幅10%" aria-keyshortcuts="8">
+        <button id="skillBoost10" class="skill-button boost-skill" type="button" data-skill="boost10" data-kind="boost" aria-label="8 伤害增幅10%，原版 10008，可与其他增幅叠加" aria-keyshortcuts="8">
           <kbd class="skill-key" aria-hidden="true">8</kbd>
-          <svg class="skill-icon icon-cloud" viewBox="0 0 32 32" aria-hidden="true"><path d="M9.4 26.2h14.7a5.4 5.4 0 0 0 .5-10.8 8.7 8.7 0 0 0-16.6-1.1 6.1 6.1 0 0 0 1.4 11.9Z"/></svg>
-          <span class="skill-copy">增幅</span><b class="skill-badge" id="skillBoost10Count">10</b>
+          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.6 29 16h-7.2v10.2H10.2V16H3L16 2.6Z"/><path d="M6.5 29.4h19"/></svg>
+          <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost10Count">10%</b>
         </button>
       </section>
 
@@ -279,7 +279,7 @@
         preload.rel = 'preload';
         preload.as = 'fetch';
         preload.type = 'application/wasm';
-        preload.href = 'wasm/gunny.wasm?v=16';
+        preload.href = 'wasm/gunny.wasm?v=17';
         document.head.appendChild(preload);
         const loadScript = (src) => new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -289,14 +289,14 @@
           document.head.appendChild(script);
         });
         try {
-          await loadScript('wasm/wasm_exec.js?v=16');
-          await loadScript('offline-api.js?v=16');
+          await loadScript('wasm/wasm_exec.js?v=17');
+          await loadScript('offline-api.js?v=17');
         } catch (error) {
           console.error('离线引擎加载失败', error);
         }
       }
       try {
-        await import('./js/main.js?v=16');
+        await import('./js/main.js?v=17');
       } catch (error) {
         console.error('前端入口加载失败', error);
         const fatal = document.getElementById('fatal');

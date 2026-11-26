@@ -482,17 +482,17 @@ async function runScatter(browser) {
   await page.evaluate((plan) => window.__GUNNY_TEST__.firePlayer(plan.angle, plan.force), plan);
   const flight = await state(page);
   assert.equal(flight.snapshot.phase, 'flight');
-  assert.equal(flight.snapshot.shots.length, 5, 'scatter must launch five shells');
+  assert.equal(flight.snapshot.shots.length, 3, 'scatter must launch three shells');
   await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().phase === 'resolve', { timeout: 15000 });
   const resolving = await state(page);
   assert.equal(resolving.snapshot.turn, 0, 'turn must not pass before shells resolve');
   assert.equal(resolving.snapshot.stats.enemyShots, 0, 'AI must not fire before scatter resolves');
-  assert.ok(resolving.snapshot.stats.playerShots === 5);
+  assert.ok(resolving.snapshot.stats.playerShots === 3);
   assert.equal(resolving.snapshot.shots.every((shot) => shot.resolved && !shot.alive), true, 'every scatter shell must resolve first');
   await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().turn === 1, { timeout: 10000 });
   const handed = await state(page);
   assert.equal(handed.snapshot.shots.every((shot) => shot.resolved && !shot.alive), true);
-  assert.equal(handed.snapshot.stats.playerShots, 5);
+  assert.equal(handed.snapshot.stats.playerShots, 3);
   assert.equal(logs.filter((line) => !line.includes('favicon')).length, 0);
   await page.close();
   return {
