@@ -93,6 +93,15 @@ class SoundEngine {
     this.buffers = new Map();
     this.sampleLoading = null;
     this.sampleError = '';
+    // BGM: original map-1001 theme (Tank.Flash/resource/v1.1/sound/1001.flv,
+    // LoadMapsItems.xml BackMusic="1001"), transcoded to loopable mp3.
+    this.bgmUrl = 'assets/audio/bgm-map1001.mp3';
+    this.bgmBuffer = null;
+    this.bgmGain = null;
+    this.bgmSource = null;
+    this.bgmLoading = null;
+    this.bgmVolume = 0.22;
+    this.bgmWanted = false;
     // Original IDs extracted from flash/audio.swf; see docs/AUDIO_MAPPING.md.
     // Fire/explosion are per weapon: BallList.xml ShootSound/BombSound of the
     // Common ball referenced by BombConfig.xml.
@@ -152,6 +161,8 @@ class SoundEngine {
     if (this.userMuted) return false;
     if (this.enabled && this.ctx) {
       this.loadSamples();
+      this.bgmWanted = true;
+      this.startBgm();
       return true;
     }
     try {
@@ -162,6 +173,8 @@ class SoundEngine {
       this.enabled = true;
       if (this.ctx.state === 'suspended') await this.ctx.resume();
       this.loadSamples();
+      this.bgmWanted = true;
+      this.startBgm();
       return true;
     } catch {
       this.enabled = false;
@@ -200,6 +213,72 @@ class SoundEngine {
     return this.sampleLoading;
   }
 
+  /** Decode the looping BGM once. Independent of the one-shot SFX buffers. */
+  async loadBgm() {
+    if (this.bgmLoading) return this.bgmLoading;
+    if (!this.ctx) return null;
+    this.bgmLoading = (async () => {
+      try {
+        const response = await fetch(this.bgmUrl, { cache: 'force-cache' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.arrayBuffer();
+        this.bgmBuffer = await new Promise((resolve, reject) => {
+          this.ctx.decodeAudioData(data, resolve, reject);
+        });
+        return this.bgmBuffer;
+      } catch {
+        return null;
+      }
+    })();
+    return this.bgmLoading;
+  }
+
+  /** Start (or resume) the background music loop. Safe before user gesture. */
+  async startBgm() {
+    this.bgmWanted = true;
+    if (!this.enabled || !this.ctx) return false;
+    if (!this.bgmBuffer) await this.loadBgm();
+    if (!this.bgmBuffer) return false;
+    if (this.bgmSource) {
+      // Already playing (or scheduled); just make sure gain is up.
+      this._fadeBgm(this.bgmVolume);
+      return true;
+    }
+    if (!this._ensureGraph()) return false;
+    this.bgmGain = this.ctx.createGain();
+    this.bgmGain.gain.value = 0.0001;
+    this.bgmGain.connect(this.master);
+    const source = this.ctx.createBufferSource();
+    source.buffer = this.bgmBuffer;
+    source.loop = true;
+    source.connect(this.bgmGain);
+    source.start();
+    this.bgmSource = source;
+    this._fadeBgm(this.bgmVolume);
+    return true;
+  }
+
+  /** Smoothly ramp the BGM gain (avoids clicks on start/stop/mute). */
+  _fadeBgm(target, seconds = 0.6) {
+    if (!this.bgmGain || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    const g = this.bgmGain.gain;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(Math.max(0.0001, g.value), now);
+    g.linearRampToValueAtTime(Math.max(0.0001, target), now + seconds);
+  }
+
+  /** Stop the BGM loop (used on mute). */
+  stopBgm() {
+    this.bgmWanted = false;
+    if (!this.bgmSource) return;
+    this._fadeBgm(0.0001, 0.25);
+    const source = this.bgmSource;
+    this.bgmSource = null;
+    const stopAt = this.ctx ? this.ctx.currentTime + 0.3 : 0;
+    try { source.stop(stopAt); } catch { /* already stopped */ }
+  }
+
   async ready() {
     if (!this.sampleLoading) await this.unlock();
     return this.sampleLoading ? this.sampleLoading : 0;
@@ -208,10 +287,13 @@ class SoundEngine {
   async setEnabled(enabled) {
     this.userMuted = !enabled;
     if (!enabled) {
+      this.stopBgm();
       this.enabled = false;
       return false;
     }
-    return this.unlock();
+    const ok = await this.unlock();
+    if (ok && this.bgmWanted) await this.startBgm();
+    return ok;
   }
 
   tone(frequency, duration, type = 'sine', volume = 0.045, endFrequency = null, delay = 0) {
@@ -335,6 +417,7 @@ class SoundEngine {
       enabled: this.enabled,
       userMuted: this.userMuted,
       state: this.ctx?.state ?? 'none',
+      bgm: { wanted: this.bgmWanted, playing: !!this.bgmSource, loaded: !!this.bgmBuffer, volume: this.bgmVolume },
       samples: [...this.buffers.keys()],
       sampleError: this.sampleError,
       events: this.events.map((event) => ({ ...event })),
@@ -1762,7 +1845,7 @@ async function boot() {
       4: { shape: 'assets/crater-4.png', brink: 'assets/craterbrink-4.png' },
     };
     const weaponIds = ['fire', 'cannon', 'fruit', 'appliance', 'wind'];
-    const [back, playerSheet, enemySheet, shell, loadedTerrain, weaponImages, projectileImages] = await Promise.all([
+    const [back, playerSheet, enemySheet, shell, loadedTerrain, weaponImages, projectileImages, fruitPowImage] = await Promise.all([
       loadImage('assets/map-1001-back.jpg'),
       loadImage('assets/character-player-sheet.png'),
       loadImage('assets/character-enemy-sheet.png'),
@@ -1773,7 +1856,11 @@ async function boot() {
       }),
       Promise.all(weaponIds.map(async (id) => [id, await loadImage(`assets/weapon-${id}.png`)])).then(Object.fromEntries),
       Promise.all(weaponIds.map(async (id) => [id, await loadImage(`assets/projectile-${id}.png`)])).then(Object.fromEntries),
+      loadImage('assets/projectile-fruit-pow.png'),
     ]);
+    // POW ammo visual: original durian item art replaces the tomato on a
+    // fruit-basket POWER shot (browser-only, see README).
+    projectileImages['fruit-pow'] = fruitPowImage;
     terrain = loadedTerrain;
     renderer = new Renderer({
       canvas: els.canvas,

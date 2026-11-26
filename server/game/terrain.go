@@ -222,7 +222,9 @@ func (t *Terrain) Carve(cx, cy int, artID, kind string) (removed int, bounds [4]
 	any := false
 	for ay := 0; ay < art.H; ay++ {
 		wy := y0 + ay
-		if wy < 0 || wy >= t.Height {
+		// Keep the source bedrock floor intact: craters may never dig into
+		// the fully-solid base rows at y >= BedrockY.
+		if wy < 0 || wy >= t.Height || wy >= BedrockY {
 			continue
 		}
 		row := wy * t.Width

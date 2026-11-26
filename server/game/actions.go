@@ -336,7 +336,7 @@ func (m *Match) beginTurnLocked(index int, rollWind bool) {
 		m.Actors[0].Facing = -1
 		m.Actors[1].Facing = 1
 	}
-	if rollWind {
+	if rollWind && !FixedWind {
 		m.Wind, m.WindTarget = NextWind(m.Wind, m.WindTarget, m.RNG)
 		m.EmitLocked("wind", map[string]any{"wind": m.Wind, "label": m.WindLabelLocked()})
 	}

@@ -25,6 +25,12 @@ const (
 	SpawnProbeY         = 700
 	PixelsPerMetre      = 20
 
+	// SOURCE: fore.map rows y>=1282 are a fully-solid 143-row bedrock base.
+	// Craters are small enough in the original game that they never reach it,
+	// so this floor survives every blast. PORT: enforce it explicitly so a
+	// deep or stacked crater cannot dig through the arena floor.
+	BedrockY = 1282
+
 	// SOURCE: SimpleBomb.StartMoving advances in 0.04 s steps.
 	PhysicsDT = 0.04
 
@@ -106,6 +112,12 @@ const (
 	CountdownSeconds  = 30.0
 	MaxFlightSeconds  = 14.0
 
+	// NEW (browser request): keep the wind constant for the whole duel so the
+	// same angle + force always produces the same trajectory. The original
+	// GetNextWind roll is retained in physics.go but is no longer applied each
+	// turn. Set false to restore the original per-turn wind behaviour.
+	FixedWind = true
+
 	// PORT: source weapon grip / muzzle geometry measured from bazooka3.
 	WeaponGripX        = 19.0
 	WeaponGripY        = -31.0
@@ -161,15 +173,15 @@ var WeaponOrder = []string{"fire", "cannon", "fruit", "appliance", "wind"}
 
 var WeaponDefs = map[string]WeaponDef{
 	"fire": {
-		ID: "fire", Label: "烈火", Trait: "中角 · 高攻爆发", Source: "Template 7006/7103 · Pic bombpack · Ball 161",
+		ID: "fire", Label: "烈火", Trait: "中角 · 高攻爆发", Source: "Template 7006/7103 · Pic bombpack · Ball 161 · Crater 161",
 		Pic: "bombpack", BallID: "161", Projectile: "fire",
-		AngleMin: 20, AngleMax: 50, StartAngle: 35, CraterArt: "4",
+		AngleMin: 20, AngleMax: 50, StartAngle: 35, CraterArt: "401",
 		WeaponSprite: "weapon-fire",
 	},
 	"cannon": {
-		ID: "cannon", Label: "轰天", Trait: "高角 · 重炮挖坑", Source: "Template 7007/7104 · Pic bomb · Ball 101",
+		ID: "cannon", Label: "轰天", Trait: "高角 · 重炮挖坑", Source: "Template 7007/7104 · Pic bomb · Ball 101 · Crater 101",
 		Pic: "bomb", BallID: "101", Projectile: "cannon",
-		AngleMin: 55, AngleMax: 70, StartAngle: 65, CraterArt: "4",
+		AngleMin: 55, AngleMax: 70, StartAngle: 65, CraterArt: "401",
 		WeaponSprite: "weapon-cannon",
 	},
 	"fruit": {
