@@ -23,7 +23,7 @@ type app struct {
 func main() {
 	addr := flag.String("addr", ":8000", "HTTP listen address")
 	root := flag.String("root", "./dist", "static web root (contains index.html)")
-	mapPath := flag.String("map", "./reference/map/1001/fore.map", "original fore.map collision bitmap")
+	mapPath := flag.String("map", "./reference/map/1156/fore.map", "original fore.map collision bitmap")
 	assets := flag.String("assets", "./dist/assets", "directory containing crater-*.png")
 	seed := flag.Int64("seed", time.Now().UnixNano(), "RNG seed for wind and AI")
 	lowPower := flag.Bool("low-power", false, "reduce AI search cost")

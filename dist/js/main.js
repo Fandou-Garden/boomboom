@@ -1,4 +1,4 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW } from './config.js?v=18';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=18';
 import { loadImage, Terrain } from './terrain.js?v=18';
 import { RemoteMatch } from './net-client.js?v=18';
 import { Renderer } from './renderer.js?v=18';
@@ -16,6 +16,7 @@ const els = {
   hp0: $('hp0'), hp1: $('hp1'), hpBar0: $('hpBar0'), hpBar1: $('hpBar1'),
   playerCard: document.querySelector('.player-card'), enemyCard: document.querySelector('.enemy-card'),
   round: $('round'), turn: $('turn'), countdown: $('countdown'),
+  buildVersion: $('buildVersion'),
   windArrow: $('windArrow'), windValue: $('windValue'), windDir: $('windDir'), windBars: $('windBars'),
   minimap: $('minimap'), minimapWrap: $('minimapWrap'), minimapDistance: $('minimapDistance'),
   recenter: $('recenter'), elevationNote: $('elevationNote'), lastShot: $('lastShot'),
@@ -45,6 +46,7 @@ const els = {
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const params = new URLSearchParams(location.search);
 const isTest = params.get('test') === '1';
+const isCheat = params.get('cheat') === '1';
 const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -129,17 +131,25 @@ class SoundEngine {
       lose: '064',
     };
     this.fireSamples = {
-      fire: '025', cannon: '023', fruit: '114', appliance: '110', wind: '029',
+      axe: '033', bow: '021', gun: '031', goldgun: '031', fire: '025',
+      cannon: '023', wind: '029', thunder: '035', brick: '116', fruit: '114',
+      scalpel: '111', toilet: '115', appliance: '110',
     };
     this.boomSamples = {
-      fire: '087', cannon: '087', fruit: '102', appliance: '100', wind: '089',
+      axe: '095', bow: '094', gun: '087', goldgun: '087', fire: '087',
+      cannon: '087', wind: '089', thunder: '091', brick: '107', fruit: '102',
+      scalpel: '103', toilet: '106', appliance: '100',
     };
     this.sampleFiles = {
       '008': 'assets/audio/sound-008-ui.mp3',
       '016': 'assets/audio/sound-016-turn-self.mp3',
+      '021': 'assets/audio/sound-021-fire-bow.mp3',
       '023': 'assets/audio/sound-023-fire-cannon.mp3',
       '025': 'assets/audio/sound-025-fire-flame.mp3',
       '029': 'assets/audio/sound-029-fire-wind.mp3',
+      '031': 'assets/audio/sound-031-fire-gun.mp3',
+      '033': 'assets/audio/sound-033-fire-axe.mp3',
+      '035': 'assets/audio/sound-035-fire-thunder.mp3',
       '038': 'assets/audio/sound-038-turn-enemy.mp3',
       '039': 'assets/audio/sound-039-item.mp3',
       '042': 'assets/audio/sound-042-death.mp3',
@@ -147,10 +157,19 @@ class SoundEngine {
       '064': 'assets/audio/sound-064-lose.mp3',
       '087': 'assets/audio/sound-087-boom-flame.mp3',
       '089': 'assets/audio/sound-089-boom-wind.mp3',
+      '091': 'assets/audio/sound-091-boom-thunder.mp3',
+      '094': 'assets/audio/sound-094-boom-bow.mp3',
+      '095': 'assets/audio/sound-095-boom-axe.mp3',
       '100': 'assets/audio/sound-100-boom-appliance.mp3',
       '102': 'assets/audio/sound-102-boom-fruit.mp3',
+      '103': 'assets/audio/sound-103-boom-scalpel.mp3',
+      '106': 'assets/audio/sound-106-boom-toilet.mp3',
+      '107': 'assets/audio/sound-107-boom-brick.mp3',
       '110': 'assets/audio/sound-110-fire-appliance.mp3',
+      '111': 'assets/audio/sound-111-fire-scalpel.mp3',
       '114': 'assets/audio/sound-114-fire-fruit.mp3',
+      '115': 'assets/audio/sound-115-fire-toilet.mp3',
+      '116': 'assets/audio/sound-116-fire-brick.mp3',
     };
   }
 
@@ -995,11 +1014,11 @@ function openHelp() {
     <dl class="help-grid">
       <dt>镜头</dt><dd>瞄准时用同一比例缩放把双方装进画面，角色与脚下地形位于中下部，上方保留抛射空间。左上小地图显示双方和镜头框；拖动小地图只移动镜头，点“回战场”立即回到自动构图。距离过大时以小地图辅助，不挪近出生点。</dd>
       <dt>飞行</dt><dd>炮弹出手后镜头跟随炮弹，允许飞入天空，双方可能暂时离屏。小地图、风向、力度尺、转盘、技能和发射键始终固定在屏幕原位；飞行中不能再次发射。最后一发爆炸并结算后，镜头平滑回到下一回合双方视角，不会在飞行中反复缩放。</dd>
-      <dt>移动</dt><dd>按住左下转盘左右键，或键盘 A / D、← / →。角色在 ${WORLD.width} px 世界地图上真实行走；本版本体力无限，移动不会耗尽体力。陡坎会挡住，脚下被炸空会受重力下落。</dd>
+      <dt>移动</dt><dd>按住左下转盘左右键，或键盘 A / D、← / →。角色在 ${WORLD.width} px 的亚特兰蒂斯地图上真实行走；本版本体力无限，移动不会耗尽体力。陡坎会挡住，脚下被炸空会受重力下落。</dd>
       <dt>角度</dt><dd>按住转盘上下键，或 W / S、↑ / ↓；桌面也可在中心角度数字上上下拖动。当前武器 <strong>${weaponLabel}</strong> 的范围是 ${weaponRange}。角色旁只显示一小段方向虚线与角度扇形，不预测整条弹道。</dd>
       <dt>力度</dt><dd>按住右下蓝色主键或空格蓄力，松手发射。力度从 5% 连续升到 100% 后立即回弹，不自动开炮；松手那一帧的实际力度就是出手力度。底部细尺显示当前值、蓝色实测推荐三角和白色上一发竖线；连续可命中时另显示蓝色区间。推荐值按当前角度、当前技能、POW 和同一套风力/碰撞逻辑逐发复算，打不到时只提示调角，不会自动调角或发射。</dd>
       <dt>战斗道具</dt><dd>右侧 1–8 格对应原版 10001–10008：<strong>1 攻击 +2</strong>（同轨迹连续 3 发，每发伤害 60%）、<strong>2 三向散射</strong>（0°、-5°、+5° 同时各一发，每发伤害 50%）、<strong>3 攻击 +1</strong>（同轨迹连续 2 发，每发伤害 90%）、<strong>4–8 伤害增幅 50/40/30/20/10%</strong>。攻击格与增幅格可以同时选择，增幅可叠加；每格每回合 1 次。选中后仍由蓝色主键或空格发射。治疗移到顶部心形按钮，快捷键 H，恢复 ${BATTLE.healAmount} 点并消耗本回合。</dd>
-      <dt>武器</dt><dd>开局可在烈火、轰天、水果篮、黑白家电、风神之间切换；第一发炮弹出手后锁定，重开后可再选。五种武器的角度、武器外观与飞行炮弹均按原版 XML/SWF 对应资源接入。</dd>
+      <dt>武器</dt><dd>开局可在石斧、弓箭、AK-48、黄金枪、烈火、轰天、风神、雷霆、司马砸缸、水果篮、手术刀、马桶、黑白家电之间切换；第一发炮弹出手后锁定，重开后可再选。十三种武器的角度、武器外观与飞行炮弹均按原版 XML/SWF 对应资源接入。</dd>
       <dt>POW</dt><dd>POW 对应 R 键，也只负责选择（再按一次取消），不会自动开炮。能量满 ${BATTLE.energyMax}% 才亮；不足时按 R 会提示能量不足并保留当前技能。选中后蓝色主键发射，伤害、爆炸半径与弹坑更大。</dd>
       <dt>标记</dt><dd>你出手后，地图上以世界坐标标出上一发的站位“起”和实际落点“落”；镜头移动不会让标记漂移。电脑的落点不会覆盖你的记录。</dd>
       <dt>倒计时</dt><dd>右上时钟按钮可开启练习计时；默认关闭，单机练习不会催你。计时只显示，不自动出手。</dd>
@@ -1008,7 +1027,7 @@ function openHelp() {
     </dl>
     <p><strong>物理来源：</strong> 重力、空气阻力与风力来自 <code>BombObject.UpdateAGW()</code> 与 <code>EulerVector.ComputeOneEulerStep()</code>；开炮速度使用 <code>Living.ShootImp()</code>；风每回合按 <code>BaseGame.GetNextWind()</code> 变化。</p>
     <p><strong>音效来源：</strong> 原版 <code>SoundManager.as</code> 的 SoundID 经 <code>audio.swf</code> 离线解码为 MP3，不运行 Flash；触发点按 <code>ShootBombAction.executeImp()</code>、<code>SimpleBomb.bomb()</code>、<code>doUseItemAnimation()</code> 与 <code>die()</code> 对齐。</p>
-    <p class="source-note">原仓库：<a href="${SOURCE_REPO}" target="_blank" rel="noopener">github.com/phucdz2kk4/Gunny</a> · 提交 <code>${SOURCE_COMMIT.slice(0, 7)}</code><br>地图 1001、地图距离、角色素材与单机规则保持不变；手机 HUD、双方广角构图、多弹技能、推荐力度与音效为网页新增实现。</p>
+    <p class="source-note">原仓库：<a href="${SOURCE_REPO}" target="_blank" rel="noopener">github.com/phucdz2kk4/Gunny</a> · 提交 <code>${SOURCE_COMMIT.slice(0, 7)}</code><br>地图 1156（亚特兰蒂斯）、13 件原版经典武器素材、角色素材与单机规则保持不变；手机 HUD、双方广角构图、多弹技能、推荐力度与音效为网页新增实现。</p>
   `;
   els.modalAction.textContent = '回到对战';
   els.modal.hidden = false;
@@ -1917,22 +1936,131 @@ function exposeTestApi() {
   };
 }
 
+
+/**
+ * Opt-in cheat dashboard (?cheat=1).
+ * It only appears behind an explicit query flag and uses the existing debug
+ * energy command. Static WASM is the intended target; HTTP needs -debug.
+ */
+function setupCheatPanel() {
+  if (document.getElementById('cheatDock')) return;
+  const style = document.createElement('style');
+  style.id = 'cheatStyles';
+  style.textContent = `
+    .cheat-dock { position: fixed; right: 10px; top: 64px; z-index: 90; font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .cheat-toggle { display: block; margin-left: auto; padding: 6px 10px; border: 1px solid rgba(79,209,255,.55); border-radius: 8px; background: rgba(5,25,38,.92); color: #9fe9ff; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.35); }
+    .cheat-panel { width: 226px; margin-top: 6px; padding: 10px; border: 1px solid rgba(79,209,255,.45); border-radius: 10px; background: rgba(4,20,30,.96); color: #eaf6ff; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+    .cheat-panel[hidden] { display: none; }
+    .cheat-panel header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; color: #9fe9ff; }
+    .cheat-panel header button { border: 0; background: transparent; color: #9fc7d6; font-size: 16px; line-height: 1; cursor: pointer; }
+    .cheat-line { display: flex; justify-content: space-between; gap: 8px; margin: 5px 0; }
+    .cheat-line b { color: #ffd36a; font-weight: 600; }
+    .cheat-panel .cheat-action { display: block; width: 100%; margin-top: 8px; padding: 8px; border: 1px solid rgba(79,209,255,.45); border-radius: 7px; background: #15506a; color: #fff; cursor: pointer; }
+    .cheat-panel .cheat-action.secondary { background: transparent; color: #9fc7d6; }
+    .cheat-panel .cheat-action:disabled { opacity: .45; cursor: not-allowed; }
+    .cheat-status { margin: 8px 0 0; color: #9fc7d6; font-size: 11px; line-height: 1.45; }
+    @media (max-width: 700px) { .cheat-dock { top: 52px; right: 6px; } .cheat-panel { width: 198px; } }
+  `;
+  document.head.append(style);
+
+  const dock = document.createElement('div');
+  dock.id = 'cheatDock';
+  dock.className = 'cheat-dock';
+  dock.innerHTML = `
+    <button type="button" class="cheat-toggle" data-cheat-toggle aria-expanded="false" aria-controls="cheatPanel">⚡ 外挂看板</button>
+    <section class="cheat-panel" id="cheatPanel" data-cheat-panel hidden aria-label="外挂看板">
+      <header><strong>战斗看板</strong><button type="button" data-cheat-close aria-label="关闭">×</button></header>
+      <div class="cheat-line"><span>能量</span><b data-cheat-energy>0%</b></div>
+      <div class="cheat-line"><span>POW</span><b data-cheat-pow>未选中</b></div>
+      <div class="cheat-line"><span>阶段</span><b data-cheat-phase>—</b></div>
+      <button type="button" class="cheat-action" data-cheat-arm>能量拉满并选中 POW</button>
+      <button type="button" class="cheat-action secondary" data-cheat-cancel>取消 POW</button>
+      <p class="cheat-status" data-cheat-status>仅 ?cheat=1 可见；静态 WASM 可直接使用。</p>
+    </section>
+  `;
+  document.body.append(dock);
+
+  const toggle = dock.querySelector('[data-cheat-toggle]');
+  const panel = dock.querySelector('[data-cheat-panel]');
+  const energyEl = dock.querySelector('[data-cheat-energy]');
+  const powEl = dock.querySelector('[data-cheat-pow]');
+  const phaseEl = dock.querySelector('[data-cheat-phase]');
+  const statusEl = dock.querySelector('[data-cheat-status]');
+  const armBtn = dock.querySelector('[data-cheat-arm]');
+  const cancelBtn = dock.querySelector('[data-cheat-cancel]');
+  let timer = 0;
+
+  function refresh() {
+    if (!game) return;
+    energyEl.textContent = `${Math.round(game.energy)}%`;
+    powEl.textContent = game.powSelected ? '已选中' : '未选中';
+    phaseEl.textContent = game.phase;
+    const canAct = game.phase === 'player' && !game.charging;
+    armBtn.disabled = !canAct;
+    cancelBtn.disabled = !game.powSelected;
+  }
+
+  function setStatus(text) { statusEl.textContent = text; }
+
+  function setOpen(open) {
+    panel.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    if (open) {
+      refresh();
+      if (!timer) timer = window.setInterval(refresh, 250);
+    } else if (timer) {
+      window.clearInterval(timer);
+      timer = 0;
+    }
+  }
+
+  toggle.addEventListener('click', () => setOpen(panel.hidden));
+  dock.querySelector('[data-cheat-close]').addEventListener('click', () => setOpen(false));
+  armBtn.addEventListener('click', () => {
+    if (!game) return;
+    if (game.phase !== 'player' || game.charging) {
+      setStatus('只能在你自己的回合、未蓄力时使用。');
+      refresh();
+      return;
+    }
+    game.setEnergy(BATTLE.energyMax);
+    if (!game.powSelected) game.togglePow();
+    if (window.__GUNNY_BACKEND__ === 'go' && !location.hostname.match(/^(127\.0\.0\.1|localhost)$/)) {
+      setStatus('HTTP 模式需要服务端以 -debug 启动；静态 WASM 不受影响。');
+    } else {
+      setStatus('能量已拉满并选中 POW；现在按住发射键开炮。');
+    }
+    refresh();
+  });
+  cancelBtn.addEventListener('click', () => {
+    if (game?.powSelected) game.togglePow();
+    setStatus('已取消 POW 选中。');
+    refresh();
+  });
+
+  setOpen(false);
+  if (window.__GUNNY_BACKEND__ === 'go') {
+    setStatus('HTTP 模式需要服务端以 -debug 启动；静态 WASM 可直接使用。');
+  }
+}
+
 async function boot() {
   try {
     setViewportVariables();
+    if (els.buildVersion) els.buildVersion.textContent = `v${BUILD_VERSION}`;
     const craterArtUrls = {
       50: { shape: 'assets/crater-50.png', brink: 'assets/craterbrink-50.png' },
       401: { shape: 'assets/crater-401.png', brink: 'assets/craterbrink-401.png' },
       4: { shape: 'assets/crater-4.png', brink: 'assets/craterbrink-4.png' },
     };
-    const weaponIds = ['fire', 'cannon', 'fruit', 'appliance', 'wind'];
+    const weaponIds = ['axe', 'bow', 'gun', 'goldgun', 'fire', 'cannon', 'wind', 'thunder', 'brick', 'fruit', 'scalpel', 'toilet', 'appliance'];
     const [back, playerSheet, enemySheet, shell, loadedTerrain, weaponImages, projectileImages, fruitPowImage] = await Promise.all([
-      loadImage('assets/map-1001-back.jpg'),
+      loadImage('assets/map-1156-back.jpg'),
       loadImage('assets/character-player-sheet.png'),
       loadImage('assets/character-enemy-sheet.png'),
       loadImage('assets/shell-bomb.png'),
       Terrain.load({
-        foregroundUrl: 'assets/map-1001-fore.png',
+        foregroundUrl: 'assets/map-1156-fore.png',
         craterArtUrls,
       }),
       Promise.all(weaponIds.map(async (id) => [id, await loadImage(`assets/weapon-${id}.png`)])).then(Object.fromEntries),
@@ -1958,6 +2086,7 @@ async function boot() {
     setupEvents();
     setupMinimap();
     exposeTestApi();
+    if (isCheat) setupCheatPanel();
     booted = true;
     measureLayout();
     selectedWeaponId = game.weapon || selectedWeaponId;

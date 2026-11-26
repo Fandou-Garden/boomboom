@@ -14,7 +14,7 @@ fi
 exec "$GO_BIN" run . \
   -addr "${ADDR:-:8000}" \
   -root ../dist \
-  -map ../reference/map/1001/fore.map \
+  -map ../reference/map/1156/fore.map \
   -assets ../dist/assets \
   ${GUNNY_DEBUG:+-debug} \
   "$@"

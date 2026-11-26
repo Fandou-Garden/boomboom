@@ -3,33 +3,33 @@
  *
  * “SOURCE” values are copied from the pinned Gunny commit, including the
  * XML data backups GameAdmin/Backup/XMLReader/XMLImport/LoadMapsItems.xml
- * (map 1001) and BallList.xml (ball 243). “TEMP” marks values whose database
+ * (map 1156, Atlantis) and BallList.xml (ball 243). “TEMP” marks values whose database
  * rows or art assets are not readable in this checkout. Never scatter tuning
  * constants through gameplay code — change them here.
  */
+export const BUILD_VERSION = '2.0.0';
 export const SOURCE_COMMIT = '057c71aab877b42ebf08258aa5c642adc6a039ec';
 export const SOURCE_REPO = 'https://github.com/phucdz2kk4/Gunny';
 
 export const WORLD = Object.freeze({
-  // SOURCE: LoadMapsItems.xml ID=1001 ForegroundWidth/Height = 2000×1425.
-  // The v5 build stretched this into a mirrored 4000 px arena; that was a
-  // web-only composition and is removed. The Go server and the renderer now
-  // share the original map size.
-  mapId: 1001,
-  width: 2000,
-  height: 1425,
-  sourceWidth: 2000,
-  mirrorAxis: 2000,
-  backgroundTileWidth: 1526,
-  // SOURCE: fore.map rows y>=1282 are a fully-solid bedrock base that craters
-  // never reach in the original game. Keep it intact on the client as well.
-  bedrockY: 1282,
+  // SOURCE: LoadMapsItems.xml ID=1156 ForegroundWidth/Height = 1843×1020.
+  // The shipped back.jpg is 1447×1020 and is tiled horizontally at native
+  // resolution. The Go server, renderer and minimap share this one size.
+  mapId: 1156,
+  name: '亚特兰蒂斯',
+  width: 1843,
+  height: 1020,
+  sourceWidth: 1843,
+  mirrorAxis: 1843,
+  backgroundTileWidth: 1447,
+  // Keep the bottom rows uncarved; 1156 has no source bedrock row.
+  bedrockY: 1015,
   // PORT: source MapInfo PosX/PosX1 are not in the readable XML export.
-  // These symmetric beach columns are the same values used by server/game.
-  spawnX: [300, 1700],
-  spawnProbeY: 700,
+  // These two flat Atlantis ledges keep the original 1400 px / 70 m distance.
+  spawnX: [240, 1640],
+  spawnProbeY: 200,
   pixelsPerMetre: 20, // NEW: display-only conversion for distance/elevation.
-  groundBottom: 1410,
+  groundBottom: 1000,
   // Foreground/collision updates are local to 256×256 chunks.
   chunkSize: 256,
 });
@@ -41,7 +41,7 @@ export const PHYSICS = Object.freeze({
   // SOURCE: Player.FORCE_MAX / EnergyView.FORCE_MAX.
   forceMax: 2000,
 
-  // SOURCE: LoadMapsItems.xml, Item ID=1001, Weight=10.
+  // SOURCE: LoadMapsItems.xml, Item ID=1156, Weight=10.
   mapGravity: 10,
 
   // SOURCE: BallList.xml, Item ID=243 (weapon 70322 common ball), Mass=10.
@@ -50,7 +50,7 @@ export const PHYSICS = Object.freeze({
   // SOURCE: BallList.xml ID=243, Weight=70 (gravity multiplier).
   gravityFactor: 70,
 
-  // SOURCE: LoadMapsItems.xml, Item ID=1001, DragIndex=2.
+  // SOURCE: LoadMapsItems.xml, Item ID=1156, DragIndex=2.
   mapDragIndex: 2,
 
   // SOURCE: BallList.xml ID=243, DragIndex=1 (air resistance multiplier).
@@ -268,6 +268,8 @@ export const VIEW = Object.freeze({
   // Shift the pair slightly left of centre so the right skill rail never
   // covers the opponent on narrow landscape phones.
   bothHudRightBias: 20,
+  // Negative keeps the camera below the actors so both stay above the HUD.
+  bothCameraShift: -0.01,
   shotLookAheadSeconds: 0.14,
   smoothTime: 0.36,
   zoomSmoothTime: 0.32,

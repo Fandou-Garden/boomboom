@@ -146,12 +146,17 @@ async function runViewport(browser, width, height) {
   const initial = await state(page);
   const { snapshot: s0, rects: r0 } = initial;
 
-  // SOURCE LoadMapsItems.xml ID=1001 is a single 2000×1425 arena.
-  assert.equal(s0.world.width, 2000);
-  assert.equal(s0.world.height, 1425);
-  assert.equal(s0.actors[0].x, 300, 'spawn must not move');
-  assert.equal(s0.actors[1].x, 1700, 'spawn must not move');
+  // SOURCE LoadMapsItems.xml ID=1156 is Atlantis 1843×1020.
+  assert.equal(s0.world.width, 1843);
+  assert.equal(s0.world.height, 1020);
+  assert.equal(s0.actors[0].x, 240, 'spawn must not move');
+  assert.equal(s0.actors[1].x, 1640, 'spawn must not move');
   assert.ok(s0.actors[1].x - s0.actors[0].x > 1300);
+  assert.equal(s0.weapons.length, 13, 'classic arsenal must expose all 13 base weapons');
+  const scalpel = s0.weapons.find((weapon) => weapon.id === 'scalpel');
+  assert.equal(scalpel?.label, '手术刀', 'scalpel must be present in the weapon list');
+  assert.equal(scalpel?.ballId, '341', 'scalpel must use Ball 341');
+  assert.equal(scalpel?.projectile, 'scalpel');
   assert.equal(Math.round(s0.metrics.horizontal), 70);
   assert.equal(s0.phase, 'player');
   assert.equal(s0.showCountdown, false, 'practice countdown must default off');
@@ -190,7 +195,7 @@ async function runViewport(browser, width, height) {
   assert.equal(layoutChecks.downInJoystick, true);
   assert.equal(layoutChecks.fireHit, 'fire', 'fire key centre must receive the pointer');
   assert.equal(layoutChecks.hasSlots, 0, 'do not clone the original empty inventory row');
-  assert.match(layoutChecks.minimizedText, /海湾/);
+  assert.match(layoutChecks.minimizedText, /亚特兰蒂斯/);
 
   for (const id of ['fire', 'pow', 'heal', 'skillExtra2', 'skillScatter', 'skillExtra1', 'skillBoost50', 'skillBoost40', 'skillBoost30', 'skillBoost20', 'skillBoost10', 'left', 'right', 'up', 'down']) {
     assertButtonSafe(layoutChecks.ids[id], width, height, `#${id}`);
@@ -425,7 +430,9 @@ async function runViewport(browser, width, height) {
     return snapshot?.effectiveCameraMode === 'both' && actors.length === 2 &&
       actors.every((rect) => rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= innerWidth && rect.y + rect.height <= innerHeight);
   }, { timeout: 4000 });
-  await sleep(180);
+  // The camera smooths back from shot mode; wait for the both-player framing
+  // to settle so this assertion measures the resting HUD, not a transition.
+  await sleep(900);
   const landed = await state(page);
   assert.ok(['resolve', 'enemy_move', 'enemy_think', 'enemy_aim', 'player', 'over'].includes(landed.snapshot.phase));
   assert.equal(landed.snapshot.effectiveCameraMode, 'both');

@@ -265,8 +265,16 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       await page.evaluate(() => window.__GUNNY_TEST__.audioEnable());
       await page.evaluate(() => window.__GUNNY_TEST__.audioReady());
       const expected = {
-        fire: { fire: '025', cannon: '023', fruit: '114', appliance: '110', wind: '029' },
-        explosion: { fire: '087', cannon: '087', fruit: '102', appliance: '100', wind: '089' },
+        fire: {
+          axe: '033', bow: '021', gun: '031', goldgun: '031', fire: '025',
+          cannon: '023', wind: '029', thunder: '035', brick: '116', fruit: '114',
+          scalpel: '111', toilet: '115', appliance: '110',
+        },
+        explosion: {
+          axe: '095', bow: '094', gun: '087', goldgun: '087', fire: '087',
+          cannon: '087', wind: '089', thunder: '091', brick: '107', fruit: '102',
+          scalpel: '103', toilet: '106', appliance: '100',
+        },
       };
       const matrix = {};
       for (const [name, byWeapon] of Object.entries(expected)) {
@@ -310,6 +318,9 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       assert.equal(s.stats.playerShots, 1);
       assert.equal(s.playerVolley.pow, false);
       await page.waitForFunction(() => ['resolve', 'over'].includes(window.__GUNNY_TEST__.snapshot().phase), { timeout: 15000 });
+      // _measure samples the analyser for 260 ms after impact; give the last
+      // hit/synth event one full window before reading its peak.
+      await sleep(350);
       s = await snapshot(page);
       assert.ok(s.stats.playerHits >= 1, 'ordinary cannon at solved angle must hit');
       await page.evaluate(() => window.__GUNNY_TEST__.audioReady());

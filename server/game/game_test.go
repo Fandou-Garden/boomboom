@@ -10,7 +10,7 @@ import (
 func testTerrain(t *testing.T) *Terrain {
 	t.Helper()
 	root := filepath.Join("..", "..")
-	tr, err := LoadTerrain(filepath.Join(root, "reference/map/1001/fore.map"), filepath.Join(root, "dist/assets"))
+	tr, err := LoadTerrain(filepath.Join(root, "reference/map/1156/fore.map"), filepath.Join(root, "dist/assets"))
 	if err != nil {
 		t.Fatalf("LoadTerrain: %v", err)
 	}
@@ -19,14 +19,14 @@ func testTerrain(t *testing.T) *Terrain {
 
 func TestTerrainHeaderMatchesSource(t *testing.T) {
 	tr := testTerrain(t)
-	if tr.Width != 2000 || tr.Height != 1425 {
-		t.Fatalf("map = %dx%d, want 2000x1425", tr.Width, tr.Height)
+	if tr.Width != 1843 || tr.Height != 1020 {
+		t.Fatalf("map = %dx%d, want 1843x1020", tr.Width, tr.Height)
 	}
-	if !tr.IsSolid(300, 1186) || tr.IsSolid(300, 1185) {
-		t.Fatalf("spawn ground mismatch at x=300")
+	if !tr.IsSolid(240, 389) || tr.IsSolid(240, 388) {
+		t.Fatalf("spawn ground mismatch at x=240")
 	}
-	if !tr.IsSolid(1700, 1193) || tr.IsSolid(1700, 1192) {
-		t.Fatalf("enemy ground mismatch at x=1700")
+	if !tr.IsSolid(1640, 522) || tr.IsSolid(1640, 521) {
+		t.Fatalf("enemy ground mismatch at x=1640")
 	}
 	if tr.SolidCount() == 0 {
 		t.Fatal("empty collision mask")
@@ -36,7 +36,7 @@ func TestTerrainHeaderMatchesSource(t *testing.T) {
 func TestCraterCarveUsesOriginalArt(t *testing.T) {
 	tr := testTerrain(t)
 	before := tr.SolidCount()
-	removed, bounds, ok := tr.Carve(300, 1186, "401", "medium")
+	removed, bounds, ok := tr.Carve(240, 389, "401", "medium")
 	if !ok || removed <= 0 {
 		t.Fatalf("carve removed=%d ok=%v", removed, ok)
 	}
@@ -279,10 +279,10 @@ func TestMatchStartsOnGround(t *testing.T) {
 	if s.Phase != "player" || s.Turn != 0 || s.Round != 1 {
 		t.Fatalf("state %+v", s)
 	}
-	if s.Actors[0].X != 300 || s.Actors[1].X != 1700 {
+	if s.Actors[0].X != 240 || s.Actors[1].X != 1640 {
 		t.Fatalf("spawns = %v %v", s.Actors[0].X, s.Actors[1].X)
 	}
-	if s.Actors[0].Y != 1186 || s.Actors[1].Y != 1193 {
+	if s.Actors[0].Y != 389 || s.Actors[1].Y != 522 {
 		t.Fatalf("spawn ground = %v %v", s.Actors[0].Y, s.Actors[1].Y)
 	}
 	if s.Wind != 0 || s.WindTarget != 0 {
@@ -370,13 +370,13 @@ func TestCraterReseatsActorAndWalkStaysOnSurface(t *testing.T) {
 	}
 }
 
-// Regression: the source fore.map has a fully-solid bedrock floor at
-// y >= BedrockY. No crater, however deep or stacked, may dig through it.
+// Regression: 1156 has solid bottom rows; no crater may dig through the
+// protected floor at y >= BedrockY.
 func TestBedrockFloorCannotBeCarved(t *testing.T) {
 	tr := testTerrain(t)
 	// Carve a big POW crater centered right at the bedrock boundary.
-	tr.Carve(300, BedrockY+20, "4", "large")
-	for _, y := range []int{BedrockY, BedrockY + 1, BedrockY + 40, tr.Height - 1} {
+	tr.Carve(300, BedrockY-10, "4", "large")
+	for _, y := range []int{BedrockY, BedrockY + 1, tr.Height - 1} {
 		if !tr.IsSolid(300, y) {
 			t.Fatalf("bedrock breached at y=%d (x=300)", y)
 		}

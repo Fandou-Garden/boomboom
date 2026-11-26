@@ -66,12 +66,13 @@
       for (let i = 0; i < 200 && !window.GunnyWasm; i += 1) await sleep(10);
       if (!window.GunnyWasm) throw new Error('WASM 引擎未挂载 GunnyWasm');
       const [map, crater50, crater401, crater4] = await Promise.all([
-        loadBytes('data/1001.fore.map?v=18'),
+        loadBytes('data/1156.fore.map?v=18'),
         loadBytes('assets/crater-50.png?v=18'),
         loadBytes('assets/crater-401.png?v=18'),
         loadBytes('assets/crater-4.png?v=18'),
       ]);
-      const debug = new URLSearchParams(location.search).has('test');
+      const debug = new URLSearchParams(location.search).has('test')
+        || new URLSearchParams(location.search).has('cheat');
       const error = window.GunnyWasm.init(map, crater50, crater401, crater4, debug);
       if (error) throw new Error(error);
       lastSeq = 0;

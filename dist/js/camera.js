@@ -211,7 +211,9 @@ export class Camera {
       targetX = (minX + maxX) / 2 + (VIEW.bothHudRightBias || 0) / targetZoom;
       const viewHAtTarget = height / targetZoom;
       // Keep the feet/terrain in the lower-middle and preserve throw space.
-      targetY = (minY + maxY) / 2 - viewHAtTarget * 0.06;
+      // Atlantis has a 133 px spawn-height difference, so lift the framing a
+      // little more than before to clear the bottom-right fire cluster.
+      targetY = (minY + maxY) / 2 + viewHAtTarget * (VIEW.bothCameraShift ?? -0.06);
       allowSky = true;
       allowWide = targetZoom < Math.max(coverZoom(width, height), VIEW.minZoomFloor);
     } else {

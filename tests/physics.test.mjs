@@ -122,7 +122,7 @@ test('continuous sweep catches a 3 px wall instead of tunnelling through it', ()
   assert.ok(projectile.y >= 995 && projectile.y <= 1010, `impact y ${projectile.y}`);
 });
 
-test('world bounds follow the source 2000×1425 map', () => {
+test('world bounds follow the source 1843×1020 Atlantis map', () => {
   assert.equal(isProjectileOut(WORLD.width + 61, 500), true);
   assert.equal(isProjectileOut(WORLD.width - 100, 500), false);
   assert.equal(isProjectileOut(500, WORLD.height + 81), true);
@@ -159,8 +159,8 @@ test('seeded crater shape is reproducible and spans multiple lobes', () => {
   assert.ok(a.bounds.y1 - a.bounds.y0 > 100);
 });
 
-test('world camera keeps the viewport inside the source 2000×1425 map', () => {
-  const view = fitCamera({ width: 844, height: 390, focusX: 300, focusY: 1186 });
+test('world camera keeps the viewport inside the source 1843×1020 Atlantis map', () => {
+  const view = fitCamera({ width: 844, height: 390, focusX: 240, focusY: 389 });
   assert.ok(view.zoom >= 844 / WORLD.width - 1e-9);
   assert.ok(view.zoom >= 390 / WORLD.height - 1e-9);
   assert.equal(view.topInset, 0);
@@ -169,15 +169,15 @@ test('world camera keeps the viewport inside the source 2000×1425 map', () => {
   assert.ok(view.worldTop >= 0);
   assert.ok(view.worldLeft + view.viewW <= WORLD.width + 1e-6);
   assert.ok(view.worldTop + view.viewH <= WORLD.height + 1e-6);
-  const p = projectPoint(view, 300, 1186);
+  const p = projectPoint(view, 240, 389);
   assert.ok(p.x > 0 && p.x < view.width);
   assert.ok(p.y > 0 && p.y < view.height);
 });
 
 test('camera clamps at world edges and smooths instead of jumping', () => {
   const actors = [
-    { x: 300, y: 1186, alive: true, walkDirection: 1, facing: 1 },
-    { x: 1700, y: 1186, alive: true, walkDirection: 0, facing: -1 },
+    { x: 240, y: 389, alive: true, walkDirection: 1, facing: 1 },
+    { x: 1640, y: 522, alive: true, walkDirection: 0, facing: -1 },
   ];
   const camera = new Camera();
   const first = camera.update({ width: 844, height: 390, mode: 'player', actors, activeIndex: 0, dt: 1 / 60 });
@@ -195,8 +195,8 @@ test('camera clamps at world edges and smooths instead of jumping', () => {
 test('shot mode follows the shell and permits sky overscan without showing blank map edges', () => {
   const camera = new Camera();
   const actors = [
-    { x: 300, y: 1186, alive: true },
-    { x: 3700, y: 1186, alive: true },
+    { x: 240, y: 389, alive: true },
+    { x: 1500, y: 522, alive: true },
   ];
   const view = camera.update({
     width: 844, height: 390, mode: 'shot', actors, activeIndex: 0,

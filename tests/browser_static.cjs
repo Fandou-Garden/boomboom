@@ -106,7 +106,18 @@ function serve() {
     assert.ok(fps >= 45, `static build should render smoothly, got ${fps} fps`);
 
     await page.evaluate(() => window.__GUNNY_TEST__.setEnergy(100));
-    assert.equal(await page.evaluate(() => window.__GUNNY_TEST__.firePlayer(30, 1200)), true);
+    const terrainPlan = await page.evaluate(() => {
+      const api = window.__GUNNY_TEST__;
+      for (const angle of [20, 25, 30, 35, 40, 45, 50]) {
+        for (const force of [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1600]) {
+          const sim = api.simulate(angle, force);
+          if (sim?.impact === 'ground' && sim.x > 300 && sim.x < 1700) return { angle, force, x: sim.x, y: sim.y };
+        }
+      }
+      return null;
+    });
+    assert.ok(terrainPlan, 'fire weapon must find a terrain impact plan on Atlantis');
+    assert.equal(await page.evaluate((plan) => window.__GUNNY_TEST__.firePlayer(plan.angle, plan.force), terrainPlan), true);
     await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().stats.playerShots >= 1, { timeout: 10000 });
     await page.waitForFunction(() => ['resolve', 'over'].includes(window.__GUNNY_TEST__.snapshot().phase), { timeout: 20000 });
     const afterPlayer = await page.evaluate(() => {

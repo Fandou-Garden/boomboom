@@ -201,9 +201,9 @@ export class Terrain {
   }
 
   _drawSourceComposition(ctx, width, height) {
-    // SOURCE map 1001 is already a complete 2000 px arena. Only legacy
-    // 4000 px compositions need the mirrored second copy; drawing it at
-    // width=2000 would overwrite the original with a mirror image.
+    // SOURCE map 1156 already fills the world width. Only legacy widened
+    // compositions need the mirrored second copy; drawing it at width=source
+    // would overwrite the original with a mirror image.
     ctx.drawImage(this.sourceImage, 0, 0);
     if (this.width > this.sourceWidth) {
       ctx.save();

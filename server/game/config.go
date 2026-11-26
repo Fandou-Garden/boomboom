@@ -4,7 +4,7 @@
 //
 //	Game.Logic/Living.ShootImp, Game.Logic/Phy/Object/{BombObject,SimpleBomb}.cs,
 //	Game.Logic/Phy/Maths/EulerVector.cs, Game.Logic/BaseGame.GetNextWind,
-//	Game.Logic/Phy/Maps/{Map,Tile}.cs and the XML rows for map 1001 / ball 243.
+//	Game.Logic/Phy/Maps/{Map,Tile}.cs and the XML rows for map 1156 / ball 243.
 //
 // PORT values are coordinate/clock adapters required by the browser world.
 // NEW values are browser-only features (heal, POW, scatter) kept behind the
@@ -16,20 +16,23 @@ import "math"
 const (
 	SourceCommit = "057c71aab877b42ebf08258aa5c642adc6a039ec"
 
-	// SOURCE: LoadMapsItems.xml Item ID=1001 (map 1001, "Cầu vồng").
-	WorldWidth          = 2000
-	WorldHeight         = 1425
-	SourceWidth         = 2000
-	BackgroundTileWidth = 1526
-	GroundBottom        = 1410
-	SpawnProbeY         = 700
+	// SOURCE: LoadMapsItems.xml Item ID=1156 (Atlantis).
+	// Foreground 1843×1020; the shipped back.jpg is 1447×1020. The XML's
+	// declared 1100×775 backdrop is the same art at a 1.316× smaller scale.
+	MapID               = 1156
+	MapName             = "Atlantis"
+	WorldWidth          = 1843
+	WorldHeight         = 1020
+	SourceWidth         = 1843
+	BackgroundTileWidth = 1447
+	GroundBottom        = 1000
+	SpawnProbeY         = 200
 	PixelsPerMetre      = 20
 
-	// SOURCE: fore.map rows y>=1282 are a fully-solid 143-row bedrock base.
-	// Craters are small enough in the original game that they never reach it,
-	// so this floor survives every blast. PORT: enforce it explicitly so a
-	// deep or stacked crater cannot dig through the arena floor.
-	BedrockY = 1282
+	// PORT: 1156 has solid bottom rows but no fully-solid source bedrock row
+	// like 1001. Protect the last five rows so deep or stacked craters cannot
+	// dig through the arena floor.
+	BedrockY = 1015
 
 	// SOURCE: SimpleBomb.StartMoving advances in 0.04 s steps.
 	PhysicsDT = 0.04
@@ -37,7 +40,7 @@ const (
 	// SOURCE: Player.FORCE_MAX / EnergyView.FORCE_MAX.
 	ForceMax = 2000.0
 
-	// SOURCE: LoadMapsItems.xml ID=1001 Weight=10 DragIndex=2.
+	// SOURCE: LoadMapsItems.xml ID=1156 Weight=10 DragIndex=2.
 	MapGravity   = 10.0
 	MapDragIndex = 2.0
 
@@ -130,25 +133,36 @@ const (
 )
 
 // SpawnX are the two duel spawn columns. The source server reads PosX/PosX1
-// from its SQL MapInfo row; that row is not in the readable XML export, so the
-// symmetric beach positions are a documented PORT.
-var SpawnX = [2]float64{300, 1700}
+// from its SQL MapInfo row; that row is not in the readable XML export. These
+// two flat Atlantis ledges (left y=389, right y=522) are a documented PORT;
+// they keep the original 1400 px / 70 m duel distance.
+var SpawnX = [2]float64{240, 1640}
 
 // WeaponDef is the browser's authoritative projection of one classic Gunny
 // weapon. Every visual/geometry field is traceable to the original XML/SWF:
 //
-//	烈火     TemplateAlllist 7006/7103  Pic=bombpack   Ball=161  Angle=20-50
-//	轰天     TemplateAlllist 7007/7104  Pic=bomb       Ball=101  Angle=55-70
-//	水果篮   TemplateAlllist 7011/7108  Pic=fruit      Ball=401  Angle=20-50
-//	黑白家电 TemplateAlllist 7014/7111  Pic=television Ball=321  Angle=50-70
-//	风神     TemplateAlllist 7008/7105  Pic=dart       Ball=121  Angle=15-50
+//	石斧     TemplateAlllist 7001       Pic=axe         Ball=20   Angle=25-60
+//	弓箭     TemplateAlllist 7002       Pic=bow         Ball=18   Angle=35-65
+//	AK-48   TemplateAlllist 7003       Pic=gun         Ball=22   Angle=35-60
+//	黄金枪   TemplateAlllist 7005       Pic=goldgun     Ball=30   Angle=20-40
+//	烈火     TemplateAlllist 7006/7103  Pic=bombpack    Ball=161  Angle=20-50
+//	轰天     TemplateAlllist 7007/7104  Pic=bomb        Ball=101  Angle=55-70
+//	风神     TemplateAlllist 7008/7105  Pic=dart        Ball=121  Angle=15-50
+//	雷霆     TemplateAlllist 7009/7106  Pic=electricbar Ball=141  Angle=25-60
+//	司马砸缸 TemplateAlllist 7010/7107  Pic=brick       Ball=381  Angle=20-65
+//	水果篮   TemplateAlllist 7011/7108  Pic=fruit       Ball=401  Angle=20-50
+//	手术刀   TemplateAlllist 7012/7109  Pic=OPSbox      Ball=341  Angle=15-45
+//	马桶     TemplateAlllist 7013/7110  Pic=closestool  Ball=361  Angle=20-45
+//	黑白家电 TemplateAlllist 7014/7111  Pic=television  Ball=321  Angle=50-70
 //
 // Ball IDs are the Common column of Tank.Request/BombConfig.xml, not the
 // Property1 field (BombConfig overrides it). Official 4399 weapon data uses the
 // same angles; 7055 Storch is the Olympic-torch skin, not 烈火.
 //
 // The browser needs one shared 55 px ball for the duel balance, so only the
-// visual particle, weapon sprite, angle range and crater art vary.
+// visual particle, weapon sprite, angle range and crater art vary. The crater
+// art is selected from the three original shapes shipped by this checkout;
+// per-ball crater PNGs are not part of the shared terrain atlas.
 type WeaponDef struct {
 	ID           string  `json:"id"`
 	Label        string  `json:"label"`
@@ -169,9 +183,36 @@ const (
 	DefaultEnemyWeapon  = "cannon"
 )
 
-var WeaponOrder = []string{"fire", "cannon", "fruit", "appliance", "wind"}
+var WeaponOrder = []string{
+	"axe", "bow", "gun", "goldgun", "fire", "cannon", "wind",
+	"thunder", "brick", "fruit", "scalpel", "toilet", "appliance",
+}
 
 var WeaponDefs = map[string]WeaponDef{
+	"axe": {
+		ID: "axe", Label: "石斧", Trait: "低角 · 大坑重击", Source: "Template 7001 · Pic axe · Ball 20",
+		Pic: "axe", BallID: "20", Projectile: "axe",
+		AngleMin: 25, AngleMax: 60, StartAngle: 42, CraterArt: "4",
+		WeaponSprite: "weapon-axe",
+	},
+	"bow": {
+		ID: "bow", Label: "弓箭", Trait: "高角 · 轻巧速射", Source: "Template 7002 · Pic bow · Ball 18",
+		Pic: "bow", BallID: "18", Projectile: "bow",
+		AngleMin: 35, AngleMax: 65, StartAngle: 50, CraterArt: "50",
+		WeaponSprite: "weapon-bow",
+	},
+	"gun": {
+		ID: "gun", Label: "AK-48", Trait: "高角 · 稳定火力", Source: "Template 7003 · Pic gun · Ball 22",
+		Pic: "gun", BallID: "22", Projectile: "gun",
+		AngleMin: 35, AngleMax: 60, StartAngle: 48, CraterArt: "50",
+		WeaponSprite: "weapon-gun",
+	},
+	"goldgun": {
+		ID: "goldgun", Label: "黄金枪", Trait: "低角 · 黄金弹幕", Source: "Template 7005 · Pic goldgun · Ball 30",
+		Pic: "goldgun", BallID: "30", Projectile: "goldgun",
+		AngleMin: 20, AngleMax: 40, StartAngle: 30, CraterArt: "50",
+		WeaponSprite: "weapon-goldgun",
+	},
 	"fire": {
 		ID: "fire", Label: "烈火", Trait: "中角 · 高攻爆发", Source: "Template 7006/7103 · Pic bombpack · Ball 161 · Crater 161",
 		Pic: "bombpack", BallID: "161", Projectile: "fire",
@@ -184,23 +225,47 @@ var WeaponDefs = map[string]WeaponDef{
 		AngleMin: 55, AngleMax: 70, StartAngle: 65, CraterArt: "401",
 		WeaponSprite: "weapon-cannon",
 	},
+	"wind": {
+		ID: "wind", Label: "风神", Trait: "低角 · 高敏先手", Source: "Template 7008/7105 · Pic dart · Ball 121",
+		Pic: "dart", BallID: "121", Projectile: "wind",
+		AngleMin: 15, AngleMax: 50, StartAngle: 35, CraterArt: "50",
+		WeaponSprite: "weapon-wind",
+	},
+	"thunder": {
+		ID: "thunder", Label: "雷霆", Trait: "中角 · 雷暴爆发", Source: "Template 7009/7106 · Pic electricbar · Ball 141",
+		Pic: "electricbar", BallID: "141", Projectile: "thunder",
+		AngleMin: 25, AngleMax: 60, StartAngle: 42, CraterArt: "401",
+		WeaponSprite: "weapon-thunder",
+	},
+	"brick": {
+		ID: "brick", Label: "司马砸缸", Trait: "广角 · 巨坑压制", Source: "Template 7010/7107 · Pic brick · Ball 381",
+		Pic: "brick", BallID: "381", Projectile: "brick",
+		AngleMin: 20, AngleMax: 65, StartAngle: 42, CraterArt: "4",
+		WeaponSprite: "weapon-brick",
+	},
 	"fruit": {
 		ID: "fruit", Label: "水果篮", Trait: "中角 · 敏幸均衡", Source: "Template 7011/7108 · Pic fruit · Ball 401",
 		Pic: "fruit", BallID: "401", Projectile: "fruit",
 		AngleMin: 20, AngleMax: 50, StartAngle: 35, CraterArt: "401",
 		WeaponSprite: "weapon-fruit",
 	},
+	"scalpel": {
+		ID: "scalpel", Label: "手术刀", Trait: "低角 · 精准切割", Source: "Template 7012/7109 · Pic OPSbox · Ball 341",
+		Pic: "OPSbox", BallID: "341", Projectile: "scalpel",
+		AngleMin: 15, AngleMax: 45, StartAngle: 30, CraterArt: "50",
+		WeaponSprite: "weapon-scalpel",
+	},
+	"toilet": {
+		ID: "toilet", Label: "马桶", Trait: "低角 · 刁钻弹道", Source: "Template 7013/7110 · Pic closestool · Ball 361",
+		Pic: "closestool", BallID: "361", Projectile: "toilet",
+		AngleMin: 20, AngleMax: 45, StartAngle: 32, CraterArt: "401",
+		WeaponSprite: "weapon-toilet",
+	},
 	"appliance": {
 		ID: "appliance", Label: "黑白家电", Trait: "高角 · 四维均衡", Source: "Template 7014/7111 · Pic television · Ball 321",
 		Pic: "television", BallID: "321", Projectile: "appliance",
 		AngleMin: 50, AngleMax: 70, StartAngle: 60, CraterArt: "50",
 		WeaponSprite: "weapon-appliance",
-	},
-	"wind": {
-		ID: "wind", Label: "风神", Trait: "低角 · 高敏先手", Source: "Template 7008/7105 · Pic dart · Ball 121",
-		Pic: "dart", BallID: "121", Projectile: "wind",
-		AngleMin: 15, AngleMax: 50, StartAngle: 35, CraterArt: "50",
-		WeaponSprite: "weapon-wind",
 	},
 }
 

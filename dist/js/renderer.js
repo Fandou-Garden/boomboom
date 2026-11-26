@@ -500,11 +500,10 @@ export class Renderer {
     const y = shot.renderY ?? shot.y;
     const trail = (shot.trail || []).slice(-8);
     const tints = {
-      fire: '255,157,68',
-      cannon: '207,220,238',
-      fruit: '255,213,117',
-      appliance: '143,218,255',
-      wind: '220,245,255',
+      axe: '255,178,92', bow: '255,222,137', gun: '255,196,112', goldgun: '255,215,96',
+      fire: '255,157,68', cannon: '207,220,238', wind: '220,245,255',
+      thunder: '150,203,255', brick: '255,143,86', fruit: '255,213,117',
+      scalpel: '209,247,255', toilet: '255,230,176', appliance: '143,218,255',
     };
     const tint = tints[shot.weapon] || '255,225,142';
 
@@ -533,12 +532,15 @@ export class Renderer {
     // item art; every other shell keeps its normal projectile image.
     const ammoKey = shot.pow && shot.weapon === 'fruit' ? 'fruit-pow' : shot.weapon;
     const image = this.images.projectiles?.[ammoKey] || this.images.projectiles?.[shot.weapon] || this.images.shell;
-    const maxSide = shot.weapon === 'fire' ? 78 : 64;
+    const maxSide = shot.weapon === 'fire' ? 78
+      : shot.weapon === 'thunder' ? 74
+      : shot.weapon === 'scalpel' ? 70 : 64;
     const k = maxSide / Math.max(image.width || image.naturalWidth || 32, image.height || image.naturalHeight || 32);
     const drawW = (image.width || image.naturalWidth || 32) * k;
     const drawH = (image.height || image.naturalHeight || 32) * k;
     const heading = Math.atan2(shot.vy || 0, shot.vx || shot.direction || 1);
-    const spin = shot.weapon === 'fruit' ? (game.visualTime ?? game.time) * 4.2 * Math.sign(shot.direction || 1) : 0;
+    const spin = shot.weapon === 'fruit' ? (game.visualTime ?? game.time) * 4.2 * Math.sign(shot.direction || 1)
+      : shot.weapon === 'brick' ? (game.visualTime ?? game.time) * 3.4 * Math.sign(shot.direction || 1) : 0;
     ctx.translate(x, y);
     ctx.rotate(heading + spin);
     ctx.shadowColor = `rgba(${tint},0.9)`;

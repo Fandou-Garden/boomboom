@@ -95,11 +95,11 @@ launch() {
   echo "启动服务端（端口 ${PORT}）…"
   if [ "$debug_flag" = "debug" ]; then
     nohup "$BIN" -addr "$ADDR" -root "$ROOT/dist" \
-      -map "$ROOT/reference/map/1001/fore.map" -assets "$ROOT/dist/assets" \
+      -map "$ROOT/reference/map/1156/fore.map" -assets "$ROOT/dist/assets" \
       -debug >"$LOG_FILE" 2>&1 < /dev/null &
   else
     nohup "$BIN" -addr "$ADDR" -root "$ROOT/dist" \
-      -map "$ROOT/reference/map/1001/fore.map" -assets "$ROOT/dist/assets" \
+      -map "$ROOT/reference/map/1156/fore.map" -assets "$ROOT/dist/assets" \
       >"$LOG_FILE" 2>&1 < /dev/null &
   fi
   echo $! > "$PID_FILE"
@@ -184,7 +184,7 @@ case "${1:-start}" in
   fg|foreground)
     build
     exec "$BIN" -addr "$ADDR" -root "$ROOT/dist" \
-      -map "$ROOT/reference/map/1001/fore.map" -assets "$ROOT/dist/assets" -debug
+      -map "$ROOT/reference/map/1156/fore.map" -assets "$ROOT/dist/assets" -debug
     ;;
   -h|--help|help)
     cat <<'TXT'

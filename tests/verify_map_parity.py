@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prove the PNG alpha mask == the server's 1-bit 1001/fore.map.
+"""Prove the PNG alpha mask == the server's 1-bit 1156/fore.map.
 
 Tile.cs reads [int32 width][int32 height][width/8+1 bytes per row], MSB first,
 and treats alpha > 100 as solid. This script compares every pixel.
@@ -15,8 +15,8 @@ except ImportError:
     sys.exit("Pillow is required: python3 -m pip install pillow")
 
 ROOT = Path(__file__).resolve().parents[1]
-PNG = ROOT / "dist/assets/map-1001-fore.png"
-MAP = ROOT / "reference/map/1001/fore.map"
+PNG = ROOT / "dist/assets/map-1156-fore.png"
+MAP = ROOT / "reference/map/1156/fore.map"
 
 img = Image.open(PNG).convert("RGBA")
 w, h = img.size

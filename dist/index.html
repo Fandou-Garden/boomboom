@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#061f2c">
-  <meta name="description" content="移植自 Gunny 源码的单机横屏弹道对战：2000×1425 大地图、可破坏地形、风向、五种经典武器与 1–8 战斗道具栏。">
+  <meta name="description" content="移植自 Gunny 源码的单机横屏弹道对战：1843×1020 亚特兰蒂斯地图、可破坏地形、风向、十三种经典武器与 1–8 战斗道具栏。">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -81,7 +81,8 @@
 
     <aside class="minimap-panel" aria-label="小地图与视野">
       <div class="minimap-head">
-        <span class="minimap-title">海湾战场</span>
+        <span class="minimap-title">亚特兰蒂斯</span>
+        <span id="buildVersion" class="build-version" title="客户端版本">v2.0.0</span>
         <span id="minimapDistance" class="minimap-distance">170m</span>
         <button id="recenter" class="recenter" type="button" title="一键回到战场">回战场</button>
       </div>
@@ -215,8 +216,8 @@
       <div class="weapon-dialog">
         <span class="weapon-kicker">GUNNY · CLASSIC ARSENAL</span>
         <h1 id="weaponPickerTitle">选择主武器</h1>
-        <p class="weapon-lead">开局可自由更换，第一发炮弹出手后本局锁定。五件武器均按原版炮塔与炮弹资源重制。</p>
-        <div id="weaponGrid" class="weapon-grid" role="radiogroup" aria-label="五种经典武器"></div>
+        <p class="weapon-lead">开局可自由更换，第一发炮弹出手后本局锁定。十三件武器均按原版炮塔与炮弹资源重制。</p>
+        <div id="weaponGrid" class="weapon-grid" role="radiogroup" aria-label="十三种经典武器"></div>
         <div class="weapon-dialog-foot">
           <span id="weaponSource">选择后开始战斗</span>
           <button id="weaponConfirm" class="weapon-confirm" type="button">开始战斗</button>
@@ -247,8 +248,8 @@
 
     <div id="loading" class="loading" role="status">
       <div class="loader-orbit" aria-hidden="true"><i></i><i></i><i></i></div>
-      <strong>正在装载海湾战场</strong>
-      <span>原版地图 1001 · 2000×1425 · 可破坏地形</span>
+      <strong>正在装载亚特兰蒂斯战场</strong>
+      <span>原版地图 1156 · 1843×1020 · 可破坏地形</span>
     </div>
 
     <div id="fatal" class="fatal" hidden>

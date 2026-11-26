@@ -23,5 +23,5 @@ else
   echo "wasm_exec.js not found under $GOROOT" >&2
   exit 1
 fi
-cp "$ROOT/reference/map/1001/fore.map" "$ROOT/dist/data/1001.fore.map"
+cp "$ROOT/reference/map/1156/fore.map" "$ROOT/dist/data/1156.fore.map"
 echo "WASM STATIC BUILD OK: dist/wasm/gunny.wasm"
