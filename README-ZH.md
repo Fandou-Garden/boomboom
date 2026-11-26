@@ -80,6 +80,8 @@ npm run build:static
 
 `npm run test:browser:static` 会在本机起一个没有 `/api` 的静态服务器，验证
 WASM 启动、完整回合、AI 行动、弹坑和重开，不需要 Go 服务端。
+`npm run test:browser:mobile` 另外用 iPhone UA 模拟 1024×386 浏览器剩余可视区和
+390×844 竖屏，检查控件不越界、全屏说明不遮挡 HUD、竖屏只进入只读预览。
 
 ### 操作
 
@@ -94,7 +96,7 @@ WASM 启动、完整回合、AI 行动、弹坑和重开，不需要 Go 服务�
 | 战斗道具 | 右侧 1–8 格：1 附加攻击2次 / 2 散弹 / 3 附加攻击1次 / 4–8 伤害增幅 50/40/30/20/10% | 点击按钮或按 `1`–`8` |
 | 治疗 | 顶部心形按钮，消耗本回合 | 点击或按 `H` |
 | 大招 | 独立 `POW` 键；满能量才亮，选中后用蓝色主键发射 | 同按钮或按 `R`；R 只选中，不自动开炮 |
-| 全屏 / 音效 / 说明 / 重开 | 右上角悬浮图标 | 右上角悬浮图标 |
+| 全屏 / 音效 / 说明 / 重开 | 右上角悬浮图标（iPhone 全屏键显示安装说明） | 右上角悬浮图标 |
 
 各武器角度范围不同：风神 15°–50°、烈火/水果篮 20°–50°、黑白家电 50°–70°、轰天 55°–70°；力度均为 `0–2000`。
 按住后按原版 `EnergyView` 的 `SHOOT_FORCE_STEP=20 / 30fps` 线性增加（600 力度/秒），
@@ -104,6 +106,10 @@ WASM 启动、完整回合、AI 行动、弹坑和重开，不需要 Go 服务�
 `pointercancel`、窗口失焦、切后台、旋转提示出现都会取消当前蓄力，不会误发射。
 手机端使用 Pointer Events 与 `touch-action: none`；底部按钮整体避开 Home Indicator
 和右下平台浮层。最窄横屏先压缩装饰和文字，蓝色主键仍保留 74 px 触控直径。
+iPhone Safari 和常见嵌入浏览器不能由网页隐藏地址栏；右上角全屏键在 iPhone 上改为
+可关闭的顶部说明，不再弹红色错误遮住角度盘。按“分享 → 添加到主屏幕”后从主屏幕图标
+打开，可获得无地址栏画面。竖屏会出现旋转门；“先看看战场”只进入禁用操控的预览，
+并保留“竖屏仅预览”提示，不把横屏 HUD 伪装成可玩竖屏。
 
 ## 一、大地图与相机
 
@@ -320,8 +326,9 @@ dead 图层硬拼，以免风格混杂。曾评估 map/1014（2106×1500，自�
 - 音频在首次点技能、按空格或按发射键时自动尝试解锁，不需要先点空白处；静音、Context
   创建失败或素材加载失败均只降级静音/合成，不阻断蓄力和发射。验收读取实际波形峰值与
   样本 ID，而不只检查静音开关。
-- 全屏 API、PWA manifest、横屏锁定和 iPhone 降级提示保留；iPhone Safari 不支持网页
-  元素全屏时不会伪造全屏状态。
+- 全屏 API、PWA manifest、横屏锁定和 iPhone 降级说明保留；iPhone Safari 不支持网页
+  元素全屏时不会伪造全屏状态，也不会用红色错误覆盖 HUD，而是给出“添加到主屏幕”的
+  非阻断说明。
 
 ## 五、参数来源
 
@@ -391,7 +398,10 @@ gunny-wind-arena/
 │   └── game/                   # config/physics/terrain/match/ai
 ├── tests/
 │   ├── physics.test.mjs
-│   ├── browser_acceptance.cjs  # 可选端到端验收
+│   ├── browser_acceptance.cjs  # 双视口画面验收
+│   ├── browser_controls_audio.cjs
+│   ├── browser_mobile.cjs      # 手机横竖屏/全屏说明验收
+│   ├── browser_static.cjs      # 无后端 WASM 验收
 │   └── verify_map_parity.py
 ├── docs/SOURCE_MAPPING.md
 ├── docs/GO_SERVER.md
@@ -414,6 +424,8 @@ python3 tests/verify_map_parity.py
 
 # 先启动 GUNNY_DEBUG=1 npm start，再运行浏览器验收
 CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' npm run test:browser
+# 也可单独运行手机横竖屏验收（内部自起静态服务器）
+npm run test:browser:mobile
 ```
 
 当前 `tests/browser_acceptance.cjs` 覆盖：
@@ -449,8 +461,9 @@ CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' npm r
 - 没有商城、房间、登录、联机；电脑为本地 AI（NEW）。
 - 地图/角色/炮弹素材来自仓库；人物 sheet 使用原版完整套装图集。待机/移动/举枪/
   开炮/受击的帧序已按 `GameCharacter.as` 对齐（待机去掉 6/7 仰头帧），但不是完整 SWF 时间线。
-- iPhone Safari 不支持网页元素 Fullscreen API 时会给出横屏/主屏幕提示，无法由网页隐藏
-  地址栏；Android Chrome、桌面浏览器支持度见 [`docs/IMMERSIVE_UI.md`](docs/IMMERSIVE_UI.md)。
+- iPhone Safari 及嵌入浏览器无法由网页隐藏地址栏；全屏键会显示“分享 → 添加到主屏幕”
+  的非阻断说明，无法把普通网页强行变成全屏 App。竖屏只提供禁用操控的战场预览。
+  Android Chrome、桌面浏览器支持度见 [`docs/IMMERSIVE_UI.md`](docs/IMMERSIVE_UI.md)。
 
 
 ## 十、素材与版权

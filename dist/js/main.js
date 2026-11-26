@@ -1,11 +1,11 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW } from './config.js?v=15';
-import { loadImage, Terrain } from './terrain.js?v=15';
-import { RemoteMatch } from './net-client.js?v=15';
-import { Renderer } from './renderer.js?v=15';
-import { Camera, projectPoint } from './camera.js?v=15';
-import { InputController } from './input.js?v=15';
-import { solvePerfect } from './ai.js?v=15';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=15';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW } from './config.js?v=16';
+import { loadImage, Terrain } from './terrain.js?v=16';
+import { RemoteMatch } from './net-client.js?v=16';
+import { Renderer } from './renderer.js?v=16';
+import { Camera, projectPoint } from './camera.js?v=16';
+import { InputController } from './input.js?v=16';
+import { solvePerfect } from './ai.js?v=16';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=16';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -37,12 +37,19 @@ const els = {
   sound: $('sound'), timerToggle: $('timerToggle'), help: $('help'), fullscreen: $('fullscreen'), restart: $('restart'),
   modal: $('modal'), modalTitle: $('modalTitle'), modalBody: $('modalBody'), modalAction: $('modalAction'), modalClose: $('modalClose'),
   toast: $('toast'), turnFlash: $('turnFlash'), loading: $('loading'), fatal: $('fatal'), fatalText: $('fatalText'),
+  displayTip: $('displayTip'), displayTipTitle: $('displayTipTitle'), displayTipText: $('displayTipText'), displayTipClose: $('displayTipClose'),
+  portraitHint: $('portraitHint'),
   rotateNotice: $('rotateNotice'), rotateFull: $('rotateFull'), rotateDismiss: $('rotateDismiss'),
 };
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const params = new URLSearchParams(location.search);
 const isTest = params.get('test') === '1';
+const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = window.navigator.standalone === true
+  || window.matchMedia?.('(display-mode: standalone)').matches;
 // Fixed slots in reading order. Empty slots 5–8 are intentionally no-ops;
 // spending a skill never reorders this table.
 const SKILL_SLOTS = ['extra2', 'scatter', 'extra1', 'boost50', 'boost40', 'boost30', 'boost20', 'boost10'];
@@ -60,6 +67,7 @@ let minimapAccum = 0;
 let paused = true;
 let modalMode = 'help';
 let toastTimer = 0;
+let displayTipTimer = 0;
 let flashTimer = 0;
 let resultTimer = 0;
 let lastTurnKey = '';
@@ -770,6 +778,20 @@ function showToast(text, { alert = false, duration = 3200 } = {}) {
   toastTimer = window.setTimeout(() => els.toast.classList.add('is-quiet'), duration);
 }
 
+function showDisplayTip(title, text, { duration = 9000 } = {}) {
+  if (!text) return;
+  clearTimeout(displayTipTimer);
+  els.displayTipTitle.textContent = title || '全屏提示';
+  els.displayTipText.textContent = text;
+  els.displayTip.hidden = false;
+  displayTipTimer = window.setTimeout(hideDisplayTip, duration);
+}
+
+function hideDisplayTip() {
+  clearTimeout(displayTipTimer);
+  els.displayTip.hidden = true;
+}
+
 function showTurnFlash(turn) {
   clearTimeout(flashTimer);
   els.turnFlash.textContent = turn === 0 ? '你的回合' : '电脑回合';
@@ -860,6 +882,11 @@ function openHelp() {
   const weaponDef = game?.weapons?.find((w) => w.id === game.weapon);
   const weaponLabel = weaponDef?.label || '水果篮';
   const weaponRange = `${weaponDef?.angleMin ?? CONTROLS.angleMin}°–${weaponDef?.angleMax ?? CONTROLS.angleMax}°`;
+  const displayHelp = isStandalone
+    ? '当前已从主屏幕打开，没有浏览器地址栏；横屏即可获得完整画面。'
+    : isIPhone
+      ? 'iPhone 浏览器不能由网页隐藏地址栏。用 Safari 打开本页，点“分享 → 添加到主屏幕”，再从主屏幕图标打开，即可全屏；在浏览器内横屏也能正常游玩。'
+      : '点右上角全屏按钮可进入系统全屏；若浏览器拒绝，横屏并隐藏地址栏后仍可完整操作。';
   els.modalBody.innerHTML = `
     <p class="intro-strip"><span class="chip"><em>1</em>移动</span><span class="chip"><em>2</em>调角</span><span class="chip"><em>3</em>蓄力</span><span class="chip"><em>4</em>松手</span></p>
     <dl class="help-grid">
@@ -873,6 +900,7 @@ function openHelp() {
       <dt>POW</dt><dd>POW 对应 R 键，也只负责选择（再按一次取消），不会自动开炮。能量满 ${BATTLE.energyMax}% 才亮；不足时按 R 会提示能量不足并保留当前技能。选中后蓝色主键发射，伤害、爆炸半径与弹坑更大。</dd>
       <dt>标记</dt><dd>你出手后，地图上以世界坐标标出上一发的站位“起”和实际落点“落”；镜头移动不会让标记漂移。电脑的落点不会覆盖你的记录。</dd>
       <dt>倒计时</dt><dd>右上时钟按钮可开启练习计时；默认关闭，单机练习不会催你。计时只显示，不自动出手。</dd>
+      <dt>全屏</dt><dd>${displayHelp}</dd>
       <dt>音效</dt><dd>首次点技能、按空格或按发射键时会自动尝试解锁音频，不需要先点空白处；静音、解锁失败或素材加载失败都不会阻断蓄力与开炮。开炮与爆炸按 <code>BombConfig.xml</code>/<code>BallList.xml</code> 的 Common 弹体逐武器取原版音：烈火 025/087、轰天 023/087、水果篮 114/102、黑白家电 110/100、风神 029/089；道具/POW 039、阵亡 042、选道具 008、回合 016/038、胜负 063/064 同样来自 <code>audio.swf</code> 离线提取。原版没有独立受击音，网页用明确标注的合成替代。完整映射见 <a href="docs/AUDIO_MAPPING.md" target="_blank" rel="noopener"><code>docs/AUDIO_MAPPING.md</code></a>。</dd>
     </dl>
     <p><strong>物理来源：</strong> 重力、空气阻力与风力来自 <code>BombObject.UpdateAGW()</code> 与 <code>EulerVector.ComputeOneEulerStep()</code>；开炮速度使用 <code>Living.ShootImp()</code>；风每回合按 <code>BaseGame.GetNextWind()</code> 变化。</p>
@@ -957,39 +985,18 @@ function isFullscreenActive() {
 function updateFullscreenUI() {
   const active = isFullscreenActive();
   document.documentElement.classList.toggle('is-fullscreen', active);
-  els.fullscreen.setAttribute('aria-label', active ? '退出全屏' : '进入全屏');
-  els.fullscreen.title = active ? '退出全屏' : '全屏';
+  // A home-screen launch already has no browser chrome, so a fullscreen
+  // control would be misleading. On an iPhone browser the control becomes a
+  // help entry instead of a button that is guaranteed to fail.
+  els.fullscreen.hidden = isStandalone;
+  const explain = isIPhone && !isStandalone;
+  els.fullscreen.setAttribute('aria-label', explain ? '查看 iPhone 全屏说明' : (active ? '退出全屏' : '进入全屏'));
+  els.fullscreen.title = explain ? '如何全屏' : (active ? '退出全屏' : '全屏');
 }
 
 async function toggleFullscreen() {
   input?.cancelAll('fullscreen');
-  if (!isFullscreenActive()) {
-    const root = document.documentElement;
-    let supported = true;
-    try {
-      if (root.requestFullscreen) await root.requestFullscreen({ navigationUI: 'hide' });
-      else if (root.webkitRequestFullscreen) root.webkitRequestFullscreen();
-      else if (root.webkitRequestFullScreen) root.webkitRequestFullScreen();
-      else supported = false;
-    } catch {
-      supported = false;
-    }
-    if (!supported || !isFullscreenActive()) {
-      document.documentElement.classList.add('fullscreen-fallback');
-      const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-        || (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
-      showToast(iOS
-        ? 'iPhone 浏览器不支持网页全屏：请横屏，或“添加到主屏幕”后全屏打开。'
-        : '当前浏览器不允许自动全屏，请手动横屏或使用系统全屏。', { alert: true, duration: 4200 });
-      scheduleLayout();
-      return;
-    }
-    try { await screen.orientation?.lock?.('landscape'); } catch { /* optional */ }
-    updateFullscreenUI();
-    showToast('已进入全屏', { duration: 1800 });
-    scheduleLayout();
-    window.setTimeout(scheduleLayout, 260);
-  } else {
+  if (isFullscreenActive()) {
     try {
       if (document.exitFullscreen) await document.exitFullscreen();
       else document.webkitExitFullscreen?.();
@@ -997,13 +1004,65 @@ async function toggleFullscreen() {
     try { screen.orientation?.unlock?.(); } catch { /* optional */ }
     updateFullscreenUI();
     scheduleLayout();
+    return;
   }
+
+  const portrait = window.innerHeight > window.innerWidth;
+  if (isIPhone && !isStandalone) {
+    // iOS Safari does not expose the Fullscreen API to web pages. Do not dim
+    // or cover the game with a red error: show a short, closeable instruction
+    // card under the top HUD instead.
+    if (portrait) {
+      portraitDismissed = false;
+      syncOrientationNotice();
+    }
+    showDisplayTip('iPhone 全屏说明', portrait
+      ? '先把手机横过来，游戏会自动铺满可用区域。要隐藏浏览器地址栏，请用 Safari 打开本页，点“分享 → 添加到主屏幕”，再从主屏幕图标打开。'
+      : '浏览器地址栏无法由网页隐藏。用 Safari 打开本页，点“分享 → 添加到主屏幕”，再从主屏幕图标打开，就能获得无地址栏的全屏画面。',
+    { duration: 12000 });
+    scheduleLayout();
+    return;
+  }
+
+  if (isStandalone) {
+    showDisplayTip('已经全屏打开', '当前从主屏幕启动，没有浏览器地址栏；横屏即可开始。', { duration: 5000 });
+    return;
+  }
+
+  const root = document.documentElement;
+  let supported = true;
+  try {
+    if (root.requestFullscreen) await root.requestFullscreen({ navigationUI: 'hide' });
+    else if (root.webkitRequestFullscreen) root.webkitRequestFullscreen();
+    else if (root.webkitRequestFullScreen) root.webkitRequestFullScreen();
+    else supported = false;
+  } catch {
+    supported = false;
+  }
+  if (!supported || !isFullscreenActive()) {
+    showDisplayTip('无法自动全屏', portrait
+      ? '当前浏览器不允许网页全屏。先横屏即可继续游玩；也可以把页面添加到主屏幕后打开。'
+      : '当前浏览器不允许网页全屏。横屏浏览器内仍可完整操作；想隐藏地址栏可把页面添加到主屏幕。',
+    { duration: 10000 });
+    scheduleLayout();
+    return;
+  }
+  try { await screen.orientation?.lock?.('landscape'); } catch { /* optional */ }
+  updateFullscreenUI();
+  showToast('已进入全屏', { duration: 1800 });
+  scheduleLayout();
+  window.setTimeout(scheduleLayout, 260);
 }
 
 function syncOrientationNotice() {
   const portrait = window.innerHeight > window.innerWidth;
-  const show = portrait && window.innerWidth < 950 && !portraitDismissed;
+  const narrowPortrait = portrait && window.innerWidth < 950;
+  const show = narrowPortrait && !portraitDismissed;
   els.rotateNotice.hidden = !show;
+  els.rotateFull.hidden = isStandalone;
+  els.rotateFull.textContent = isIPhone && !isStandalone ? '如何全屏' : '进入全屏横屏';
+  els.portraitHint.hidden = !(narrowPortrait && portraitDismissed);
+  document.documentElement.classList.toggle('portrait-preview', narrowPortrait);
   if (show) {
     input?.cancelAll('orientation');
     game?.cancelCharge();
@@ -1380,6 +1439,7 @@ function setupEvents() {
   });
   els.restart.addEventListener('click', () => { restartMatch(); els.restart.blur(); });
   els.fullscreen.addEventListener('click', async () => { await toggleFullscreen(); els.fullscreen.blur(); });
+  els.displayTipClose.addEventListener('click', () => { hideDisplayTip(); els.displayTipClose.blur(); });
   els.modalClose.addEventListener('click', closeModal);
   els.modal.addEventListener('click', (event) => {
     if (event.target === els.modal && modalMode !== 'result') closeModal();
@@ -1397,7 +1457,7 @@ function setupEvents() {
   });
   els.rotateDismiss.addEventListener('click', () => {
     portraitDismissed = true;
-    els.rotateNotice.hidden = true;
+    syncOrientationNotice();
     els.rotateDismiss.blur();
     scheduleLayout();
   });
@@ -1438,6 +1498,7 @@ function setupEvents() {
   window.addEventListener('resize', handleViewportChange);
   window.addEventListener('orientationchange', () => {
     input?.cancelAll('orientationchange');
+    hideDisplayTip();
     portraitDismissed = false;
     syncOrientationNotice();
     scheduleLayout();

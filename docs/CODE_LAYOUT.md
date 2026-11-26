@@ -76,7 +76,7 @@ firing --resolve done--> enemyThink -> enemy -> ...
 | `dist/js/camera.js` | 玩家/双方/跟弹相机 |
 | `dist/js/input.js` | Pointer/键盘/取消，只产生命令 |
 | `dist/js/explosion.js` | 粒子形状与视觉噪声（不修改 mask） |
-| `dist/js/main.js` | 启动 `RemoteMatch`、HUD、全屏、PWA、测试钩子 |
+| `dist/js/main.js` | 启动 `RemoteMatch`、HUD、手机全屏说明、PWA、测试钩子 |
 | `dist/offline-api.js` | 静态站点适配：用 WASM 实现 EventSource + `/api/command` |
 | `dist/wasm/gunny.wasm` | `server/game` 经 `server/wasm` 编译的浏览器引擎（3.6 MB） |
 | `dist/wasm/wasm_exec.js` | 与 Go 工具链匹配的 WASM 运行时 |
@@ -100,8 +100,9 @@ npm test                  # Go + JS 物理测试
 npm run build:wasm        # 编译 dist/wasm/gunny.wasm
 npm run build:static      # 生成 gunny-static.zip（index.html 在根目录）
 npm run test:browser:static # 无 Go 后端的静态 WASM 验收
+npm run test:browser:mobile # 手机横屏/竖屏预览验收
 npm run check             # JS 语法 + gofmt + go vet
-npm run test:browser      # 需要 Chrome + puppeteer-core
+npm run test:browser      # 画面 + 控件 + 手机适配，需要 Chrome + puppeteer-core
 ```
 
 `ddt` 由 `bin/ddt` 实现，通过 `~/.local/bin/ddt` 软链接进入 PATH；

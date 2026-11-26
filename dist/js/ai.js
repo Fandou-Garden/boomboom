@@ -1,8 +1,8 @@
 /** New browser-only opponent. It solves with the same physics/terrain modules. */
-import { AI, CONTROLS, PHYSICS, COMBAT, BATTLE } from './config.js?v=15';
+import { AI, CONTROLS, PHYSICS, COMBAT, BATTLE } from './config.js?v=16';
 
 const COMBAT_TARGET_RADIUS = COMBAT.targetHitRadius;
-import { blastDamageFor, clamp, muzzlePoint, simulateShot } from './physics.js?v=15';
+import { blastDamageFor, clamp, muzzlePoint, simulateShot } from './physics.js?v=16';
 
 function triangularNoise(random) {
   // Range roughly [-1, 1], denser near zero.

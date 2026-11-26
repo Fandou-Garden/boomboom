@@ -58,6 +58,20 @@
 
 ## 4. 安全区
 
-- 使用 `env(safe-area-inset-*)`；底部控件至少留 34 px，主键至少 76 px。
-- 竖屏显示旋转提示并暂停；不把横屏 HUD 强行塞进竖屏。
-- 最窄横屏 667×375 已验证主键无遮挡、双方不被控件压住。
+- 使用 `env(safe-area-inset-*)`；底部控件至少留 34 px，主键至少留 76 px。
+- `--app-height` 优先跟随 `visualViewport.height`，并用 `top/left` 跟随
+  `visualViewport.offsetTop/offsetLeft`；CSS 同时提供 `100dvh` 回退，避免浏览器
+  地址栏展开/收起后把底部力度尺留在可视区外。
+- 竖屏显示旋转提示并暂停；不把横屏 HUD 强行塞进竖屏。点“先看看战场”只进入只读
+  预览，操控层保持 `pointer-events:none` 和低透明度，并常驻“竖屏仅预览”提示。
+- 最窄横屏 667×375 已验证主键无遮挡、双方不被控件压住；iPhone 剩余可视区
+  1024×386 也已验证力度尺、发射键、技能栏均在屏内。
+
+## 5. 手机浏览器与全屏
+
+- iPhone Safari 和多数嵌入浏览器不向网页开放元素 Fullscreen API，网页无法隐藏地址栏。
+- iPhone 上右上角全屏键不再请求必然失败的 API，而是打开顶部、可关闭的说明卡：
+  “分享 → 添加到主屏幕”；不会用红色错误框遮挡角度盘、力度尺或发射键。
+- 从主屏幕图标启动（`navigator.standalone` 或 `display-mode: standalone`）时不再显示
+  全屏键；普通浏览器内仍可横屏完整游玩。
+- Android/桌面浏览器保留 Fullscreen API 和横屏锁定；只有调用失败时才显示非阻断说明。

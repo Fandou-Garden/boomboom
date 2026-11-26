@@ -10,10 +10,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="风场弹道">
   <title>风场弹道 · Gunny Wind Arena</title>
-  <link rel="icon" href="assets/favicon.svg?v=15" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=15">
-  <link rel="manifest" href="manifest.webmanifest?v=15">
-  <link rel="stylesheet" href="styles.css?v=15">
+  <link rel="icon" href="assets/favicon.svg?v=16" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=16">
+  <link rel="manifest" href="manifest.webmanifest?v=16">
+  <link rel="stylesheet" href="styles.css?v=16">
 </head>
 <body>
   <div id="app" class="app">
@@ -22,7 +22,7 @@
     <header id="topbar" class="topbar">
       <section class="battle-hud" aria-label="双方状态与风力">
         <article class="combatant player-card" aria-label="玩家状态">
-          <span class="portrait"><img src="assets/portrait-player.png?v=15" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-player.png?v=16" alt=""></span>
           <div class="combatant-copy">
             <div class="name-row"><span class="team-dot"></span><strong>蓝波</strong><span class="role">你</span></div>
             <div class="hp-track"><i id="hpBar0"></i></div>
@@ -48,7 +48,7 @@
             <div class="hp-track"><i id="hpBar1"></i></div>
             <div class="hp-number" id="hp1">2000</div>
           </div>
-          <span class="portrait"><img src="assets/portrait-enemy.png?v=15" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-enemy.png?v=16" alt=""></span>
         </article>
       </section>
 
@@ -96,6 +96,12 @@
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite">拖动小地图可看战场 · 左下移动与调角</div>
+    <div id="portraitHint" class="portrait-hint" hidden>竖屏仅预览 · 把手机横过来操控</div>
+    <aside id="displayTip" class="display-tip" role="status" aria-live="polite" hidden>
+      <button id="displayTipClose" class="display-tip-close" type="button" aria-label="关闭全屏提示">×</button>
+      <strong id="displayTipTitle">全屏提示</strong>
+      <p id="displayTipText"></p>
+    </aside>
     <div id="turnFlash" class="turn-flash" aria-hidden="true"></div>
 
     <footer id="controls" class="controls" aria-label="战斗操控">
@@ -233,9 +239,10 @@
         <svg viewBox="0 0 64 64"><rect x="20" y="8" width="24" height="48" rx="5"/><path d="M27 49h10"/><path d="M8 31c0-12 9-21 20-22"/><path d="m22 3 7 6-8 5"/></svg>
       </div>
       <h2>把手机横过来</h2>
-      <p>全屏横屏能看到完整的双方战场与操控区。</p>
-      <button id="rotateFull" type="button">进入全屏横屏</button>
-      <button id="rotateDismiss" class="ghost" type="button">仍然竖屏试玩</button>
+      <p>横屏后画面与操控区会自动铺满可用区域。iPhone 浏览器无法隐藏地址栏，建议用 Safari 打开后点“分享 → 添加到主屏幕”。</p>
+      <button id="rotateFull" type="button">如何全屏</button>
+      <button id="rotateDismiss" class="ghost" type="button">先看看战场</button>
+      <small class="rotate-note">竖屏下仅预览，横屏后操控可用。</small>
     </div>
 
     <div id="loading" class="loading" role="status">
@@ -272,7 +279,7 @@
         preload.rel = 'preload';
         preload.as = 'fetch';
         preload.type = 'application/wasm';
-        preload.href = 'wasm/gunny.wasm?v=15';
+        preload.href = 'wasm/gunny.wasm?v=16';
         document.head.appendChild(preload);
         const loadScript = (src) => new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -282,14 +289,14 @@
           document.head.appendChild(script);
         });
         try {
-          await loadScript('wasm/wasm_exec.js?v=15');
-          await loadScript('offline-api.js?v=15');
+          await loadScript('wasm/wasm_exec.js?v=16');
+          await loadScript('offline-api.js?v=16');
         } catch (error) {
           console.error('离线引擎加载失败', error);
         }
       }
       try {
-        await import('./js/main.js?v=15');
+        await import('./js/main.js?v=16');
       } catch (error) {
         console.error('前端入口加载失败', error);
         const fatal = document.getElementById('fatal');
