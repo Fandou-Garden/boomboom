@@ -10,10 +10,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="风场弹道">
   <title>风场弹道 · Gunny Wind Arena</title>
-  <link rel="icon" href="assets/favicon.svg?v=14" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=14">
-  <link rel="manifest" href="manifest.webmanifest?v=14">
-  <link rel="stylesheet" href="styles.css?v=14">
+  <link rel="icon" href="assets/favicon.svg?v=15" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=15">
+  <link rel="manifest" href="manifest.webmanifest?v=15">
+  <link rel="stylesheet" href="styles.css?v=15">
 </head>
 <body>
   <div id="app" class="app">
@@ -22,7 +22,7 @@
     <header id="topbar" class="topbar">
       <section class="battle-hud" aria-label="双方状态与风力">
         <article class="combatant player-card" aria-label="玩家状态">
-          <span class="portrait"><img src="assets/portrait-player.png?v=14" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-player.png?v=15" alt=""></span>
           <div class="combatant-copy">
             <div class="name-row"><span class="team-dot"></span><strong>蓝波</strong><span class="role">你</span></div>
             <div class="hp-track"><i id="hpBar0"></i></div>
@@ -48,7 +48,7 @@
             <div class="hp-track"><i id="hpBar1"></i></div>
             <div class="hp-number" id="hp1">2000</div>
           </div>
-          <span class="portrait"><img src="assets/portrait-enemy.png?v=14" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-enemy.png?v=15" alt=""></span>
         </article>
       </section>
 
@@ -272,7 +272,7 @@
         preload.rel = 'preload';
         preload.as = 'fetch';
         preload.type = 'application/wasm';
-        preload.href = 'wasm/gunny.wasm?v=14';
+        preload.href = 'wasm/gunny.wasm?v=15';
         document.head.appendChild(preload);
         const loadScript = (src) => new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -282,14 +282,14 @@
           document.head.appendChild(script);
         });
         try {
-          await loadScript('wasm/wasm_exec.js?v=14');
-          await loadScript('offline-api.js?v=14');
+          await loadScript('wasm/wasm_exec.js?v=15');
+          await loadScript('offline-api.js?v=15');
         } catch (error) {
           console.error('离线引擎加载失败', error);
         }
       }
       try {
-        await import('./js/main.js?v=14');
+        await import('./js/main.js?v=15');
       } catch (error) {
         console.error('前端入口加载失败', error);
         const fatal = document.getElementById('fatal');

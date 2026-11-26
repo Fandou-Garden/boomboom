@@ -159,11 +159,12 @@ HUD、血条、风力、回合、距离、移动/调角/发射按钮全部是 Ca
 
 ### 1.4 角色动画与插值
 
-角色帧序直接取自原版 `GameCharacter.as` 的常量，不是按“行走/站立/开炮”猜的：
+角色帧序取自原版 `GameCharacter.as` 的常量，不是按“行走/站立/开炮”猜的；仅待机跳过
+6/7 两个会导致循环头部抽动的仰头反应帧：
 
 | 动作 | 原版帧序列（3×13 sheet 索引） | 触发 |
 | --- | --- | --- |
-| `STAND` | `0, 6, 7, 8, 9, 10` | 自己/敌方待机 |
+| `STAND` | `0, 8, 9, 10` | 自己/敌方待机（移除 6/7 的仰头反应帧） |
 | `WALK` | `1, 2, 3, 4, 5` | 左右移动 |
 | `SHOWGUN` | `19, 20, 21` | 按住蓄力、轮到该角色 |
 | `SHOT` | `22, 23, 26, 27` | 开炮后的 0.28 s |
@@ -355,14 +356,14 @@ dead 图层硬拼，以免风格混杂。曾评估 map/1014（2106×1500，自�
 | `crater-50.png` 等 | `Tank.Flash/resource/v1.1/image/bomb/crater/50` 等 | 原始弹坑/边缘图 |
 | `weapon-bazooka3.png` | `.../image/arm/bazooka3/00.png` | 火箭筒 |
 | `shell-bomb.png` | `.../image/arm/bomb/00.png` | 飞行炮弹 |
-| `character-player-sheet.png` | `Resource/v1.1/image/equip/{m}/...` 的装备图层 | 网页合成的 3×13 人物 sheet；帧序按原版 `GameCharacter.as` |
-| `character-enemy-sheet.png` | `Resource/v1.1/image/equip/{f}/...` | 同上，女性角色 |
+| `character-player-sheet.png` | `.../image/equip/m/suits/suits571/1/game.png` | 原版完整套装 3×13 图集（114×95/格）；帧序按 `GameCharacter.as` |
+| `character-enemy-sheet.png` | `.../image/equip/f/suits/suits45/1/game.png` | 原版完整套装 3×13 图集；女性角色 |
 | `portrait-player.png` / `portrait-enemy.png` | 网页从人物 sheet 裁切 | 128×128 驾驶舱头像 |
 
-角色 sheet 是按原装备 PNG 重新合成的网页资源；站立/行走/举枪/开炮/受击的帧序来自
-`GameCharacter.as`，武器显隐与层级来自 `GamePlayer.as`。它不是逐帧导出的完整 SWF 时间线，
-没有复刻攀爬、跳跃等本版未使用的动作。地图、武器、炮弹和弹坑是原始素材；人物合成、相机、
-分块破坏和粒子为网页实现。
+角色 sheet 直接使用原版完整套装图集，不再由装备图层现场合成；站立/行走/举枪/开炮/
+受击的帧序来自 `GameCharacter.as`，其中待机去掉 6/7 两个仰头反应帧以避免循环时头部抽动。
+武器显隐与层级来自 `GamePlayer.as`。它不是逐帧导出的完整 SWF 时间线，没有复刻攀爬、
+跳跃等本版未使用的动作。地图、武器、炮弹和弹坑是原始素材；相机、分块破坏和粒子为网页实现。
 
 ## 七、目录
 
@@ -446,8 +447,8 @@ CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' npm r
 - `Crater=241` 原始素材缺失，弹坑底层图使用 50/401/4 替代；多层不规则边缘是网页新增。
 - 五件主武器的炮塔/炮弹素材、角度与弹坑来自原版资源；1–8 道具、增幅、无限体力、治疗与 POW 是网页新增单机规则；没有宠物技能、队友伤害或联机同步。
 - 没有商城、房间、登录、联机；电脑为本地 AI（NEW）。
-- 地图/角色/炮弹素材来自仓库；人物 sheet 是网页对装备 PNG 的合成。待机/移动/举枪/
-  开炮/受击的帧序已按 `GameCharacter.as` 对齐，但不是完整 SWF 时间线。
+- 地图/角色/炮弹素材来自仓库；人物 sheet 使用原版完整套装图集。待机/移动/举枪/
+  开炮/受击的帧序已按 `GameCharacter.as` 对齐（待机去掉 6/7 仰头帧），但不是完整 SWF 时间线。
 - iPhone Safari 不支持网页元素 Fullscreen API 时会给出横屏/主屏幕提示，无法由网页隐藏
   地址栏；Android Chrome、桌面浏览器支持度见 [`docs/IMMERSIVE_UI.md`](docs/IMMERSIVE_UI.md)。
 

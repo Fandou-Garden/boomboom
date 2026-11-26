@@ -84,7 +84,7 @@ function serve() {
 
     const idle = await page.evaluate(() => window.__GUNNY_TEST__.snapshot());
     assert.equal(idle.phase, 'player');
-    assert.ok([0, 6, 7, 8, 9, 10].includes(idle.poses[0].frame), 'static idle must use STAND');
+    assert.ok([0, 8, 9, 10].includes(idle.poses[0].frame), 'static idle must use calm STAND frames');
     assert.equal(idle.poses[0].weaponVisible, false, 'static idle weapon must stay on the back');
 
     await page.evaluate(() => window.__GUNNY_TEST__.selectWeapon('fire'));

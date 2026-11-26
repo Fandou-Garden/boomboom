@@ -1,7 +1,7 @@
 /** Canvas renderer. World layers use world coordinates; HUD stays in DOM. */
-import { PHYSICS, COMBAT, WORLD, COLORS } from './config.js?v=14';
-import { clamp, muzzlePoint, weaponGripPoint } from './physics.js?v=14';
-import { projectPoint } from './camera.js?v=14';
+import { PHYSICS, COMBAT, WORLD, COLORS } from './config.js?v=15';
+import { clamp, muzzlePoint, weaponGripPoint } from './physics.js?v=15';
+import { projectPoint } from './camera.js?v=15';
 
 // SOURCE: GameCharacter.as action frame arrays. The 3×13 sheet is a frame atlas,
 // not three independent suit rows: STAND/WALK/SHOWGUN/SHOT/HIT all index into it.
@@ -207,8 +207,9 @@ export class Renderer {
       const t = game.visualTime ?? game.time ?? 0;
       return ACTOR_FRAMES.show[Math.floor(t * 10) % ACTOR_FRAMES.show.length];
     }
-    // SOURCE: STAND loops [0,6,7,8,9,10]. Frame 0 is the resting pose with the
-    // weapon stowed on the back; frame 19 is SHOWGUN, not an idle frame.
+    // SOURCE: GameCharacter.as STAND includes 0,6,7,8,9,10, but frames 6/7
+    // throw the head back and read as a reaction, not idle. Loop the calm
+    // forward-facing frames instead; frame 0 has the weapon stowed on the back.
     const t = game.visualTime ?? game.time ?? 0;
     const index = Math.floor(t * 5 + actor.index * 2) % ACTOR_FRAMES.stand.length;
     return ACTOR_FRAMES.stand[index];

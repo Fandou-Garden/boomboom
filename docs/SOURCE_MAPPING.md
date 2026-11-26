@@ -181,16 +181,17 @@ return (float)num2 / 10f;
 | `assets/portrait-player.png` / `portrait-enemy.png` | 网页从人物 sheet 裁切 | 128×128 驾驶舱头像；不是原版独立头像文件 |
 | `assets/shell-bomb.png` | `.../image/arm/bomb/00.png` | 飞行炮弹图标（78×78） |
 | `assets/weapon-bazooka3.png` | `.../image/arm/bazooka3/00.png` | 火箭筒武器贴图（78×78） |
-| `assets/character-player-sheet.png` | `Resource/v1.1/image/equip/m/...` | 网页合成的男性 3×13 人物 sheet；帧序按 `GameCharacter.as` |
-| `assets/character-enemy-sheet.png` | `Resource/v1.1/image/equip/f/...` | 网页合成的女性 3×13 人物 sheet；同上 |
+| `assets/character-player-sheet.png` | `.../image/equip/m/suits/suits571/1/game.png` | 原版男性完整套装 3×13 图集；帧序按 `GameCharacter.as` |
+| `assets/character-enemy-sheet.png` | `.../image/equip/f/suits/suits45/1/game.png` | 原版女性完整套装 3×13 图集；同上 |
 
-**说明（PORT/NEW）**：地图、弹坑、武器和炮弹来自原仓库；人物贴图是把
-`Resource/v1.1/image/equip/` 的装备 PNG 合成为 3×13 人物 sheet。动作帧序不是自拟的，
-而是按 `GameCharacter.as` 的常量索引同一张 sheet：
+**说明（PORT/NEW）**：地图、弹坑、武器和炮弹来自原仓库；人物贴图直接使用原版
+`Resource/v1.1/image/equip/{m,f}/suits/.../game.png` 完整套装图集，不再由装备图层合成。
+动作帧序不是自拟的，而是按 `GameCharacter.as` 的常量索引同一张 sheet；待机去掉 6/7
+两个仰头反应帧，避免循环时头部抽动：
 
 | 动作 | 帧索引 |
 | --- | --- |
-| `STAND` | `0, 6, 7, 8, 9, 10` |
+| `STAND` | `0, 8, 9, 10`（原版含 6/7，作为仰头反应帧跳过） |
 | `WALK` | `1, 2, 3, 4, 5` |
 | `SHOWGUN` | `19, 20, 21` |
 | `SHOT` | `22, 23, 26, 27` |

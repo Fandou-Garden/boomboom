@@ -81,7 +81,7 @@ STATIC WASM ACCEPTANCE PASS
 
 操作验收直接读取 `window.__GUNNY_TEST__.snapshot().poses`，断言角色姿势而不只是截图：
 
-- 待机：玩家和电脑都必须是 `STAND` 帧（`0/6/7/8/9/10`），且 `weaponVisible=false`；
+- 待机：玩家和电脑都必须是 `STAND` 帧（`0/8/9/10`；6/7 为仰头反应帧，不参与循环），且 `weaponVisible=false`；
 - 按住蓄力：必须是 `SHOWGUN` 帧（`19/20/21`），且 `weaponVisible=true`；
 - 开炮后：必须是 `SHOT` 帧（`22/23/26/27`），且 `weaponVisible=true`。
 
@@ -89,8 +89,12 @@ STATIC WASM ACCEPTANCE PASS
 开炮动画固定 0.28 s，一次齐射（附加攻击/散弹）只触发一轮，不按炮弹数重复抬手。
 
 流畅度方面：服务器快照 25 Hz，前端用本地 `visualTime` 驱动动画，角色位置按
-`tau=22 ms` 指数平滑，炮弹用 `x+v·t+½a·t²` 外推（上限 60 ms）。本机 headless Chromium
-启用 GPU 时实测约 120 fps；触摸设备/小窗口将画布 backing store 限制在 1.5× DPR。
+`tau=22 ms` 指数平滑，炮弹用 `x+v·t+½a·t²` 外推（上限 60 ms）。小地图限制在约 30 Hz，
+天空渐变按高度缓存，不再每帧分配；开炮前选择的武器会短暂锁定，避免飞行中的旧快照把 HUD
+回退到默认武器。本机 headless Chromium 启用 GPU 时实测约 120 fps；触摸设备/小窗口将
+画布 backing store 限制在 1.5× DPR。挖坑后服务端会重算角色所在列的真实地表高度并立即
+刷新支撑点，回归测试 `TestCraterReseatsActorAndWalkStaysOnSurface` 已覆盖角色不陷入弹坑、
+行走时脚底贴合地形。
 
 ## 6. 静态站点（WASM）
 
@@ -131,9 +135,12 @@ WASM 包 3.6 MB，地图 349 KB；`dist/wasm/gunny.wasm`、`dist/wasm/wasm_exec.
 ## 9. 公网发布
 
 - 稳定地址：`https://slnp165x30zq.reakh.fun/`，`site_id=slnp165x30zq`。
-- 本轮发布为 **版本 6**，静态资源查询版本 `?v=14`，状态 `PUBLISHED`。
-- 公网 `index.html` 已确认引用 `styles.css?v=14` 与 `js/main.js?v=14`；
-  `wasm/gunny.wasm?v=14` 返回 HTTP 200。
+- 历史：版本 6 首次切换到浏览器内 WASM；版本 7 修正文档与加载文案尺寸。
+- 本轮发布为 **版本 8**，静态资源查询版本 `?v=15`，状态 `PUBLISHED`。
+- 版本 8 合并远端 `de99e9b`：挖坑后角色支撑点修复、待机移除 6/7 仰头帧并降到 5 fps、
+  待确认武器保护、小地图约 30 Hz、天空渐变缓存；WASM 由合并后的 Go 代码重编。
+- 公网 `index.html` 已确认引用 `styles.css?v=15` 与 `js/main.js?v=15`；
+  `wasm/gunny.wasm?v=15` 返回 HTTP 200。
 - 公网 844×390 冒烟：后端 `wasm`、双方 x=300/1700、待机帧 0/8、120 fps、
   玩家 1 发落地生成 1 个弹坑、console/page error 为 0。
 - 公网资源首次加载约 3.6 MB WASM + 349 KB 地图；浏览器随后使用版本化缓存。
