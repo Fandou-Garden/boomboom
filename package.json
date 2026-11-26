@@ -1,0 +1,20 @@
+{
+  "name": "gunny-wind-arena",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Gunny turn-based artillery duel with an authoritative Go server and JS renderer.",
+  "scripts": {
+    "start": "sh server/run.sh",
+    "start:debug": "GUNNY_DEBUG=1 sh server/run.sh",
+    "test": "sh server/test.sh && sh scripts/node.sh --test tests/physics.test.mjs",
+    "test:map": "python3 tests/verify_map_parity.py",
+    "check": "sh server/check.sh",
+    "test:browser": "npm run test:browser:visual && npm run test:browser:controls",
+    "test:browser:visual": "sh scripts/node.sh tests/browser_acceptance.cjs",
+    "test:browser:controls": "sh scripts/node.sh tests/browser_controls_audio.cjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^23.11.1"
+  }
+}

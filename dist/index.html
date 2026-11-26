@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#061f2c">
+  <meta name="description" content="移植自 Gunny 源码的单机横屏弹道对战：2000×1425 大地图、可破坏地形、风向、五种经典武器与 1–8 战斗道具栏。">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="风场弹道">
+  <title>风场弹道 · Gunny Wind Arena</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css?v=13">
+</head>
+<body>
+  <div id="app" class="app">
+    <canvas id="scene" width="1280" height="720" aria-label="弹道对战战场"></canvas>
+
+    <header id="topbar" class="topbar">
+      <section class="battle-hud" aria-label="双方状态与风力">
+        <article class="combatant player-card" aria-label="玩家状态">
+          <span class="portrait"><img src="assets/portrait-player.png" alt=""></span>
+          <div class="combatant-copy">
+            <div class="name-row"><span class="team-dot"></span><strong>蓝波</strong><span class="role">你</span></div>
+            <div class="hp-track"><i id="hpBar0"></i></div>
+            <div class="hp-number" id="hp0">10000</div>
+          </div>
+        </article>
+
+        <div class="round-center" aria-live="polite">
+          <div class="wind-pill">
+            <span id="windArrow" class="wind-arrow" aria-hidden="true">→</span>
+            <b id="windValue">0.0</b><small>风</small>
+            <span id="windDir" class="wind-dir">无风</span>
+            <span id="windBars" class="wind-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          </div>
+          <div class="turn-line">
+            <span id="round">回合 01</span><i></i><b id="turn">你的回合</b><span id="countdown" class="countdown" hidden>30s</span>
+          </div>
+        </div>
+
+        <article class="combatant enemy-card" aria-label="电脑状态">
+          <div class="combatant-copy">
+            <div class="name-row"><strong>芽芽</strong><span class="role enemy">电脑</span><span class="team-dot"></span></div>
+            <div class="hp-track"><i id="hpBar1"></i></div>
+            <div class="hp-number" id="hp1">2000</div>
+          </div>
+          <span class="portrait"><img src="assets/portrait-enemy.png" alt=""></span>
+        </article>
+      </section>
+
+      <nav class="utilities" aria-label="游戏工具">
+        <button id="sound" class="icon-button" type="button" aria-label="开启音效" title="音效">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path class="sound-wave" d="M16 9c1.2 1.6 1.2 4.4 0 6M19 6c3 3.3 3 8.7 0 12"/></svg>
+        </button>
+        <button id="timerToggle" class="icon-button timer-toggle" type="button" aria-label="开启练习倒计时" aria-pressed="false" title="练习倒计时（默认关）">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.6 1.6M9 3h6"/></svg>
+        </button>
+        <button id="help" class="icon-button" type="button" aria-label="操作说明" title="说明">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.6 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1.1.9-1.1 1.7"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>
+        </button>
+        <button id="fullscreen" class="icon-button" type="button" aria-label="进入全屏" title="全屏">
+          <svg class="fs-icon fs-enter" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5"/></svg>
+          <svg class="fs-icon fs-exit" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+        <button id="weaponButton" class="icon-button" type="button" aria-label="更换主武器" title="更换主武器（开局）">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20 9 15M7 17l-3 3M8.5 9.5l6-6 3 3-6 6-3 3-3-3 3-3Z"/><path d="m14 4 6 6"/></svg>
+        </button>
+        <button id="heal" class="icon-button heal-button" type="button" aria-label="自我治疗：恢复生命，消耗本回合" aria-keyshortcuts="H" title="治疗（H）">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.2-7-9.2A4 4 0 0 1 12 7a4 4 0 0 1 7 3.8C19 15.8 12 20 12 20Z"/><path d="M8.5 12h7M12 8.5v7"/></svg>
+          <b id="healCount" class="icon-count">1</b>
+        </button>
+        <button id="restart" class="icon-button" type="button" aria-label="重新开始" title="重开">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5"/><path d="M19 12a7 7 0 1 0-2.1 5"/></svg>
+        </button>
+      </nav>
+    </header>
+
+    <aside class="minimap-panel" aria-label="小地图与视野">
+      <div class="minimap-head">
+        <span class="minimap-title">海湾战场</span>
+        <span id="minimapDistance" class="minimap-distance">170m</span>
+        <button id="recenter" class="recenter" type="button" title="一键回到战场">回战场</button>
+      </div>
+      <div id="minimapWrap" class="minimap-wrap" title="拖动小地图移动视野；只影响镜头">
+        <canvas id="minimap" width="280" height="128" aria-label="小地图"></canvas>
+      </div>
+      <div class="minimap-meta">
+        <span><i class="dot player"></i>蓝波</span>
+        <span><i class="dot enemy"></i>芽芽</span>
+        <span id="elevationNote">等高</span>
+      </div>
+    </aside>
+
+    <div id="toast" class="toast" role="status" aria-live="polite">拖动小地图可看战场 · 左下移动与调角</div>
+    <div id="turnFlash" class="turn-flash" aria-hidden="true"></div>
+
+    <footer id="controls" class="controls" aria-label="战斗操控">
+      <section id="joystick" class="joystick" aria-label="移动与角度转盘">
+        <button id="left" class="joy-button joy-left" type="button" data-hold="left" aria-label="按住向左移动">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/></svg>
+        </button>
+        <button id="right" class="joy-button joy-right" type="button" data-hold="right" aria-label="按住向右移动">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 5 7 7-7 7"/></svg>
+        </button>
+        <button id="up" class="joy-button joy-up" type="button" data-hold="up" aria-label="按住抬高角度">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 14.5 7-7 7 7"/></svg>
+        </button>
+        <button id="down" class="joy-button joy-down" type="button" data-hold="down" aria-label="按住降低角度">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 9.5 7 7 7-7"/></svg>
+        </button>
+        <div class="joy-center angle-readout" title="上下拖动角度可直接微调">
+          <span>角度</span>
+          <div><b id="angle">45</b><em>°</em></div>
+          <small id="angleNote">朝右上</small>
+        </div>
+      </section>
+
+      <section class="power-panel" aria-label="力度、推荐与状态">
+        <div class="power-head">
+          <span class="power-current"><b id="forcePct">0</b><em>%</em></span>
+          <span id="powerText" class="power-recommend"><b id="recommendText" class="recommend-value">推荐 —</b><i class="power-sep"> / </i><b id="lastPowerText" class="last-value">上一发 —</b></span>
+        </div>
+        <div id="chargeTrack" class="power-track" role="progressbar" aria-label="蓄力力度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <i id="chargeFill" class="charge-fill"></i>
+          <span class="power-ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span id="recommendBand" class="recommend-band" hidden aria-hidden="true"></span>
+          <span id="lastPowerMarker" class="last-power-marker" hidden aria-hidden="true"></span>
+          <span id="recommendMarker" class="recommend-marker" hidden aria-hidden="true"></span>
+          <span id="chargeThumb" class="charge-thumb" aria-hidden="true"></span>
+        </div>
+        <div class="power-scale" aria-hidden="true"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+        <div class="power-foot">
+          <span id="forceRaw">力度 0 / 2000</span>
+          <span id="aimStatus" class="aim-status">读取风场…</span>
+          <span id="lastShot" class="sr-only">—</span>
+        </div>
+        <div class="attributes" aria-label="角色属性">
+          <span class="attr hp">血量 <b id="statHp">10000</b></span>
+          <span class="attr stamina">体力 <b id="statStamina">∞</b></span>
+          <span class="attr energy">能量 <b id="statEnergy">0</b></span>
+          <span class="attr weapon">武器 <b id="statWeapon">水果篮</b></span>
+        </div>
+      </section>
+
+      <section class="skill-rail" aria-label="战斗道具栏 1 到 8">
+        <button id="skillExtra2" class="skill-button attack-skill" type="button" data-skill="extra2" data-kind="attack" aria-label="1 附加攻击2次：主炮后额外追加2发，共3发" aria-keyshortcuts="1">
+          <kbd class="skill-key" aria-hidden="true">1</kbd>
+          <svg class="skill-icon icon-flame" viewBox="0 0 32 32" aria-hidden="true"><path d="M17.4 2.8c.9 5.6-4.1 7.1-4.1 12.1 0 2.1 1.5 3.6 3.4 3.6 2.2 0 3.7-1.8 3.3-4.3 3.6 2.4 5.8 5.7 5.8 9.2A9.8 9.8 0 0 1 16 29.2a9.8 9.8 0 0 1-9.8-9.8c0-6.7 5.4-10.2 11.2-16.6Z"/></svg>
+          <span class="skill-copy">附加×2</span><b class="skill-badge" id="skillExtra2Count">3</b>
+        </button>
+        <button id="skillScatter" class="skill-button attack-skill" type="button" data-skill="scatter" data-kind="attack" aria-label="2 散弹：五枚宽角炮弹覆盖落点" aria-keyshortcuts="2">
+          <kbd class="skill-key" aria-hidden="true">2</kbd>
+          <svg class="skill-icon icon-splash" viewBox="0 0 32 32" aria-hidden="true"><path d="M17 3.2c4.1 5.6 7.6 8.8 7.6 13.8a8.6 8.6 0 1 1-17.2 0C7.4 12 10.8 8.8 17 3.2Z"/><circle cx="8.2" cy="8.4" r="2.1"/><circle cx="24.8" cy="10.4" r="1.6"/><circle cx="6.2" cy="17" r="1.2"/></svg>
+          <span class="skill-copy">散弹</span><b class="skill-badge" id="skillScatterCount">5</b>
+        </button>
+        <button id="skillExtra1" class="skill-button attack-skill" type="button" data-skill="extra1" data-kind="attack" aria-label="3 附加攻击1次：主炮后额外追加1发，共2发" aria-keyshortcuts="3">
+          <kbd class="skill-key" aria-hidden="true">3</kbd>
+          <svg class="skill-icon icon-bolt" viewBox="0 0 32 32" aria-hidden="true"><path d="M18.4 2 6.8 18.2h7.3L12 30l12-17h-7.2L18.4 2Z"/></svg>
+          <span class="skill-copy">附加×1</span><b class="skill-badge" id="skillExtra1Count">2</b>
+        </button>
+        <button id="skillBoost50" class="skill-button boost-skill" type="button" data-skill="boost50" data-kind="boost" aria-label="4 伤害增幅50%" aria-keyshortcuts="4">
+          <kbd class="skill-key" aria-hidden="true">4</kbd>
+          <svg class="skill-icon icon-cloud" viewBox="0 0 32 32" aria-hidden="true"><path d="M9.4 26.2h14.7a5.4 5.4 0 0 0 .5-10.8 8.7 8.7 0 0 0-16.6-1.1 6.1 6.1 0 0 0 1.4 11.9Z"/></svg>
+          <span class="skill-copy">增幅</span><b class="skill-badge" id="skillBoost50Count">50</b>
+        </button>
+        <button id="skillBoost40" class="skill-button boost-skill" type="button" data-skill="boost40" data-kind="boost" aria-label="5 伤害增幅40%" aria-keyshortcuts="5">
+          <kbd class="skill-key" aria-hidden="true">5</kbd>
+          <svg class="skill-icon icon-cloud" viewBox="0 0 32 32" aria-hidden="true"><path d="M9.4 26.2h14.7a5.4 5.4 0 0 0 .5-10.8 8.7 8.7 0 0 0-16.6-1.1 6.1 6.1 0 0 0 1.4 11.9Z"/></svg>
+          <span class="skill-copy">增幅</span><b class="skill-badge" id="skillBoost40Count">40</b>
+        </button>
+        <button id="skillBoost30" class="skill-button boost-skill" type="button" data-skill="boost30" data-kind="boost" aria-label="6 伤害增幅30%" aria-keyshortcuts="6">
+          <kbd class="skill-key" aria-hidden="true">6</kbd>
+          <svg class="skill-icon icon-cloud" viewBox="0 0 32 32" aria-hidden="true"><path d="M9.4 26.2h14.7a5.4 5.4 0 0 0 .5-10.8 8.7 8.7 0 0 0-16.6-1.1 6.1 6.1 0 0 0 1.4 11.9Z"/></svg>
+          <span class="skill-copy">增幅</span><b class="skill-badge" id="skillBoost30Count">30</b>
+        </button>
+        <button id="skillBoost20" class="skill-button boost-skill" type="button" data-skill="boost20" data-kind="boost" aria-label="7 伤害增幅20%" aria-keyshortcuts="7">
+          <kbd class="skill-key" aria-hidden="true">7</kbd>
+          <svg class="skill-icon icon-cloud" viewBox="0 0 32 32" aria-hidden="true"><path d="M9.4 26.2h14.7a5.4 5.4 0 0 0 .5-10.8 8.7 8.7 0 0 0-16.6-1.1 6.1 6.1 0 0 0 1.4 11.9Z"/></svg>
+          <span class="skill-copy">增幅</span><b class="skill-badge" id="skillBoost20Count">20</b>
+        </button>
+        <button id="skillBoost10" class="skill-button boost-skill" type="button" data-skill="boost10" data-kind="boost" aria-label="8 伤害增幅10%" aria-keyshortcuts="8">
+          <kbd class="skill-key" aria-hidden="true">8</kbd>
+          <svg class="skill-icon icon-cloud" viewBox="0 0 32 32" aria-hidden="true"><path d="M9.4 26.2h14.7a5.4 5.4 0 0 0 .5-10.8 8.7 8.7 0 0 0-16.6-1.1 6.1 6.1 0 0 0 1.4 11.9Z"/></svg>
+          <span class="skill-copy">增幅</span><b class="skill-badge" id="skillBoost10Count">10</b>
+        </button>
+      </section>
+
+      <div class="fire-cluster">
+        <button id="pow" class="pow-button" type="button" disabled aria-label="POW 大招未充能，当前 0%" aria-keyshortcuts="R">
+          <kbd class="skill-key pow-key" aria-hidden="true">R</kbd>
+          <span class="pow-label">POW</span>
+          <span id="powPct" class="pow-pct">0%</span>
+          <i class="pow-ring" aria-hidden="true"></i>
+        </button>
+        <button id="fire" class="fire-button" type="button" aria-label="按住蓄力，松手发射" title="按住蓄力；桌面向上拖动可增加力度">
+          <span class="fire-glyph" aria-hidden="true">
+            <svg viewBox="0 0 32 32"><path d="M7 21h11l5-7h4l-2 7 2 7h-4l-5-7H7Z"/><path d="M5 16h7M9 11l4 5M9 26l4-5"/><circle cx="25" cy="21" r="1.5"/></svg>
+          </span>
+          <span class="fire-copy"><b id="fireLabel">发射</b><small>长按蓄力</small></span>
+        </button>
+      </div>
+    </footer>
+
+    <section id="weaponPicker" class="weapon-picker" role="dialog" aria-modal="true" aria-labelledby="weaponPickerTitle" hidden>
+      <div class="weapon-dialog">
+        <span class="weapon-kicker">GUNNY · CLASSIC ARSENAL</span>
+        <h1 id="weaponPickerTitle">选择主武器</h1>
+        <p class="weapon-lead">开局可自由更换，第一发炮弹出手后本局锁定。五件武器均按原版炮塔与炮弹资源重制。</p>
+        <div id="weaponGrid" class="weapon-grid" role="radiogroup" aria-label="五种经典武器"></div>
+        <div class="weapon-dialog-foot">
+          <span id="weaponSource">选择后开始战斗</span>
+          <button id="weaponConfirm" class="weapon-confirm" type="button">开始战斗</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
+      <article class="dialog-card">
+        <button id="modalClose" class="dialog-close" type="button" aria-label="关闭">×</button>
+        <span class="dialog-kicker">GUNNY · WIND ARENA</span>
+        <h1 id="modalTitle">操作说明</h1>
+        <div id="modalBody" class="dialog-body"></div>
+        <button id="modalAction" class="dialog-action" type="button">回到对战</button>
+      </article>
+    </div>
+
+    <div id="rotateNotice" class="rotate-notice" hidden>
+      <div class="rotate-icon" aria-hidden="true">
+        <svg viewBox="0 0 64 64"><rect x="20" y="8" width="24" height="48" rx="5"/><path d="M27 49h10"/><path d="M8 31c0-12 9-21 20-22"/><path d="m22 3 7 6-8 5"/></svg>
+      </div>
+      <h2>把手机横过来</h2>
+      <p>全屏横屏能看到完整的双方战场与操控区。</p>
+      <button id="rotateFull" type="button">进入全屏横屏</button>
+      <button id="rotateDismiss" class="ghost" type="button">仍然竖屏试玩</button>
+    </div>
+
+    <div id="loading" class="loading" role="status">
+      <div class="loader-orbit" aria-hidden="true"><i></i><i></i><i></i></div>
+      <strong>正在装载海湾战场</strong>
+      <span>原版地图 1001 · 4000×1425 · 可破坏地形</span>
+    </div>
+
+    <div id="fatal" class="fatal" hidden>
+      <strong>游戏装载失败</strong>
+      <p id="fatalText">请通过本地 HTTP 服务打开页面后再试。</p>
+    </div>
+  </div>
+  <noscript>需要启用 JavaScript 才能游玩。</noscript>
+  <script type="module" src="js/main.js?v=13"></script>
+</body>
+</html>

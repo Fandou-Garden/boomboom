@@ -1,0 +1,209 @@
+#!/bin/sh
+# ddt — start / stop the local Gunny Go server from any directory.
+# Usage: ddt [start|debug|stop|restart|status|logs|open|fg]
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+PORT="${DDT_PORT:-8000}"
+ADDR=":${PORT}"
+URL="http://127.0.0.1:${PORT}/"
+RUN_DIR="$ROOT/.run"
+BIN="$RUN_DIR/gunny-server"
+PID_FILE="$RUN_DIR/gunny-${PORT}.pid"
+LOG_FILE="$RUN_DIR/gunny-${PORT}.log"
+mkdir -p "$RUN_DIR"
+
+find_go() {
+  if [ -n "${GO_BIN:-}" ] && [ -x "${GO_BIN}" ]; then printf '%s\n' "$GO_BIN"; return 0; fi
+  if command -v go >/dev/null 2>&1; then command -v go; return 0; fi
+  for c in /opt/homebrew/bin/go /usr/local/bin/go "$HOME/sdk/go1.24.3/bin/go" /usr/bin/go; do
+    if [ -x "$c" ]; then printf '%s\n' "$c"; return 0; fi
+  done
+  return 1
+}
+
+pid_of() {
+  [ -f "$PID_FILE" ] || return 1
+  pid=$(cat "$PID_FILE" 2>/dev/null || true)
+  [ -n "$pid" ] || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+  printf '%s\n' "$pid"
+}
+
+healthy() {
+  curl -fsS --max-time 1 "${URL}healthz" >/dev/null 2>&1
+}
+
+listener_pid() {
+  lsof -nP -tiTCP:"${PORT}" -sTCP:LISTEN 2>/dev/null | head -n 1
+}
+
+repo_server_pid() {
+  pid=$(listener_pid)
+  [ -n "$pid" ] || return 1
+  cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1)
+  [ "$cwd" = "$ROOT/server" ] || return 1
+  printf '%s\n' "$pid"
+}
+
+running_debug() {
+  pid=$(listener_pid)
+  [ -n "$pid" ] || return 1
+  ps -p "$pid" -o command= 2>/dev/null | grep -q -- "-debug"
+}
+
+open_url() {
+  printf 'Gunny: %s\n' "$URL"
+  if [ "${DDT_NO_OPEN:-0}" != "1" ] && command -v open >/dev/null 2>&1; then
+    open "$URL" >/dev/null 2>&1 || true
+  fi
+}
+
+build() {
+  GO=$(find_go) || {
+    echo "找不到 Go。请安装 Go 1.21+，或设置 GO_BIN=/path/to/go" >&2
+    exit 1
+  }
+  echo "编译 Go 服务端…"
+  (cd "$ROOT/server" && "$GO" build -o "$BIN" .)
+}
+
+launch() {
+  debug_flag="${1:-}"
+  if healthy; then
+    if [ "$debug_flag" = "debug" ] && ! running_debug; then
+      echo "当前不是调试模式，重启以开启调试。"
+      stop_server
+    else
+      if ! pid_of >/dev/null 2>&1; then
+        if old_pid=$(repo_server_pid); then
+          echo "$old_pid" > "$PID_FILE"
+          echo "已接管现有服务（PID ${old_pid}）。"
+        fi
+      fi
+      echo "服务已在运行（端口 ${PORT}），直接打开。"
+      open_url
+      return 0
+    fi
+  fi
+  if pid_of >/dev/null 2>&1; then
+    echo "发现旧进程，先停止。"
+    stop_server
+  fi
+  build
+  : > "$LOG_FILE"
+  echo "启动服务端（端口 ${PORT}）…"
+  if [ "$debug_flag" = "debug" ]; then
+    nohup "$BIN" -addr "$ADDR" -root "$ROOT/dist" \
+      -map "$ROOT/reference/map/1001/fore.map" -assets "$ROOT/dist/assets" \
+      -debug >"$LOG_FILE" 2>&1 < /dev/null &
+  else
+    nohup "$BIN" -addr "$ADDR" -root "$ROOT/dist" \
+      -map "$ROOT/reference/map/1001/fore.map" -assets "$ROOT/dist/assets" \
+      >"$LOG_FILE" 2>&1 < /dev/null &
+  fi
+  echo $! > "$PID_FILE"
+  i=0
+  while [ "$i" -lt 80 ]; do
+    if healthy; then
+      echo "已启动，日志：$LOG_FILE"
+      open_url
+      return 0
+    fi
+    if ! pid_of >/dev/null 2>&1; then break; fi
+    sleep 0.1
+    i=$((i + 1))
+  done
+  echo "启动失败。日志：" >&2
+  tail -n 40 "$LOG_FILE" >&2 || true
+  rm -f "$PID_FILE"
+  exit 1
+}
+
+stop_server() {
+  pid=$(pid_of 2>/dev/null || true)
+  if [ -z "$pid" ]; then
+    rm -f "$PID_FILE"
+    if old_pid=$(repo_server_pid); then
+      echo "发现本项目的旧服务（PID ${old_pid}），停止它。"
+      pid="$old_pid"
+    elif healthy; then
+      echo "端口 ${PORT} 有服务在运行，但不是本项目/未由 ddt 启动，未停止。"
+      echo "查看占用：lsof -nP -iTCP:${PORT} -sTCP:LISTEN"
+      return 0
+    else
+      echo "没有由 ddt 启动的服务。"
+      return 0
+    fi
+  fi
+  echo "停止服务端 PID ${pid}…"
+  kill "$pid" 2>/dev/null || true
+  i=0
+  while [ "$i" -lt 50 ] && kill -0 "$pid" 2>/dev/null; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    echo "进程未退出，请手动检查：kill -9 ${pid}" >&2
+    exit 1
+  fi
+  rm -f "$PID_FILE"
+  echo "已停止。"
+}
+
+status() {
+  pid=$(pid_of 2>/dev/null || true)
+  if [ -n "$pid" ]; then
+    echo "ddt 服务运行中：PID ${pid}，端口 ${PORT}，${URL}"
+    echo "日志：$LOG_FILE"
+  elif old_pid=$(repo_server_pid); then
+    echo "本项目服务运行中（旧进程，未被 ddt 接管）：PID ${old_pid}，${URL}"
+    echo "执行 ddt 可接管，或 ddt stop 停止。"
+  elif healthy; then
+    echo "端口 ${PORT} 有 HTTP 服务在运行（非 ddt 管理）：${URL}"
+  else
+    echo "未运行（端口 ${PORT}）。执行 ddt 启动。"
+  fi
+}
+
+case "${1:-start}" in
+  start|"") launch ;;
+  debug) launch debug ;;
+  stop|down) stop_server ;;
+  restart) stop_server; launch ;;
+  status) status ;;
+  logs|log)
+    if [ -f "$LOG_FILE" ]; then
+      tail -n 80 -f "$LOG_FILE"
+    else
+      echo "没有日志文件（服务可能是旧进程启动的）：$LOG_FILE" >&2
+      exit 1
+    fi
+    ;;
+  open) open_url ;;
+  fg|foreground)
+    build
+    exec "$BIN" -addr "$ADDR" -root "$ROOT/dist" \
+      -map "$ROOT/reference/map/1001/fore.map" -assets "$ROOT/dist/assets" -debug
+    ;;
+  -h|--help|help)
+    cat <<'TXT'
+用法: ddt [命令]
+
+  ddt            启动服务端并打开浏览器（已在运行则直接打开）
+  ddt debug      以调试模式启动（浏览器测试用）
+  ddt stop       停止由 ddt 启动的服务端
+  ddt restart    重启
+  ddt status     查看运行状态
+  ddt logs       实时查看日志
+  ddt open       只打开浏览器
+  ddt fg         前台运行（调试用）
+
+环境变量:
+  DDT_PORT=8000  端口
+  DDT_NO_OPEN=1  不自动打开浏览器
+  GO_BIN=...     指定 go 可执行文件
+TXT
+    ;;
+  *) echo "未知命令：$1（运行 ddt help）" >&2; exit 2 ;;
+esac
