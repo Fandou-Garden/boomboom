@@ -15,6 +15,8 @@ type FireEvent struct {
 	Weapon   string  `json:"weapon,omitempty"`
 	Pow      bool    `json:"pow"`
 	Shells   int     `json:"shells"`
+	Shell    int     `json:"shell,omitempty"`
+	Followup bool    `json:"followup,omitempty"`
 	VolleyID string  `json:"volleyId"`
 }
 
@@ -46,6 +48,7 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 	scales := []float64{1}
 	attackPenalty := 1.0
 	firedSkill := ""
+	sequential := false
 	pow := index == 0 && m.PowSelected && m.Energy >= EnergyMax
 	if pow {
 		// NEW browser POW: one heavy shell with the original crater-4 bitmap.
@@ -53,6 +56,7 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 		if def, ok := SkillDefs[m.SelectedSkill]; ok && def.Kind == "attack" && m.SkillUses[m.SelectedSkill] > 0 {
 			offsets = def.Offsets
 			scales = def.ForceScales
+			sequential = def.Sequential
 			attackPenalty = def.DamageScale
 			firedSkill = def.ID
 		}
@@ -94,8 +98,18 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 		shots = append(shots, p)
 	}
 
-	m.Shots = shots
-	m.Shot = shots[0]
+	// Extra attack items replay the same launch vector: the first shell flies
+	// and resolves, then the next one is launched from the same muzzle with the
+	// same angle/force. Scatter keeps all three shells in flight together.
+	activeShots := shots
+	m.QueuedShots = nil
+	m.VolleyTotal = len(shots)
+	if sequential && len(shots) > 1 {
+		activeShots = shots[:1]
+		m.QueuedShots = shots[1:]
+	}
+	m.Shots = activeShots
+	m.Shot = activeShots[0]
 	m.Phase = "flight"
 	m.Timer = 0
 	m.FlightAccumulator = 0
@@ -110,7 +124,7 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 	m.LastPower = &lp
 
 	if index == 0 {
-		m.Stats.PlayerShots += len(shots)
+		m.Stats.PlayerShots += len(activeShots)
 		if pow {
 			m.Energy = 0
 			m.PowSelected = false
@@ -130,7 +144,7 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 			m.SelectedBuffs = nil
 		}
 	} else {
-		m.Stats.EnemyShots += len(shots)
+		m.Stats.EnemyShots += len(activeShots)
 	}
 
 	if pow {
@@ -270,13 +284,51 @@ func (m *Match) resolveImpactLocked(p *Projectile) {
 	m.EmitLocked("impact", impact)
 }
 
+// launchQueuedShotLocked starts the next shell of a sequential attack item.
+// The projectile was created at fire time, so it keeps the exact same muzzle,
+// elevation and force as the first shell.
+func (m *Match) launchQueuedShotLocked() bool {
+	if len(m.QueuedShots) == 0 {
+		return false
+	}
+	p := m.QueuedShots[0]
+	m.QueuedShots = m.QueuedShots[1:]
+	m.Shots = []*Projectile{p}
+	m.Shot = p
+	m.Phase = "flight"
+	m.Timer = 0
+	m.FlightAccumulator = 0
+	if p.Owner == 0 {
+		m.Stats.PlayerShots++
+	} else {
+		m.Stats.EnemyShots++
+	}
+	m.EmitLocked("sound", map[string]any{"name": "fire", "weapon": p.Weapon})
+	m.EmitLocked("fire", FireEvent{
+		Actor: p.Owner, X: p.X, Y: p.Y, Angle: p.Elevation, Force: p.Force,
+		Skill: p.Skill, Weapon: p.Weapon, Pow: p.Pow, Shells: p.Shells,
+		Shell: p.Slot, Followup: true, VolleyID: p.VolleyID,
+	})
+	return true
+}
+
 func (m *Match) finishFlightLocked() {
 	if m.Phase != "flight" {
 		return
 	}
-	shotCount := len(m.Shots)
+	// A killed target ends the volley immediately; otherwise replay the same
+	// launch vector for the remaining extra shells.
+	if m.PendingWinner == nil && m.launchQueuedShotLocked() {
+		return
+	}
+	shotCount := m.VolleyTotal
+	if shotCount == 0 {
+		shotCount = len(m.Shots)
+	}
 	m.Shot = nil
 	m.Shots = nil
+	m.QueuedShots = nil
+	m.VolleyTotal = 0
 	m.FlightAccumulator = 0
 	m.Phase = "resolve"
 	m.Timer = ResolveDelay

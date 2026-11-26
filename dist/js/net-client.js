@@ -304,7 +304,7 @@ export class RemoteMatch {
     if (type === 'fire') {
       this._markFire(data.actor);
       this._spawnMuzzle(data);
-      if (data.actor === 0) {
+      if (data.actor === 0 && !data.followup) {
         this.playerVolley = {
           from: { x: data.x, y: data.y },
           impacts: [],
@@ -319,6 +319,8 @@ export class RemoteMatch {
       this.onEvent('fire', {
         owner: data.actor,
         shells: data.shells,
+        shell: data.shell || 0,
+        followup: !!data.followup,
         skill: data.skill,
         weapon: data.weapon,
         pow: data.pow,

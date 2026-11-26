@@ -131,6 +131,8 @@ type Match struct {
 
 	Shots             []*Projectile
 	Shot              *Projectile
+	QueuedShots       []*Projectile
+	VolleyTotal       int
 	FlightAccumulator float64
 
 	LastImpact        *Impact
@@ -214,6 +216,8 @@ func (m *Match) resetLocked() {
 	m.HealsRemaining = HealsPerRound
 	m.Shots = nil
 	m.Shot = nil
+	m.QueuedShots = nil
+	m.VolleyTotal = 0
 	m.FlightAccumulator = 0
 	m.LastImpact = nil
 	m.LastPlayerSummary = "—"

@@ -91,7 +91,6 @@ const uiCache = {
   stamina: null, energy: null, healDisabled: null, healCount: null, manualPan: null,
   weapon: null, weaponLocked: null, aimStatus: '', aimBad: null,
 };
-const skillButtonCache = new Map();
 
 class SoundEngine {
   constructor() {
@@ -599,17 +598,10 @@ function updateSkillButtons(phase) {
     const uses = Math.max(0, game.skillUses?.[id] ?? 0);
     const selected = game.selectedSkill === id || buffs.includes(id);
     const disabled = phase !== 'player' || game.charging || uses <= 0;
-    const previous = skillButtonCache.get(id);
-    if (!previous || previous.disabled !== disabled) {
-      button.disabled = disabled;
-    }
-    if (!previous || previous.selected !== selected) {
-      button.classList.toggle('is-selected', selected);
-      button.setAttribute('aria-pressed', String(selected));
-    }
-    if (!previous || previous.disabled !== disabled || previous.selected !== selected) {
-      skillButtonCache.set(id, { disabled, selected });
-    }
+    // Keep every selected attack/boost visible, including multi-select boosts.
+    button.disabled = disabled;
+    button.classList.toggle('is-selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
   }
 }
 
@@ -945,8 +937,13 @@ function handleEvent(type, data = {}) {
   } else if (type === 'fire') {
     if (data.owner === 0) {
       const weaponLabel = game?.weapons?.find((w) => w.id === data.weapon)?.label || '';
-      const extra = data.shells > 1 ? ` · ${skillName(data.skill)} 共 ${data.shells} 发` : '';
-      showToast(`${weaponLabel ? `${weaponLabel} · ` : ''}炮弹已出膛${extra} · 观察风偏`, { duration: 1900 });
+      const followup = data.followup
+        ? ` · 同轨迹追加 ${Math.min((data.shell || 0) + 1, data.shells || 1)}/${data.shells || 1}`
+        : '';
+      const extra = !data.followup && data.shells > 1
+        ? ` · ${skillName(data.skill)} 共 ${data.shells} 发`
+        : '';
+      showToast(`${weaponLabel ? `${weaponLabel} · ` : ''}炮弹已出膛${followup}${extra} · 观察风偏`, { duration: 1900 });
     } else {
       showToast('电脑开火，注意落点', { duration: 1800 });
     }
@@ -1001,7 +998,7 @@ function openHelp() {
       <dt>移动</dt><dd>按住左下转盘左右键，或键盘 A / D、← / →。角色在 ${WORLD.width} px 世界地图上真实行走；本版本体力无限，移动不会耗尽体力。陡坎会挡住，脚下被炸空会受重力下落。</dd>
       <dt>角度</dt><dd>按住转盘上下键，或 W / S、↑ / ↓；桌面也可在中心角度数字上上下拖动。当前武器 <strong>${weaponLabel}</strong> 的范围是 ${weaponRange}。角色旁只显示一小段方向虚线与角度扇形，不预测整条弹道。</dd>
       <dt>力度</dt><dd>按住右下蓝色主键或空格蓄力，松手发射。力度从 5% 连续升到 100% 后立即回弹，不自动开炮；松手那一帧的实际力度就是出手力度。底部细尺显示当前值、蓝色实测推荐三角和白色上一发竖线；连续可命中时另显示蓝色区间。推荐值按当前角度、当前技能、POW 和同一套风力/碰撞逻辑逐发复算，打不到时只提示调角，不会自动调角或发射。</dd>
-      <dt>战斗道具</dt><dd>右侧 1–8 格对应原版 10001–10008：<strong>1 攻击 +2</strong>（共 3 发，每发伤害 60%）、<strong>2 三向散射</strong>（0°、-5°、+5° 各一发，每发伤害 50%）、<strong>3 攻击 +1</strong>（共 2 发，每发伤害 90%）、<strong>4–8 伤害增幅 50/40/30/20/10%</strong>。攻击格与增幅格可以同时选择，增幅可叠加；每格每回合 1 次。选中后仍由蓝色主键或空格发射。治疗移到顶部心形按钮，快捷键 H，恢复 ${BATTLE.healAmount} 点并消耗本回合。</dd>
+      <dt>战斗道具</dt><dd>右侧 1–8 格对应原版 10001–10008：<strong>1 攻击 +2</strong>（同轨迹连续 3 发，每发伤害 60%）、<strong>2 三向散射</strong>（0°、-5°、+5° 同时各一发，每发伤害 50%）、<strong>3 攻击 +1</strong>（同轨迹连续 2 发，每发伤害 90%）、<strong>4–8 伤害增幅 50/40/30/20/10%</strong>。攻击格与增幅格可以同时选择，增幅可叠加；每格每回合 1 次。选中后仍由蓝色主键或空格发射。治疗移到顶部心形按钮，快捷键 H，恢复 ${BATTLE.healAmount} 点并消耗本回合。</dd>
       <dt>武器</dt><dd>开局可在烈火、轰天、水果篮、黑白家电、风神之间切换；第一发炮弹出手后锁定，重开后可再选。五种武器的角度、武器外观与飞行炮弹均按原版 XML/SWF 对应资源接入。</dd>
       <dt>POW</dt><dd>POW 对应 R 键，也只负责选择（再按一次取消），不会自动开炮。能量满 ${BATTLE.energyMax}% 才亮；不足时按 R 会提示能量不足并保留当前技能。选中后蓝色主键发射，伤害、爆炸半径与弹坑更大。</dd>
       <dt>标记</dt><dd>你出手后，地图上以世界坐标标出上一发的站位“起”和实际落点“落”；镜头移动不会让标记漂移。电脑的落点不会覆盖你的记录。</dd>

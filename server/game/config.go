@@ -214,9 +214,9 @@ func WeaponFor(id string) WeaponDef {
 // SkillDef maps one battle-item slot to its effect. The eight slots follow the
 // classic right-side battle-item bar (SharedManager.KEY_SET_ABLE):
 //
-//	10001 攻击 +2: 3 shots, one at 0° each, damage ×0.6
-//	10003 三向散射: 3 shots at 0°/-5°/+5°, force ×1.0/×0.9/×1.1, damage ×0.5
-//	10002 攻击 +1: 2 shots, one at 0° each, damage ×0.9
+//	10001 攻击 +2: 3 sequential shots on the same launch vector, damage ×0.6
+//	10003 三向散射: 3 simultaneous shots at 0°/-5°/+5°, force ×1.0/×0.9/×1.1, damage ×0.5
+//	10002 攻击 +1: 2 sequential shots on the same launch vector, damage ×0.9
 //	10004–10008 伤害增幅 50/40/30/20/10%
 //
 // SOURCE AddAttackSpell.cs multiplies CurrentShootMinus by 0.6/0.9.
@@ -229,6 +229,7 @@ type SkillDef struct {
 	Badge       string    `json:"badge"`
 	Offsets     []float64 `json:"offsets,omitempty"`
 	ForceScales []float64 `json:"forceScales,omitempty"`
+	Sequential  bool      `json:"sequential,omitempty"`
 	DamageScale float64   `json:"damageScale"`
 	DamageBonus float64   `json:"damageBonus"`
 	CraterArt   string    `json:"craterArt"`
@@ -244,7 +245,7 @@ var SkillDefs = map[string]SkillDef{
 	"extra2": {
 		ID: "extra2", Label: "攻击 +2", Kind: "attack", Badge: "+2",
 		Offsets: []float64{0, 0, 0}, ForceScales: []float64{1.0, 1.0, 1.0},
-		DamageScale: 0.6, CraterArt: "401", Source: true,
+		Sequential: true, DamageScale: 0.6, CraterArt: "401", Source: true,
 	},
 	"scatter": {
 		ID: "scatter", Label: "三向散射", Kind: "attack", Badge: "×3",
@@ -254,7 +255,7 @@ var SkillDefs = map[string]SkillDef{
 	"extra1": {
 		ID: "extra1", Label: "攻击 +1", Kind: "attack", Badge: "+1",
 		Offsets: []float64{0, 0}, ForceScales: []float64{1.0, 1.0},
-		DamageScale: 0.9, CraterArt: "401", Source: true,
+		Sequential: true, DamageScale: 0.9, CraterArt: "401", Source: true,
 	},
 	"boost50": {
 		ID: "boost50", Label: "伤害增幅 50%", Kind: "boost", Badge: "50",

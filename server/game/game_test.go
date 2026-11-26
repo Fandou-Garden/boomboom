@@ -77,15 +77,15 @@ func TestClassicSkillBar(t *testing.T) {
 	if len(extra1.Offsets) != 2 || extra1.Offsets[0] != 0 || extra1.Offsets[1] != 0 {
 		t.Fatalf("extra1 offsets = %v, want two centred shots", extra1.Offsets)
 	}
-	if extra1.DamageScale != 0.9 || !extra1.Source {
-		t.Fatalf("extra1 = %+v, want ×0.9 source attack", extra1)
+	if extra1.DamageScale != 0.9 || !extra1.Source || !extra1.Sequential {
+		t.Fatalf("extra1 = %+v, want ×0.9 sequential source attack", extra1)
 	}
 	extra2 := SkillDefs["extra2"]
 	if len(extra2.Offsets) != 3 {
 		t.Fatalf("extra2 offsets = %v", extra2.Offsets)
 	}
-	if extra2.DamageScale != 0.6 || !extra2.Source {
-		t.Fatalf("extra2 = %+v, want ×0.6 source attack", extra2)
+	if extra2.DamageScale != 0.6 || !extra2.Source || !extra2.Sequential {
+		t.Fatalf("extra2 = %+v, want ×0.6 sequential source attack", extra2)
 	}
 	scatter := SkillDefs["scatter"]
 	if len(scatter.Offsets) != 3 || scatter.Offsets[0] != 0 || scatter.Offsets[1] != -5 || scatter.Offsets[2] != 5 {
@@ -126,14 +126,69 @@ func TestClassicAttackItemsApplySourceDamagePenalty(t *testing.T) {
 		if !m.fireLocked(0, AngleMax, ForceMax) {
 			t.Fatalf("%s fire rejected", tc.id)
 		}
-		if len(m.Shots) != tc.shots {
-			t.Fatalf("%s shells = %d, want %d", tc.id, len(m.Shots), tc.shots)
+		wantActive := tc.shots
+		wantQueued := 0
+		if tc.id != "scatter" {
+			wantActive = 1
+			wantQueued = tc.shots - 1
 		}
-		for i, shot := range m.Shots {
+		if len(m.Shots) != wantActive || len(m.QueuedShots) != wantQueued {
+			t.Fatalf("%s active/queued = %d/%d, want %d/%d", tc.id, len(m.Shots), len(m.QueuedShots), wantActive, wantQueued)
+		}
+		allShots := append(append([]*Projectile{}, m.Shots...), m.QueuedShots...)
+		for i, shot := range allShots {
 			if shot.Skill != tc.id || math.Abs(shot.DamageScale-tc.scale) > 1e-9 {
 				t.Fatalf("%s shot %d = skill %q scale %v, want %q ×%v", tc.id, i, shot.Skill, shot.DamageScale, tc.id, tc.scale)
 			}
 		}
+	}
+}
+
+func TestSequentialAttackReplaysSameLaunchVector(t *testing.T) {
+	m := NewMatch(testTerrain(t), 7, false)
+	m.SelectedSkill = "extra2"
+	if !m.fireLocked(0, AngleMax, ForceMax) {
+		t.Fatal("fire rejected")
+	}
+	all := append(append([]*Projectile{}, m.Shots...), m.QueuedShots...)
+	if len(all) != 3 {
+		t.Fatalf("extra2 total shots = %d, want 3", len(all))
+	}
+	first := all[0]
+	for i, shot := range all[1:] {
+		if shot.Elevation != first.Elevation || shot.Force != first.Force ||
+			shot.VX != first.VX || shot.VY != first.VY ||
+			shot.X != first.X || shot.Y != first.Y {
+			t.Fatalf("shot %d does not replay the first launch vector: %+v vs %+v", i+1, shot, first)
+		}
+	}
+	if m.VolleyTotal != 3 {
+		t.Fatalf("volley total = %d, want 3", m.VolleyTotal)
+	}
+}
+
+func TestSequentialAttackLaunchesNextShell(t *testing.T) {
+	m := NewMatch(testTerrain(t), 7, false)
+	m.SelectedSkill = "extra1"
+	if !m.fireLocked(0, AngleMax, ForceMax) {
+		t.Fatal("fire rejected")
+	}
+	if len(m.Shots) != 1 || len(m.QueuedShots) != 1 || m.Stats.PlayerShots != 1 {
+		t.Fatalf("initial active/queued/shots = %d/%d/%d", len(m.Shots), len(m.QueuedShots), m.Stats.PlayerShots)
+	}
+	first := *m.Shots[0]
+	m.Shots[0].Alive = false
+	m.finishFlightLocked()
+	if m.Phase != "flight" || len(m.Shots) != 1 || m.Shots[0].Slot != 1 {
+		t.Fatalf("next shell was not launched: phase=%s active=%d", m.Phase, len(m.Shots))
+	}
+	if len(m.QueuedShots) != 0 || m.VolleyTotal != 2 || m.Stats.PlayerShots != 2 {
+		t.Fatalf("queue/total/shots = %d/%d/%d", len(m.QueuedShots), m.VolleyTotal, m.Stats.PlayerShots)
+	}
+	next := m.Shots[0]
+	if next.Elevation != first.Elevation || next.Force != first.Force ||
+		next.VX != first.VX || next.VY != first.VY || next.X != first.X || next.Y != first.Y {
+		t.Fatalf("next shell changed launch vector: %+v vs %+v", next, first)
 	}
 }
 
