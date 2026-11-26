@@ -1,20 +1,24 @@
 # 验证记录
 
-验证日期：2026-11-26。环境：沙箱 Chromium（headless）+ Node 24，本地
+验证日期：2026-11-26。环境：本机 Chromium（headless，启用 GPU）+ Node 22，本地
 `http://127.0.0.1:8000/?test=1`。这是浏览器设备仿真，不等同于真实 iPhone/Android
 硬件；触摸手感、真实 Home Indicator 和低端机性能仍建议在目标手机复测。
 
 ## 1. 自动化结果
 
 ```text
+npm run check
+CHECK PASS
+
 npm test
-23 tests / 23 pass / 0 fail
+Go: gunny/server/game ok
+Node: 13 tests / 13 pass / 0 fail
 
-node --check dist/js/*.js
-全部通过
-
-node tests/browser_acceptance.cjs
+npm run test:browser:visual
 BROWSER ACCEPTANCE PASS
+
+npm run test:browser:controls
+CONTROLS + AUDIO ACCEPTANCE PASS
 ```
 
 `tests/browser_acceptance.cjs` 使用真实 Pointer Events、游戏循环和 Web Audio，不绕过
@@ -70,26 +74,42 @@ BROWSER ACCEPTANCE PASS
 真实战斗用例使用风神/水果篮各打一轮，确认 `fire`/`explosion` 事件的 `sample` 与上表
 一致且 `peak > 0`；道具/POW 仍为 039，选道具 008，阵亡 042，回合 016/038，胜负 063/064。
 
-## 5. 保留项
+## 5. 角色动画与帧率
+
+操作验收直接读取 `window.__GUNNY_TEST__.snapshot().poses`，断言角色姿势而不只是截图：
+
+- 待机：玩家和电脑都必须是 `STAND` 帧（`0/6/7/8/9/10`），且 `weaponVisible=false`；
+- 按住蓄力：必须是 `SHOWGUN` 帧（`19/20/21`），且 `weaponVisible=true`；
+- 开炮后：必须是 `SHOT` 帧（`22/23/26/27`），且 `weaponVisible=true`。
+
+帧序来自 `GameCharacter.as`；武器显隐与 `body → weaponMovie` 层级来自 `GamePlayer.as`。
+开炮动画固定 0.28 s，一次齐射（附加攻击/散弹）只触发一轮，不按炮弹数重复抬手。
+
+流畅度方面：服务器快照 25 Hz，前端用本地 `visualTime` 驱动动画，角色位置按
+`tau=22 ms` 指数平滑，炮弹用 `x+v·t+½a·t²` 外推（上限 60 ms）。本机 headless Chromium
+启用 GPU 时实测约 120 fps；触摸设备/小窗口将画布 backing store 限制在 1.5× DPR。
+
+## 6. 保留项
 
 - 世界仍为 4000×1425，玩家 x=300、电脑 x=3700，初始水平距离 3400 px（170.0 m）。
 - 角色、地形、炮弹、弹坑素材未换；没有移动出生点来强行同屏。
 - 单机回合、风力、连续碰撞、分块 Alpha Mask 地形破坏和确定性弹坑规则未改。
 - 没有商城、房间、登录、联机或网络同步。
 
-## 6. 已知未覆盖
+## 7. 已知未覆盖
 
 - 真实 iPhone Safari 的元素全屏限制只能按降级逻辑模拟；无法在沙箱验证真实
   Home Indicator、地址栏动画和触摸延迟。
 - 设备性能只在 headless Chromium 中观察；低端 Android 的 Canvas/内存表现需真机复测。
 - 本版仍只有 map/1001，没有地图选择/切换 UI。
-- 角色 sheet 是网页对装备 PNG 的合成，不等同于原版 SWF 时间线。
+- 角色 sheet 是网页对装备 PNG 的合成；待机/移动/举枪/开炮/受击帧序已按
+  `GameCharacter.as` 对齐，但不是完整 SWF 时间线（攀爬、跳跃等动作未使用）。
 
-## 7. 公网发布
+## 8. 公网发布
 
 - 稳定地址：`https://slnp165x30zq.reakh.fun/`，`site_id=slnp165x30zq`。
-- 本轮发布为 **版本 4**，静态资源查询版本 `?v=9`。
-- 边缘前三次返回 HTTP 425，第四次 HTTP 200；公网 `index.html` 已确认引用
-  `styles.css?v=9` 与 `js/main.js?v=9`。
+- 上次发布为 **版本 4**，静态资源查询版本 `?v=9`；当前源码已到 `?v=13`，尚未重新发布。
+- 上次发布时边缘前三次返回 HTTP 425，第四次 HTTP 200；公网 `index.html` 已确认引用
+  `styles.css?v=9` 与 `js/main.js?v=9`。本轮未改动公网版本。
 - 公网 844×390 与 667×375 冒烟：双方 x=300/3700、两名角色完整在屏、蓝色主键
   74×74、console/page error 为 0。
