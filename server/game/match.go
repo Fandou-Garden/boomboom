@@ -119,15 +119,16 @@ type Match struct {
 	ChargeStarted time.Time
 	ChargeElapsed float64
 
-	PlayerWeapon   string
-	EnemyWeapon    string
-	SelectedSkill  string
-	SelectedBuffs  []string
-	PowSelected    bool
-	Energy         float64
-	Stamina        float64
-	SkillUses      map[string]int
-	HealsRemaining int
+	PlayerWeapon    string
+	EnemyWeapon     string
+	SelectedSkill   string
+	SelectedAttacks []string
+	SelectedBuffs   []string
+	PowSelected     bool
+	Energy          float64
+	Stamina         float64
+	SkillUses       map[string]int
+	HealsRemaining  int
 
 	Shots             []*Projectile
 	Shot              *Projectile
@@ -205,6 +206,7 @@ func (m *Match) resetLocked() {
 	m.Charging = false
 	m.ChargeElapsed = 0
 	m.SelectedSkill = ""
+	m.SelectedAttacks = nil
 	m.SelectedBuffs = nil
 	m.PowSelected = false
 	m.Energy = 0
@@ -425,12 +427,38 @@ func (m *Match) Command(c Command) error {
 			if !found {
 				m.SelectedBuffs = append(m.SelectedBuffs, c.Skill)
 			}
-		} else if m.SelectedSkill == c.Skill {
-			m.SelectedSkill = ""
 		} else {
-			m.SelectedSkill = c.Skill
+			// 1–3 are stackable attack patterns. Selecting a boost or another
+			// attack must not clear an earlier attack choice.
+			if len(m.SelectedAttacks) == 0 && m.SelectedSkill != "" {
+				if prev, ok := SkillDefs[m.SelectedSkill]; ok && prev.Kind == "attack" {
+					m.SelectedAttacks = []string{m.SelectedSkill}
+				}
+			}
+			found := false
+			for i, id := range m.SelectedAttacks {
+				if id == c.Skill {
+					m.SelectedAttacks = append(m.SelectedAttacks[:i], m.SelectedAttacks[i+1:]...)
+					found = true
+					break
+				}
+			}
+			if !found {
+				m.SelectedAttacks = append(m.SelectedAttacks, c.Skill)
+				m.SelectedSkill = c.Skill
+			} else if m.SelectedSkill == c.Skill {
+				if len(m.SelectedAttacks) > 0 {
+					m.SelectedSkill = m.SelectedAttacks[len(m.SelectedAttacks)-1]
+				} else {
+					m.SelectedSkill = ""
+				}
+			}
 		}
-		m.EmitLocked("skill-select", map[string]any{"skill": m.SelectedSkill, "buffs": append([]string(nil), m.SelectedBuffs...)})
+		m.EmitLocked("skill-select", map[string]any{
+			"skill":   m.SelectedSkill,
+			"attacks": append([]string(nil), m.SelectedAttacks...),
+			"buffs":   append([]string(nil), m.SelectedBuffs...),
+		})
 		return nil
 	case "pow":
 		if m.Phase != "player" || m.Charging {
