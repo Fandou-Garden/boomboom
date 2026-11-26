@@ -45,6 +45,9 @@ type Projectile struct {
 	VolleyID    string       `json:"volleyId"`
 	Slot        int          `json:"slot"`
 	Shells      int          `json:"shells"`
+	Wave        int          `json:"wave,omitempty"`
+	Waves       int          `json:"waves,omitempty"`
+	WaveSize    int          `json:"waveSize,omitempty"`
 	Skill       string       `json:"skill,omitempty"`
 	Weapon      string       `json:"weapon,omitempty"`
 	CraterArt   string       `json:"craterArt,omitempty"`

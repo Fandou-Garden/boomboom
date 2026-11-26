@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"math"
+	"strings"
 )
 
 type FireEvent struct {
@@ -16,8 +17,30 @@ type FireEvent struct {
 	Pow      bool    `json:"pow"`
 	Shells   int     `json:"shells"`
 	Shell    int     `json:"shell,omitempty"`
+	Wave     int     `json:"wave,omitempty"`
+	Waves    int     `json:"waves,omitempty"`
+	WaveSize int     `json:"waveSize,omitempty"`
 	Followup bool    `json:"followup,omitempty"`
 	VolleyID string  `json:"volleyId"`
+}
+
+func (m *Match) selectedAttackIDsLocked() []string {
+	ids := make([]string, 0, 3)
+	for _, id := range m.SelectedAttacks {
+		def, ok := SkillDefs[id]
+		if ok && def.Kind == "attack" && m.SkillUses[id] > 0 {
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) > 0 {
+		return ids
+	}
+	// Keep direct Match setup and older snapshots working: SelectedSkill is
+	// the legacy single-attack field used by tests and callers.
+	if def, ok := SkillDefs[m.SelectedSkill]; ok && def.Kind == "attack" && m.SkillUses[m.SelectedSkill] > 0 {
+		return []string{m.SelectedSkill}
+	}
+	return nil
 }
 
 func (m *Match) fireLocked(index int, angle, force float64) bool {
@@ -48,17 +71,51 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 	scales := []float64{1}
 	attackPenalty := 1.0
 	firedSkill := ""
-	sequential := false
+	waves := 1
+	waveSize := 1
 	pow := index == 0 && m.PowSelected && m.Energy >= EnergyMax
+	attackIDs := []string(nil)
 	if pow {
 		// NEW browser POW: one heavy shell with the original crater-4 bitmap.
-	} else if index == 0 && m.SelectedSkill != "" {
-		if def, ok := SkillDefs[m.SelectedSkill]; ok && def.Kind == "attack" && m.SkillUses[m.SelectedSkill] > 0 {
-			offsets = def.Offsets
-			scales = def.ForceScales
-			sequential = def.Sequential
-			attackPenalty = def.DamageScale
-			firedSkill = def.ID
+	} else if index == 0 {
+		attackIDs = m.selectedAttackIDsLocked()
+		if len(attackIDs) > 0 {
+			// Attack items stack. Sequential items (+2 / +1) add whole waves;
+			// scatter replaces each single shell with its 0°/-5°/+5° fan.
+			waveOffsets := []float64{0}
+			waveScales := []float64{1}
+			for _, id := range attackIDs {
+				def := SkillDefs[id]
+				attackPenalty *= def.DamageScale
+				if def.Sequential {
+					if extra := len(def.Offsets) - 1; extra > 0 {
+						waves += extra
+					}
+				} else if len(def.Offsets) > 0 {
+					waveOffsets = def.Offsets
+					if len(def.ForceScales) > 0 {
+						waveScales = def.ForceScales
+					}
+				}
+			}
+			waveSize = len(waveOffsets)
+			if waveSize < 1 {
+				waveSize = 1
+				waveOffsets = []float64{0}
+			}
+			offsets = make([]float64, 0, waves*waveSize)
+			scales = make([]float64, 0, waves*waveSize)
+			for w := 0; w < waves; w++ {
+				offsets = append(offsets, waveOffsets...)
+				for i := 0; i < waveSize; i++ {
+					if i < len(waveScales) {
+						scales = append(scales, waveScales[i])
+					} else {
+						scales = append(scales, 1)
+					}
+				}
+			}
+			firedSkill = strings.Join(attackIDs, "+")
 		}
 	}
 	// 4–8 are additive damage amplifiers. SOURCE AddWoudSpell adds
@@ -92,6 +149,7 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 			VX: vx, VY: vy, Alive: true, Direction: direction,
 			Elevation: elevation, Force: f, Trail: []TrailPoint{{X: mx, Y: my}},
 			VolleyID: volleyID, Slot: i, Shells: len(offsets), Skill: firedSkill,
+			Wave: i / waveSize, Waves: waves, WaveSize: waveSize,
 			Weapon: weapon.ID, CraterArt: weapon.CraterArt,
 			DamageScale: damageScale, Pow: pow,
 		}
@@ -104,9 +162,9 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 	activeShots := shots
 	m.QueuedShots = nil
 	m.VolleyTotal = len(shots)
-	if sequential && len(shots) > 1 {
-		activeShots = shots[:1]
-		m.QueuedShots = shots[1:]
+	if waves > 1 && len(shots) > waveSize {
+		activeShots = shots[:waveSize]
+		m.QueuedShots = shots[waveSize:]
 	}
 	m.Shots = activeShots
 	m.Shot = activeShots[0]
@@ -130,12 +188,13 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 			m.PowSelected = false
 		} else {
 			m.Energy = math.Min(EnergyMax, m.Energy+EnergyPerVolley)
-			if m.SelectedSkill != "" {
-				if m.SkillUses[m.SelectedSkill] > 0 {
-					m.SkillUses[m.SelectedSkill]--
+			for _, id := range attackIDs {
+				if m.SkillUses[id] > 0 {
+					m.SkillUses[id]--
 				}
-				m.SelectedSkill = ""
 			}
+			m.SelectedSkill = ""
+			m.SelectedAttacks = nil
 			for _, id := range m.SelectedBuffs {
 				if m.SkillUses[id] > 0 {
 					m.SkillUses[id]--
@@ -153,7 +212,8 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 	m.EmitLocked("sound", map[string]any{"name": "fire", "weapon": weapon.ID})
 	m.EmitLocked("fire", FireEvent{
 		Actor: index, X: a.X, Y: a.Y, Angle: baseAngle, Force: safeForce,
-		Skill: firedSkill, Weapon: weapon.ID, Pow: pow, Shells: len(shots), VolleyID: volleyID,
+		Skill: firedSkill, Weapon: weapon.ID, Pow: pow, Shells: len(shots),
+		WaveSize: waveSize, Waves: waves, VolleyID: volleyID,
 	})
 	return true
 }
@@ -291,23 +351,32 @@ func (m *Match) launchQueuedShotLocked() bool {
 	if len(m.QueuedShots) == 0 {
 		return false
 	}
-	p := m.QueuedShots[0]
-	m.QueuedShots = m.QueuedShots[1:]
-	m.Shots = []*Projectile{p}
+	n := m.QueuedShots[0].WaveSize
+	if n < 1 {
+		n = 1
+	}
+	if n > len(m.QueuedShots) {
+		n = len(m.QueuedShots)
+	}
+	wave := m.QueuedShots[:n]
+	m.QueuedShots = m.QueuedShots[n:]
+	m.Shots = wave
+	p := wave[0]
 	m.Shot = p
 	m.Phase = "flight"
 	m.Timer = 0
 	m.FlightAccumulator = 0
 	if p.Owner == 0 {
-		m.Stats.PlayerShots++
+		m.Stats.PlayerShots += n
 	} else {
-		m.Stats.EnemyShots++
+		m.Stats.EnemyShots += n
 	}
 	m.EmitLocked("sound", map[string]any{"name": "fire", "weapon": p.Weapon})
 	m.EmitLocked("fire", FireEvent{
 		Actor: p.Owner, X: p.X, Y: p.Y, Angle: p.Elevation, Force: p.Force,
 		Skill: p.Skill, Weapon: p.Weapon, Pow: p.Pow, Shells: p.Shells,
-		Shell: p.Slot, Followup: true, VolleyID: p.VolleyID,
+		Shell: p.Slot, Wave: p.Wave, Waves: p.Waves, WaveSize: p.WaveSize,
+		Followup: true, VolleyID: p.VolleyID,
 	})
 	return true
 }
@@ -403,6 +472,7 @@ func (m *Match) beginTurnLocked(index int, rollWind bool) {
 			m.SkillUses[id] = 1
 		}
 		m.SelectedSkill = ""
+		m.SelectedAttacks = nil
 		m.SelectedBuffs = nil
 		m.PowSelected = false
 		m.Stamina = StaminaMax

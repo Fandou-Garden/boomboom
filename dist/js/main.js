@@ -1,11 +1,11 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW } from './config.js?v=19';
-import { loadImage, Terrain } from './terrain.js?v=19';
-import { RemoteMatch } from './net-client.js?v=19';
-import { Renderer } from './renderer.js?v=19';
-import { Camera, projectPoint } from './camera.js?v=19';
-import { InputController } from './input.js?v=19';
-import { solvePerfect } from './ai.js?v=19';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=19';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW } from './config.js?v=20';
+import { loadImage, Terrain } from './terrain.js?v=20';
+import { RemoteMatch } from './net-client.js?v=20';
+import { Renderer } from './renderer.js?v=20';
+import { Camera, projectPoint } from './camera.js?v=20';
+import { InputController } from './input.js?v=20';
+import { solvePerfect } from './ai.js?v=20';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=20';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -576,7 +576,8 @@ function phaseLabel() {
   if (game.phase === 'enemy_think') return '电脑测算中';
   if (game.phase === 'enemy_aim') return '电脑瞄准中';
   if (game.phase === 'flight') {
-    const total = game.shots?.length || 1;
+    const current = game.shots?.length || 1;
+    const total = Math.max(current, game.volleyTotal || 0);
     const alive = game.shots?.filter((shot) => shot.alive).length || 1;
     return total > 1 ? `弹道飞行 ${alive}/${total}` : (game.shot?.owner === 0 ? '弹道飞行中' : '炮弹来袭');
   }
@@ -593,11 +594,14 @@ function angleNoteText() {
 
 function updateSkillButtons(phase) {
   const buffs = Array.isArray(game.selectedBuffs) ? game.selectedBuffs : [];
+  const attacks = Array.isArray(game.selectedAttacks)
+    ? game.selectedAttacks
+    : (game.selectedSkill ? [game.selectedSkill] : []);
   for (const button of SKILL_BUTTONS) {
     const id = button.dataset.skill;
     if (!id) continue;
     const uses = Math.max(0, game.skillUses?.[id] ?? 0);
-    const selected = game.selectedSkill === id || buffs.includes(id);
+    const selected = attacks.includes(id) || buffs.includes(id);
     const disabled = phase !== 'player' || game.charging || uses <= 0;
     // Keep every selected attack/boost visible, including multi-select boosts.
     button.disabled = disabled;
@@ -682,7 +686,10 @@ function syncUI() {
   const angleHeld = input?.getAimDirection?.() ?? 0;
   let recommendation = null;
   if (phase === 'player' && !p.walkDirection && !angleHeld) {
-    const modeKey = `${game.angle.toFixed(2)}|${wind.toFixed(2)}|${p.x.toFixed(1)}|${p.y.toFixed(1)}|${e.x.toFixed(1)}|${e.y.toFixed(1)}|${game.terrain?.craters?.length ?? 0}|${game.selectedSkill || '-'}|${game.powSelected ? 'pow' : '-'}`;
+    const selectedMode = (game.selectedAttacks?.length
+      ? game.selectedAttacks
+      : (game.selectedSkill ? [game.selectedSkill] : [])).join(',') || '-';
+    const modeKey = `${game.angle.toFixed(2)}|${wind.toFixed(2)}|${p.x.toFixed(1)}|${p.y.toFixed(1)}|${e.x.toFixed(1)}|${e.y.toFixed(1)}|${game.terrain?.craters?.length ?? 0}|${selectedMode}|${game.powSelected ? 'pow' : '-'}`;
     if (lastRecommendationMode !== modeKey || now - lastRecommendationAt > 170) {
       recommendation = game.recommendation();
       lastRecommendation = recommendation;
@@ -902,7 +909,8 @@ function showTurnFlash(turn) {
 }
 
 function skillName(skill) {
-  return BATTLE.skillDefs[skill]?.label || '';
+  if (!skill) return '';
+  return String(skill).split('+').map((id) => BATTLE.skillDefs[id]?.label || '').filter(Boolean).join(' + ');
 }
 
 function handleEvent(type, data = {}) {
@@ -939,7 +947,9 @@ function handleEvent(type, data = {}) {
     if (data.owner === 0) {
       const weaponLabel = game?.weapons?.find((w) => w.id === data.weapon)?.label || '';
       const followup = data.followup
-        ? ` · 同轨迹追加 ${Math.min((data.shell || 0) + 1, data.shells || 1)}/${data.shells || 1}`
+        ? (data.waveSize > 1
+          ? ` · 散射追加 ${Math.min((data.wave || 0) + 1, data.waves || 1)}/${data.waves || 1} 轮`
+          : ` · 同轨迹追加 ${Math.min((data.shell || 0) + 1, data.shells || 1)}/${data.shells || 1}`)
         : '';
       const extra = !data.followup && data.shells > 1
         ? ` · ${skillName(data.skill)} 共 ${data.shells} 发`
@@ -949,7 +959,8 @@ function handleEvent(type, data = {}) {
       showToast('电脑开火，注意落点', { duration: 1800 });
     }
   } else if (type === 'skill-select') {
-    const active = [data.skill, ...(data.buffs || [])].filter(Boolean);
+    const attacks = Array.isArray(data.attacks) ? data.attacks : (data.skill ? [data.skill] : []);
+    const active = [...attacks, ...(data.buffs || [])].filter(Boolean);
     showToast(active.length
       ? `已选 ${active.map(skillName).join(' + ')} · 下一发生效，仍用蓝色主键发射`
       : '已取消技能选择', { duration: 2200 });
@@ -999,7 +1010,7 @@ function openHelp() {
       <dt>移动</dt><dd>按住左下转盘左右键，或键盘 A / D、← / →。角色在 ${WORLD.width} px 世界地图上真实行走；本版本体力无限，移动不会耗尽体力。陡坎会挡住，脚下被炸空会受重力下落。</dd>
       <dt>角度</dt><dd>按住转盘上下键，或 W / S、↑ / ↓；桌面也可在中心角度数字上上下拖动。当前武器 <strong>${weaponLabel}</strong> 的范围是 ${weaponRange}。角色旁只显示一小段方向虚线与角度扇形，不预测整条弹道。</dd>
       <dt>力度</dt><dd>按住右下蓝色主键或空格蓄力，松手发射。力度从 5% 连续升到 100% 后立即回弹，不自动开炮；松手那一帧的实际力度就是出手力度。底部细尺显示当前值、蓝色实测推荐三角和白色上一发竖线；连续可命中时另显示蓝色区间。推荐值按当前角度、当前技能、POW 和同一套风力/碰撞逻辑逐发复算，打不到时只提示调角，不会自动调角或发射。</dd>
-      <dt>战斗道具</dt><dd>右侧 1–8 格对应原版 10001–10008：<strong>1 攻击 +2</strong>（同轨迹连续 3 发，每发伤害 60%）、<strong>2 三向散射</strong>（0°、-5°、+5° 同时各一发，每发伤害 50%）、<strong>3 攻击 +1</strong>（同轨迹连续 2 发，每发伤害 90%）、<strong>4–8 伤害增幅 50/40/30/20/10%</strong>。攻击格与增幅格可以同时选择，增幅可叠加；每格每回合 1 次。选中后仍由蓝色主键或空格发射。治疗移到顶部心形按钮，快捷键 H，恢复 ${BATTLE.healAmount} 点并消耗本回合。</dd>
+      <dt>战斗道具</dt><dd>右侧 1–8 格对应原版 10001–10008：<strong>1 攻击 +2</strong>（同轨迹连续 3 发，每发伤害 60%）、<strong>2 三向散射</strong>（0°、-5°、+5° 同时各一发，每发伤害 50%）、<strong>3 攻击 +1</strong>（同轨迹连续 2 发，每发伤害 90%）、<strong>4–8 伤害增幅 50/40/30/20/10%</strong>。1–3 攻击格也可互相叠加：先选连击再选散弹，会连续多轮散射；4–8 增幅全部相加；每格每回合 1 次。选中后仍由蓝色主键或空格发射。治疗移到顶部心形按钮，快捷键 H，恢复 ${BATTLE.healAmount} 点并消耗本回合。</dd>
       <dt>武器</dt><dd>开局可在烈火、轰天、水果篮、黑白家电、风神之间切换；第一发炮弹出手后锁定，重开后可再选。五种武器的角度、武器外观与飞行炮弹均按原版 XML/SWF 对应资源接入。</dd>
       <dt>POW</dt><dd>POW 对应 R 键，也只负责选择（再按一次取消），不会自动开炮。能量满 ${BATTLE.energyMax}% 才亮；不足时按 R 会提示能量不足并保留当前技能。选中后蓝色主键发射，伤害、爆炸半径与弹坑更大。</dd>
       <dt>标记</dt><dd>你出手后，地图上以世界坐标标出上一发的站位“起”和实际落点“落”；镜头移动不会让标记漂移。电脑的落点不会覆盖你的记录。</dd>
@@ -1666,7 +1677,9 @@ function exposeTestApi() {
         chargeElapsed: game.chargeElapsed,
         charging: game.charging,
         selectedSkill: game.selectedSkill,
+        selectedAttacks: [...(game.selectedAttacks || [])],
         selectedBuffs: [...(game.selectedBuffs || [])],
+        volleyTotal: game.volleyTotal || 0,
         skillUses: { ...game.skillUses },
         weapon: game.weapon,
         enemyWeapon: game.enemyWeapon,
@@ -1928,9 +1941,9 @@ function setupCheatPanel() {
   const style = document.createElement('style');
   style.id = 'cheatStyles';
   style.textContent = `
-    .cheat-dock { position: fixed; right: 10px; top: 64px; z-index: 90; font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .cheat-dock { position: fixed; left: 50%; right: auto; top: 64px; transform: translateX(-50%); z-index: 90; font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     .cheat-toggle { display: block; margin-left: auto; padding: 6px 10px; border: 1px solid rgba(79,209,255,.55); border-radius: 8px; background: rgba(5,25,38,.92); color: #9fe9ff; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.35); }
-    .cheat-panel { width: 226px; margin-top: 6px; padding: 10px; border: 1px solid rgba(79,209,255,.45); border-radius: 10px; background: rgba(4,20,30,.96); color: #eaf6ff; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+    .cheat-panel { width: 226px; max-height: calc(100vh - 76px); overflow-y: auto; margin-top: 6px; padding: 10px; border: 1px solid rgba(79,209,255,.45); border-radius: 10px; background: rgba(4,20,30,.96); color: #eaf6ff; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
     .cheat-panel[hidden] { display: none; }
     .cheat-panel header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; color: #9fe9ff; }
     .cheat-panel header button { border: 0; background: transparent; color: #9fc7d6; font-size: 16px; line-height: 1; cursor: pointer; }
@@ -1940,7 +1953,8 @@ function setupCheatPanel() {
     .cheat-panel .cheat-action.secondary { background: transparent; color: #9fc7d6; }
     .cheat-panel .cheat-action:disabled { opacity: .45; cursor: not-allowed; }
     .cheat-status { margin: 8px 0 0; color: #9fc7d6; font-size: 11px; line-height: 1.45; }
-    @media (max-width: 700px) { .cheat-dock { top: 52px; right: 6px; } .cheat-panel { width: 198px; } }
+    @media (max-width: 700px) { .cheat-dock { top: 62px; left: 50%; right: auto; } .cheat-panel { width: 198px; } }
+    @media (max-height: 440px) { .cheat-panel { width: 210px; padding: 7px 8px; } .cheat-panel header { margin-bottom: 4px; } .cheat-line { margin: 3px 0; } .cheat-panel .cheat-action { margin-top: 5px; padding: 6px; } .cheat-status { display: none; } }
   `;
   document.head.append(style);
 

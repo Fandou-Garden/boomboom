@@ -5,9 +5,9 @@
  * snapshot and sends intent commands over HTTP; server events arrive through
  * SSE. Local physics remains only for the non-firing aim recommendation.
  */
-import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=19';
-import { solveForceForAngle } from './ai.js?v=19';
-import { muzzlePoint } from './physics.js?v=19';
+import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=20';
+import { solveForceForAngle } from './ai.js?v=20';
+import { muzzlePoint } from './physics.js?v=20';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const FIRE_ANIM_SECONDS = 0.28;
@@ -57,7 +57,9 @@ export class RemoteMatch {
     this.winner = null;
     this.shots = [];
     this.shot = null;
+    this.volleyTotal = 0;
     this.selectedSkill = null;
+    this.selectedAttacks = [];
     this.selectedBuffs = [];
     this.skillUses = {};
     this.powSelected = false;
@@ -198,7 +200,11 @@ export class RemoteMatch {
     this.lastPower = s.lastPower ?? null;
     this.winner = s.winner ?? null;
     this.selectedSkill = s.selectedSkill || null;
+    this.selectedAttacks = Array.isArray(s.selectedAttacks)
+      ? s.selectedAttacks
+      : (this.selectedSkill ? [this.selectedSkill] : []);
     this.selectedBuffs = Array.isArray(s.selectedBuffs) ? s.selectedBuffs : [];
+    this.volleyTotal = Number.isFinite(s.volleyTotal) ? s.volleyTotal : this.shots.length;
     this.skillUses = s.skillUses || {};
     // Keep a just-selected weapon stable against in-flight stale snapshots.
     if (this._pendingWeapon && nowMs < this._pendingWeaponUntil && s.weapon !== this._pendingWeapon) {
@@ -598,7 +604,16 @@ export class RemoteMatch {
       if (at >= 0) this.selectedBuffs.splice(at, 1);
       else this.selectedBuffs.push(id);
     } else {
-      this.selectedSkill = this.selectedSkill === id ? null : id;
+      const at = this.selectedAttacks.indexOf(id);
+      if (at >= 0) {
+        this.selectedAttacks.splice(at, 1);
+        if (this.selectedSkill === id) {
+          this.selectedSkill = this.selectedAttacks[this.selectedAttacks.length - 1] || null;
+        }
+      } else {
+        this.selectedAttacks.push(id);
+        this.selectedSkill = id;
+      }
     }
     this._post({ type: 'skill', skill: id });
     return true;
@@ -739,10 +754,13 @@ export class RemoteMatch {
       return { reachable: false, force: null, reason: 'not-player' };
     }
     const powActive = this.powSelected && this.energy >= BATTLE.energyMax;
+    const attacks = this.selectedAttacks.length
+      ? this.selectedAttacks
+      : (this.selectedSkill ? [this.selectedSkill] : []);
     const key = [this.angle.toFixed(2), this.wind.value.toFixed(2),
       this.player.x.toFixed(1), this.player.y.toFixed(1),
       this.enemy.x.toFixed(1), this.enemy.y.toFixed(1),
-      this.terrain?.craters?.length ?? 0, this.selectedSkill || '-',
+      this.terrain?.craters?.length ?? 0, attacks.join(',') || '-',
       this.selectedBuffs.join(',') || '-', this.weapon || '-', powActive ? 'pow' : '-'].join('|');
     if (this.recommendationCache?.key === key) return this.recommendationCache.value;
     const value = solveForceForAngle({
@@ -752,6 +770,7 @@ export class RemoteMatch {
       terrain: this.terrain,
       angle: this.angle,
       skill: this.selectedSkill || null,
+      attacks,
       buffs: this.selectedBuffs,
       angleMin: this.angleMin,
       angleMax: this.angleMax,

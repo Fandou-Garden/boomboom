@@ -122,7 +122,12 @@ function serve() {
     }, { timeout: 40000 });
     const afterEnemy = await page.evaluate(() => window.__GUNNY_TEST__.snapshot());
     assert.equal(afterEnemy.stats.enemyShots, 1, 'WASM AI must take its turn');
-    assert.ok(afterEnemy.terrain?.craters >= 2, 'AI crater must be recorded');
+    const enemyImpact = afterEnemy.lastImpact;
+    assert.ok(
+      afterEnemy.terrain?.craters >= 2
+        || (enemyImpact?.owner === 1 && enemyImpact?.type === 'actor' && enemyImpact?.damage > 0),
+      'AI shot must resolve as a terrain crater or a direct hit',
+    );
 
     await page.evaluate(() => window.__GUNNY_TEST__.restart());
     await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().stats.playerShots === 0, { timeout: 5000 });

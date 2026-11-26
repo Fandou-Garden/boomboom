@@ -1,8 +1,8 @@
 /** New browser-only opponent. It solves with the same physics/terrain modules. */
-import { AI, CONTROLS, PHYSICS, COMBAT, BATTLE } from './config.js?v=19';
+import { AI, CONTROLS, PHYSICS, COMBAT, BATTLE } from './config.js?v=20';
 
 const COMBAT_TARGET_RADIUS = COMBAT.targetHitRadius;
-import { blastDamageFor, clamp, muzzlePoint, simulateShot } from './physics.js?v=19';
+import { blastDamageFor, clamp, muzzlePoint, simulateShot } from './physics.js?v=20';
 
 function triangularNoise(random) {
   // Range roughly [-1, 1], denser near zero.
@@ -103,6 +103,7 @@ export function evaluateVolleyForForce({
   angle,
   force,
   skill = null,
+  attacks = [],
   buffs = [],
   angleMin = CONTROLS.angleMin,
   angleMax = CONTROLS.angleMax,
@@ -111,10 +112,32 @@ export function evaluateVolleyForForce({
   skillDefs = BATTLE.skillDefs,
 }) {
   const direction = Math.sign(target.x - shooter.x) || 1;
-  const def = skill ? skillDefs[skill] : null;
-  const offsets = def?.offsets ?? [0];
-  const forceScales = def?.forceScales ?? [def?.forceScale ?? 1];
-  const attackPenalty = def?.damageScale ?? 1;
+  const attackIDs = Array.isArray(attacks) && attacks.length
+    ? attacks
+    : (skill ? [skill] : []);
+  let attackPenalty = 1;
+  let repeats = 1;
+  let waveOffsets = [0];
+  let waveScales = [1];
+  for (const id of attackIDs) {
+    const def = skillDefs[id];
+    if (!def) continue;
+    attackPenalty *= def.damageScale ?? 1;
+    if (def.sequential) {
+      repeats += Math.max(0, (def.offsets?.length ?? 1) - 1);
+    } else if (Array.isArray(def.offsets) && def.offsets.length) {
+      waveOffsets = def.offsets;
+      waveScales = def.forceScales ?? [1];
+    }
+  }
+  const offsets = [];
+  const forceScales = [];
+  for (let wave = 0; wave < repeats; wave += 1) {
+    for (let i = 0; i < waveOffsets.length; i += 1) {
+      offsets.push(waveOffsets[i]);
+      forceScales.push(waveScales[i] ?? 1);
+    }
+  }
   const damageBonus = buffs.reduce((sum, id) => sum + (skillDefs[id]?.damageBonus ?? 0), 0);
   const damageScale = attackPenalty * (1 + damageBonus);
   const blastCfg = pow ? { ...COMBAT, blastRadius: BATTLE.powBlastRadius } : COMBAT;
@@ -187,6 +210,7 @@ export function solveForceForAngle({
   terrain,
   angle,
   skill = null,
+  attacks = [],
   buffs = [],
   angleMin = CONTROLS.angleMin,
   angleMax = CONTROLS.angleMax,
@@ -204,7 +228,7 @@ export function solveForceForAngle({
     for (let pct = minPct; pct <= 100; pct += step) {
       const force = pct / 100 * cfg.forceMax;
       const value = evaluateVolleyForForce({
-        shooter, target, wind, terrain, angle, force, skill,
+        shooter, target, wind, terrain, angle, force, skill, attacks,
         buffs, angleMin, angleMax, pow, cfg,
       });
       out.push({ pct, force, ...value });
@@ -213,7 +237,7 @@ export function solveForceForAngle({
       const pct = 100;
       const force = cfg.forceMax;
       const value = evaluateVolleyForForce({
-        shooter, target, wind, terrain, angle, force, skill,
+        shooter, target, wind, terrain, angle, force, skill, attacks,
         buffs, angleMin, angleMax, pow, cfg,
       });
       out.push({ pct, force, ...value });
@@ -260,7 +284,7 @@ export function solveForceForAngle({
       chosen = {
         pct, force,
         ...evaluateVolleyForForce({
-          shooter, target, wind, terrain, angle, force, skill,
+          shooter, target, wind, terrain, angle, force, skill, attacks,
           buffs, angleMin, angleMax, pow, cfg,
         }),
       };
