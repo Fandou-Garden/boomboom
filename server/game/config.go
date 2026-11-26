@@ -65,6 +65,17 @@ const (
 	DamagePlus = 1.0
 	ShootMinus = 1.0
 
+	// SOURCE: Game.Logic/Living.cs MakeCriticalDamage(Living, int).
+	// The original rolls `lucky*45/(800+lucky) + PetEffects.CritRate` against
+	// Random.Next(100); on a crit it adds `(0.5 + lucky*0.00015) * damage`,
+	// reduced by the target's ReduceCrit gems/pet value. SimpleBomb.BombImp
+	// passes `damage` and `critical` SEPARATELY to Living.TakeDamage, so the
+	// victim loses damage + critical and the client draws two numbers.
+	// The browser duel keeps MakeDamage's Lucky input at 0 above so the ported
+	// DR2 term stays unchanged; crits use the original stat magnitude here.
+	CriticalLucky  = 180.0
+	CriticalReduce = 0.0
+
 	// NEW browser duel balance: both sides now use the same source-like HP.
 	PlayerMaxHP = 2000
 	EnemyMaxHP  = 2000

@@ -14,6 +14,7 @@ type FireEvent struct {
 	Skill    string  `json:"skill,omitempty"`
 	Weapon   string  `json:"weapon,omitempty"`
 	Pow      bool    `json:"pow"`
+	Carry    bool    `json:"carry,omitempty"`
 	Shells   int     `json:"shells"`
 	Shell    int     `json:"shell,omitempty"`
 	Followup bool    `json:"followup,omitempty"`
@@ -49,8 +50,15 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 	attackPenalty := 1.0
 	firedSkill := ""
 	sequential := false
-	pow := index == 0 && m.PowSelected && m.Energy >= EnergyMax
-	if pow {
+	// SOURCE: Player.UseFlySkill() -> CarrySpell:SetBall(3). A carry ball is a
+	// single shell with Power=0 / Crater="" (BallList ID=3): it replaces the
+	// volley entirely, so POW and attack items are ignored for this shot.
+	carry := index == 0 && m.CarryArmed && m.CanCarry
+	pow := index == 0 && !carry && m.PowSelected && m.Energy >= EnergyMax
+	if carry {
+		offsets = []float64{0}
+		scales = []float64{1}
+	} else if pow {
 		// NEW browser POW: one heavy shell with the original crater-4 bitmap.
 	} else if index == 0 && m.SelectedSkill != "" {
 		if def, ok := SkillDefs[m.SelectedSkill]; ok && def.Kind == "attack" && m.SkillUses[m.SelectedSkill] > 0 {
@@ -95,6 +103,13 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 			Weapon: weapon.ID, CraterArt: weapon.CraterArt,
 			DamageScale: damageScale, Pow: pow,
 		}
+		if carry {
+			// BallList ID=3: Power=0, Crater="" — no damage, no crater. The
+			// impact translates the owner to the landing point instead.
+			p.Carry = true
+			p.DamageScale = 0
+			p.CraterArt = ""
+		}
 		shots = append(shots, p)
 	}
 
@@ -125,7 +140,12 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 
 	if index == 0 {
 		m.Stats.PlayerShots += len(activeShots)
-		if pow {
+		if carry {
+			// One fly per turn: consume the armed shot and the availability,
+			// mirroring Player.CanFly / m_flyCoolDown in PrepareNewTurn.
+			m.CarryArmed = false
+			m.CanCarry = false
+		} else if pow {
 			m.Energy = 0
 			m.PowSelected = false
 		} else {
@@ -153,7 +173,7 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 	m.EmitLocked("sound", map[string]any{"name": "fire", "weapon": weapon.ID})
 	m.EmitLocked("fire", FireEvent{
 		Actor: index, X: a.X, Y: a.Y, Angle: baseAngle, Force: safeForce,
-		Skill: firedSkill, Weapon: weapon.ID, Pow: pow, Shells: len(shots), VolleyID: volleyID,
+		Skill: firedSkill, Weapon: weapon.ID, Pow: pow, Carry: carry, Shells: len(shots), VolleyID: volleyID,
 	})
 	return true
 }
@@ -198,6 +218,60 @@ func (m *Match) updateFlightLocked(dt float64) {
 	}
 }
 
+// resolveCarryImpactLocked ports Game.Logic/Phy/Object/SimpleBomb.cs
+// BombType.FLY: the shell is a teleport ball (BallList ID=3, Power=0,
+// Crater=""). On landing it steps back 5 px along the reversed velocity to
+// sit on the surface, then translates its owner to that point and re-seats
+// them on the terrain. No crater is carved and no damage is dealt.
+func (m *Match) resolveCarryImpactLocked(p *Projectile, ix, iy int, impactType string) {
+	owner := m.Actors[p.Owner]
+	// Back off along -v, normalised to 5 (source: PointF(-vX,-vY).Normalize(5)).
+	tx, ty := float64(ix), float64(iy)
+	if impactType == "ground" || impactType == "actor" {
+		vx, vy := p.VX, p.VY
+		length := math.Hypot(vx, vy)
+		if length > 0.0001 {
+			tx -= vx / length * 5
+			ty -= vy / length * 5
+		}
+	}
+	lx := int(math.Round(Clamp(tx, 70, WorldWidth-70)))
+	// Find the ground at the landing column so the transported actor stands on
+	// the surface rather than being left inside the terrain.
+	landY := 0
+	fromY := int(math.Max(0, math.Min(float64(m.Terrain.Height-1), ty-8)))
+	if gy, ok := m.Terrain.FindGroundY(lx, fromY, m.Terrain.Height-1); ok {
+		landY = gy
+	} else if gy, ok := m.Terrain.FindGroundY(lx, 0, m.Terrain.Height-1); ok {
+		landY = gy
+	} else {
+		landY = GroundBottom
+	}
+	if owner != nil && owner.Alive {
+		owner.X = float64(lx)
+		owner.Y = float64(landY)
+		owner.VY = 0
+		owner.Falling = false
+		owner.Grounded = true
+		owner.Slope = m.Terrain.SlopeAt(owner.X, owner.Y, 22)
+		owner.WalkDirection = 0
+		owner.WalkAccum = 0
+		m.refreshSupportLocked(owner)
+	}
+	impact := &Impact{X: float64(lx), Y: float64(landY), Type: "carry", Owner: p.Owner, Shell: p.Slot, Shells: p.Shells}
+	m.LastImpact = impact
+	if p.Owner == 0 {
+		m.LastPlayerSummary = fmt.Sprintf("第 %d 回合 · 传送到落点", m.Round)
+	}
+	// TRANSLATE is consumed by the client to play the teleport effect; it also
+	// carries the final actor position so late joiners stay in sync.
+	m.EmitLocked("translate", map[string]any{
+		"actor": p.Owner, "x": float64(lx), "y": float64(landY), "shell": p.Slot,
+	})
+	m.EmitLocked("sound", map[string]any{"name": "carry"})
+	m.EmitLocked("impact", impact)
+}
+
 func (m *Match) resolveImpactLocked(p *Projectile) {
 	if p == nil || p.Resolved {
 		return
@@ -210,6 +284,14 @@ func (m *Match) resolveImpactLocked(p *Projectile) {
 	ix := int(math.Trunc(p.X))
 	iy := int(math.Trunc(p.Y))
 	p.X, p.Y = float64(ix), float64(iy)
+	// SOURCE: SimpleBomb.cs BombType.FLY. A carry ball has Power=0/Crater="",
+	// so instead of carving and dealing damage it backs off 5 px along the
+	// reversed velocity and translates the OWNER to that spot (SetXY +
+	// StartMoving); the client plays TRANSLATE -> Living.transmit()).
+	if p.Carry {
+		m.resolveCarryImpactLocked(p, ix, iy, impactType)
+		return
+	}
 	attacker := m.Actors[p.Owner]
 	target := m.Actors[1-p.Owner]
 	impact := &Impact{
@@ -244,21 +326,38 @@ func (m *Match) resolveImpactLocked(p *Projectile) {
 		if damage < 0 {
 			damage = 0
 		}
-		impact.Damage = damage
-		impact.Distance = distance
+		// SOURCE: SimpleBomb.BombImp -> Living.MakeCriticalDamage(p2, damage).
+		// damage and critical are passed SEPARATELY to Living.TakeDamage, so
+		// the victim loses their sum and the client draws two numbers. A
+		// dedicated RNG keeps crit rolls out of the wind / AI streams.
+		critical := 0
 		if damage > 0 && target.Alive {
-			target.HP -= damage
+			roll := 99
+			if m.CritRNG != nil {
+				roll = m.CritRNG.Intn(100)
+			}
+			critical = SourceCriticalDamage(CriticalLucky, CriticalReduce, damage, roll)
+		}
+		total := damage + critical
+		impact.Damage = damage
+		impact.Critical = critical
+		impact.Distance = distance
+		if total > 0 && target.Alive {
+			target.HP -= total
 			target.Flash = 1
 			target.HurtTimer = 0.5
 			if p.Owner == 0 {
 				m.Stats.PlayerHits++
-				m.Stats.PlayerDamageDealt += damage
+				m.Stats.PlayerDamageDealt += total
 				m.Energy = math.Min(EnergyMax, m.Energy+EnergyPerHit)
 			} else {
 				m.Stats.EnemyHits++
-				m.Stats.PlayerDamageTaken += damage
+				m.Stats.PlayerDamageTaken += total
 			}
 			m.EmitLocked("sound", map[string]any{"name": "hit"})
+			if critical > 0 {
+				m.EmitLocked("sound", map[string]any{"name": "critical"})
+			}
 			if target.HP <= 0 {
 				target.HP = 0
 				target.Alive = false
@@ -275,7 +374,11 @@ func (m *Match) resolveImpactLocked(p *Projectile) {
 	}
 	if p.Owner == 0 {
 		if impact.Damage > 0 {
-			m.LastPlayerSummary = fmt.Sprintf("第 %d 回合 · 命中 %d 伤害", m.Round, impact.Damage)
+			if impact.Critical > 0 {
+				m.LastPlayerSummary = fmt.Sprintf("第 %d 回合 · 暴击 %d+%d 伤害", m.Round, impact.Damage, impact.Critical)
+			} else {
+				m.LastPlayerSummary = fmt.Sprintf("第 %d 回合 · 命中 %d 伤害", m.Round, impact.Damage)
+			}
 		} else {
 			m.LastPlayerSummary = fmt.Sprintf("第 %d 回合 · 未命中", m.Round)
 		}
@@ -405,6 +508,8 @@ func (m *Match) beginTurnLocked(index int, rollWind bool) {
 		m.SelectedSkill = ""
 		m.SelectedBuffs = nil
 		m.PowSelected = false
+		m.CarryArmed = false
+		m.CanCarry = true // SOURCE Player.PrepareNewTurn(): CanFly = true
 		m.Stamina = StaminaMax
 		m.Angle = Clamp(m.Angle, m.playerWeapon().AngleMin, m.playerWeapon().AngleMax)
 		m.Actors[0].AimAngle = m.Angle

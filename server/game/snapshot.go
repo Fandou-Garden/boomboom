@@ -33,6 +33,8 @@ type Snapshot struct {
 	SelectedSkill  string         `json:"selectedSkill"`
 	SelectedBuffs  []string       `json:"selectedBuffs"`
 	PowSelected    bool           `json:"powSelected"`
+	CarryArmed     bool           `json:"carryArmed"`
+	CanCarry       bool           `json:"canCarry"`
 	Energy         float64        `json:"energy"`
 	Stamina        float64        `json:"stamina"`
 
@@ -66,8 +68,8 @@ func (m *Match) snapshotLocked() Snapshot {
 		LastPlayerSummary: m.LastPlayerSummary,
 		Stats:             m.Stats, HealsRemaining: m.HealsRemaining,
 		SelectedSkill: m.SelectedSkill, SelectedBuffs: append([]string{}, m.SelectedBuffs...),
-		PowSelected: m.PowSelected,
-		Energy:      m.Energy, Stamina: m.Stamina,
+		PowSelected: m.PowSelected, CarryArmed: m.CarryArmed, CanCarry: m.CanCarry,
+		Energy: m.Energy, Stamina: m.Stamina,
 		Countdown: m.Countdown, ShowCountdown: m.ShowCountdown,
 		EnemyAimAngle: m.EnemyAimAngle,
 		Craters:       m.Terrain.CratersCopy(),

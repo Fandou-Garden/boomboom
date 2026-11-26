@@ -50,7 +50,11 @@ type Projectile struct {
 	CraterArt   string       `json:"craterArt,omitempty"`
 	DamageScale float64      `json:"damageScale"`
 	Pow         bool         `json:"pow"`
-	Resolved    bool         `json:"resolved"`
+	// SOURCE: SetBall(3) / BombType.FLY — a "carry" (fly/teleport) ball has
+	// Power=0, Crater="" in BallList.xml ID=3, so it deals no damage and digs
+	// no crater; on impact the owner is translated to the landing point instead.
+	Carry    bool `json:"carry,omitempty"`
+	Resolved bool `json:"resolved"`
 }
 
 // NextWind is the exact branch shape of BaseGame.GetNextWind. The original
@@ -241,6 +245,32 @@ func SourceDamage(distance, radius float64, attacker, defender *Actor) int {
 		return 1
 	}
 	return value
+}
+
+// SourceCriticalDamage ports Game.Logic/Living.cs MakeCriticalDamage().
+//
+//	double lucky = Lucky;
+//	if (lucky * 45.0 / (800.0 + lucky) + PetEffects.CritRate >= Random.Next(100))
+//	{
+//	    int reduce = target.ReduceCritFisrtGem + target.ReduceCritSecondGem
+//	               + target.PetEffects.ReduceCritValue;
+//	    int crit = (int)((0.5 + lucky * 0.00015) * baseDamage);
+//	    crit = crit * (100 - reduce) / 100;
+//	    ...
+//	    return crit;
+//	}
+//	return 0;
+//
+// roll is supplied by the match's dedicated crit RNG (0..99) so the whole
+// duel stays reproducible under a fixed seed and crit rolls never perturb the
+// wind / AI random streams.
+func SourceCriticalDamage(lucky, reduce float64, baseDamage int, roll int) int {
+	critRate := lucky * 45.0 / (800.0 + lucky)
+	if critRate < float64(roll) || baseDamage <= 0 {
+		return 0
+	}
+	crit := int((0.5 + lucky*0.00015) * float64(baseDamage))
+	return crit * int(100-reduce) / 100
 }
 
 func BlastDamage(target *Actor, impactX, impactY float64, attacker *Actor, radius float64) (damage int, distance float64) {

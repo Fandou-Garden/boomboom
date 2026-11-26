@@ -14,7 +14,10 @@ async function open(browser, { width = 844, height = 390, hasTouch = false, bloc
   await page.setViewport({ width, height, deviceScaleFactor: 1, hasTouch, isMobile: hasTouch });
   const logs = [];
   page.on('console', (message) => {
-    if (message.type() === 'error' && !message.text().includes('ERR_FAILED')) logs.push(message.text());
+    if (message.type() !== 'error' || message.text().includes('ERR_FAILED')) return;
+    // /api/state 404 is the expected static-host probe that selects WASM.
+    if ((message.location()?.url || '').includes('/api/state')) return;
+    logs.push(message.text());
   });
   page.on('pageerror', (error) => logs.push(`PAGEERROR: ${error.message}`));
   if (blockAudio) {

@@ -10,10 +10,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="风场弹道">
   <title>风场弹道 · Gunny Wind Arena</title>
-  <link rel="icon" href="assets/favicon.svg?v=19" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=19">
-  <link rel="manifest" href="manifest.webmanifest?v=19">
-  <link rel="stylesheet" href="styles.css?v=19">
+  <link rel="icon" href="assets/favicon.svg?v=21" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=21">
+  <link rel="manifest" href="manifest.webmanifest?v=21">
+  <link rel="stylesheet" href="styles.css?v=21">
 </head>
 <body>
   <div id="app" class="app">
@@ -22,7 +22,7 @@
     <header id="topbar" class="topbar">
       <section class="battle-hud" aria-label="双方状态与风力">
         <article class="combatant player-card" aria-label="玩家状态">
-          <span class="portrait"><img src="assets/portrait-player.png?v=19" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-player.png?v=21" alt=""></span>
           <div class="combatant-copy">
             <div class="name-row"><span class="team-dot"></span><strong>蓝波</strong><span class="role">你</span></div>
             <div class="hp-track"><i id="hpBar0"></i></div>
@@ -48,7 +48,7 @@
             <div class="hp-track"><i id="hpBar1"></i></div>
             <div class="hp-number" id="hp1">2000</div>
           </div>
-          <span class="portrait"><img src="assets/portrait-enemy.png?v=19" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-enemy.png?v=21" alt=""></span>
         </article>
       </section>
 
@@ -68,6 +68,12 @@
         </button>
         <button id="weaponButton" class="icon-button" type="button" aria-label="更换主武器" title="更换主武器（开局）">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20 9 15M7 17l-3 3M8.5 9.5l6-6 3 3-6 6-3 3-3-3 3-3Z"/><path d="m14 4 6 6"/></svg>
+        </button>
+        <button id="mapButton" class="icon-button" type="button" aria-label="更换地图" title="更换战场地图">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15M15 6v15"/></svg>
+        </button>
+        <button id="carryButton" class="icon-button carry-toggle" type="button" aria-label="飞行：传送弹" aria-pressed="false" title="飞行（原版 10016 传送弹，每回合一次）">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="plane-top" d="M2 12 22 4 13 12l-5 2 5-2-5 6Z"/><path class="plane-bottom" d="M2 12 8 18l5-6Z"/></svg>
         </button>
         <button id="heal" class="icon-button heal-button" type="button" aria-label="自我治疗：恢复生命，消耗本回合" aria-keyshortcuts="H" title="治疗（H）">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.2-7-9.2A4 4 0 0 1 12 7a4 4 0 0 1 7 3.8C19 15.8 12 20 12 20Z"/><path d="M8.5 12h7M12 8.5v7"/></svg>
@@ -239,6 +245,19 @@
       </div>
     </footer>
 
+    <section id="mapPicker" class="map-picker" role="dialog" aria-modal="true" aria-labelledby="mapPickerTitle" hidden>
+      <div class="map-dialog">
+        <span class="map-kicker">GUNNY · CLASSIC MAPS</span>
+        <h1 id="mapPickerTitle">选择战场地图</h1>
+        <p class="map-lead">十张地图均按原版资源重制，可在开局自由选择；选定后进入备战。之后可随时从右上角「地图」按钮更换。</p>
+        <div id="mapGrid" class="map-grid" role="radiogroup" aria-label="战场地图"></div>
+        <div class="map-dialog-foot">
+          <span id="mapSource">选择一张地图开始</span>
+          <button id="mapConfirm" class="map-confirm" type="button">进入战场</button>
+        </div>
+      </div>
+    </section>
+
     <section id="weaponPicker" class="weapon-picker" role="dialog" aria-modal="true" aria-labelledby="weaponPickerTitle" hidden>
       <div class="weapon-dialog">
         <span class="weapon-kicker">GUNNY · CLASSIC ARSENAL</span>
@@ -307,7 +326,7 @@
         preload.rel = 'preload';
         preload.as = 'fetch';
         preload.type = 'application/wasm';
-        preload.href = 'wasm/gunny.wasm?v=19';
+        preload.href = 'wasm/gunny.wasm?v=21';
         document.head.appendChild(preload);
         const loadScript = (src) => new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -317,14 +336,14 @@
           document.head.appendChild(script);
         });
         try {
-          await loadScript('wasm/wasm_exec.js?v=19');
-          await loadScript('offline-api.js?v=19');
+          await loadScript('wasm/wasm_exec.js?v=21');
+          await loadScript('offline-api.js?v=21');
         } catch (error) {
           console.error('离线引擎加载失败', error);
         }
       }
       try {
-        await import('./js/main.js?v=19');
+        await import('./js/main.js?v=21');
       } catch (error) {
         console.error('前端入口加载失败', error);
         const fatal = document.getElementById('fatal');

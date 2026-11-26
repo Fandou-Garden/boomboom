@@ -1,11 +1,12 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=19';
-import { loadImage, Terrain } from './terrain.js?v=19';
-import { RemoteMatch } from './net-client.js?v=19';
-import { Renderer } from './renderer.js?v=19';
-import { Camera, projectPoint } from './camera.js?v=19';
-import { InputController } from './input.js?v=19';
-import { solvePerfect } from './ai.js?v=19';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=19';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=21';
+import { loadImage, Terrain } from './terrain.js?v=21';
+import { RemoteMatch } from './net-client.js?v=21';
+import { Renderer } from './renderer.js?v=21';
+import { Camera, projectPoint } from './camera.js?v=21';
+import { InputController } from './input.js?v=21';
+import { solvePerfect } from './ai.js?v=21';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=21';
+import { MAPS, getMap, resolveMapId } from './maps.js?v=21';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -30,6 +31,8 @@ const els = {
   heal: $('heal'), healCount: $('healCount'),
   weaponButton: $('weaponButton'), weaponPicker: $('weaponPicker'), weaponGrid: $('weaponGrid'),
   weaponConfirm: $('weaponConfirm'), weaponSource: $('weaponSource'),
+  mapButton: $('mapButton'), mapPicker: $('mapPicker'), mapGrid: $('mapGrid'),
+  mapConfirm: $('mapConfirm'), mapSource: $('mapSource'),
   skillExtra2: $('skillExtra2'), skillScatter: $('skillScatter'), skillExtra1: $('skillExtra1'),
   skillBoost50: $('skillBoost50'), skillBoost40: $('skillBoost40'), skillBoost30: $('skillBoost30'),
   skillBoost20: $('skillBoost20'), skillBoost10: $('skillBoost10'),
@@ -45,6 +48,8 @@ const els = {
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const params = new URLSearchParams(location.search);
+const currentMapId = resolveMapId(params.get('map'));
+const currentMap = getMap(currentMapId);
 const isTest = params.get('test') === '1';
 const isCheat = params.get('cheat') === '1';
 const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
@@ -75,6 +80,7 @@ let toastTimer = 0;
 let displayTipTimer = 0;
 let flashTimer = 0;
 let resultTimer = 0;
+let resultCardTimer = 0;
 let lastTurnKey = '';
 let portraitDismissed = false;
 let booted = false;
@@ -124,6 +130,10 @@ class SoundEngine {
       'pow-select': '008',
       heal: '039',
       pow: '039',
+      carry: '039',
+      // SOURCE: SimpleBomb.BombImp emits a separate critical amount; the
+      // browser pairs it with the original item chime.
+      critical: '039',
       death: '042',
       'turn-self': '016',
       'turn-enemy': '038',
@@ -815,6 +825,22 @@ function syncUI() {
       : `POW 大招未充能，当前 ${powPct}%`);
   }
 
+  // 飞行（传送弹）按钮：每回合一次，选中后下一发为纸飞机传送弹。
+  if (els.carryButton) {
+    const armed = !!game.carryArmed;
+    const canCarry = game.canCarry !== false && phase === 'player' && !game.charging;
+    const carryKey = `${armed}|${canCarry}`;
+    if (uiCache.carry !== carryKey) {
+      uiCache.carry = carryKey;
+      els.carryButton.classList.toggle('is-armed', armed);
+      els.carryButton.setAttribute('aria-pressed', String(armed));
+      els.carryButton.disabled = !canCarry;
+      els.carryButton.title = armed
+        ? '飞行已选中：下一发为传送弹，落在哪里你就飞到哪里'
+        : canCarry ? '飞行（原版 10016 传送弹，每回合一次）' : '本回合飞行已使用';
+    }
+  }
+
   if (uiCache.stamina !== '∞') {
     uiCache.stamina = '∞';
     setText(els.statStamina, '∞');
@@ -991,8 +1017,19 @@ function handleEvent(type, data = {}) {
   } else if (type === 'volley-resolve') {
     if (data.shots > 1) showToast(`${data.shots} 发已全部结算，即将切换回合`, { duration: 1700 });
   } else if (type === 'gameover') {
+    // SOURCE: GameOverAction -> ExpView.showCard(). Delay the result screen so
+    // the tombstone + rising soul stay visible for a beat before the cards.
     clearTimeout(resultTimer);
-    resultTimer = window.setTimeout(() => showResult(data), 420);
+    resultTimer = window.setTimeout(() => showResult(data), 1500);
+  } else if (type === 'translate') {
+    // SOURCE: ActionType.TRANSLATE -> Living.transmit(). The carry ball moved
+    // its owner to the landing point; flash a teleport ring at the new spot.
+    if (game && Number.isFinite(data.x)) {
+      game.spawnTranslateEffect?.(data.x, data.y, data.actor);
+      if (data.actor === 0) showToast('传送成功 · 你已飞到炮弹落点', { duration: 2200 });
+    }
+  } else if (type === 'carry') {
+    // Arming state comes through snapshots too; nothing extra needed here.
   }
 }
 
@@ -1035,6 +1072,72 @@ function openHelp() {
   lastFrame = performance.now();
 }
 
+// SOURCE: GameView.__gameOver -> GameOverAction -> ExpView.showCard() ->
+// TakeOutCardController.tryShowCard() -> SmallCardsView. The original lays out
+// _cardCnt = 9 face-down cards in _cardColumns = 3 columns, ticks a
+// CardCountDown of _countDownTime = 5 seconds and, on expiry, disables every
+// card and reveals the remaining ones. Only GetCardCount picks are allowed.
+// The single-player build has no inventory/backend, so cards reveal honour
+// badges instead of item drops.
+function setupResultCards(win) {
+  const row = document.getElementById('cardsRow');
+  const timer = document.getElementById('cardsCountdown');
+  if (!row) return;
+  window.clearInterval(resultCardTimer);
+  const CARD_COUNT = 9;
+  const CARD_COLUMNS = 3;
+  const COUNTDOWN = 5;
+  const MAX_PICKS = win ? 3 : 2;
+  const prizes = [
+    ['⚔', '英勇勋章'], ['✦', '精准之星'], ['★', '制胜之证'],
+    ['✧', '风之记忆'], ['◆', '幸运之石'], ['❖', '荣誉徽记'],
+    ['✺', '战利品箱'], ['⚜', '勇士印记'], ['✹', '经验加成'],
+  ];
+  row.style.setProperty('--card-columns', String(CARD_COLUMNS));
+  row.innerHTML = prizes.slice(0, CARD_COUNT).map((prize, i) => `
+    <button class="result-card" type="button" data-card="${i}" aria-label="第 ${i + 1} 张卡，点击翻开">
+      <span class="card-inner">
+        <span class="card-back"><span class="card-emblem">◆</span></span>
+        <span class="card-face"><b>${prize[0]}</b><small>${prize[1]}</small></span>
+      </span>
+    </button>
+  `).join('');
+  const cards = [...row.querySelectorAll('.result-card')];
+  const picked = new Set();
+  let remaining = COUNTDOWN;
+  let finished = false;
+  const reveal = (card, silent = false) => {
+    if (card.classList.contains('is-flipped')) return false;
+    card.classList.add('is-flipped');
+    if (!silent) sound.play('item');
+    return true;
+  };
+  const finish = (auto) => {
+    if (finished) return;
+    finished = true;
+    window.clearInterval(resultCardTimer);
+    cards.forEach((card) => card.classList.add('is-disabled'));
+    if (auto) cards.forEach((card) => reveal(card, true));
+    if (timer) timer.textContent = auto ? '时间到 · 战利品自动揭晓' : '翻牌结束';
+    showToast(auto ? '翻牌时间到，战利品自动揭晓' : (win ? '战利品已全部翻开，漂亮的一局！' : '翻牌完成，再战一局换个角度试试'), { duration: 2400 });
+  };
+  if (timer) timer.textContent = `翻牌倒计时 ${remaining}s`;
+  resultCardTimer = window.setInterval(() => {
+    remaining -= 1;
+    if (timer) timer.textContent = `翻牌倒计时 ${Math.max(0, remaining)}s`;
+    if (remaining <= 0) finish(true);
+  }, 1000);
+  row.addEventListener('click', (event) => {
+    const card = event.target.closest('.result-card');
+    if (!card || finished || card.classList.contains('is-disabled')) return;
+    if (card.classList.contains('is-flipped') || picked.size >= MAX_PICKS) return;
+    if (!reveal(card)) return;
+    sound.play(picked.size === 0 && win ? 'win' : 'item');
+    picked.add(Number(card.dataset.card));
+    if (picked.size === MAX_PICKS) finish(false);
+  });
+}
+
 function showResult(data) {
   input?.cancelAll('result');
   modalMode = 'result';
@@ -1052,7 +1155,12 @@ function showResult(data) {
       <div class="result-stat"><b>${data.stats.playerDamageDealt}</b><span>伤害</span></div>
     </div>
     <p class="source-note">本局电脑发射 ${data.stats.enemyShots} 发、命中 ${data.stats.enemyHits} 发。风场沿用原版 GetNextWind 规则。</p>
+    <div class="result-cards" aria-label="战后翻牌">
+      <p class="cards-title">${win ? '胜利翻牌 · 点击卡片抽取战利品' : '安慰翻牌 · 点击卡片查看'}<span class="cards-countdown" id="cardsCountdown"></span></p>
+      <div class="cards-row" id="cardsRow"></div>
+    </div>
   `;
+  setupResultCards(win);
   els.modalAction.textContent = '再战一局';
   els.modalClose.hidden = true;
   els.modal.hidden = false;
@@ -1072,6 +1180,8 @@ function closeModal() {
 
 function restartMatch() {
   clearTimeout(resultTimer);
+  window.clearInterval(resultCardTimer);
+  resultCardTimer = 0;
   clearTimeout(flashTimer);
   input?.cancelAll('restart');
   if (!game) return;
@@ -1345,7 +1455,7 @@ function setupInput() {
     aimButtons: [els.up, els.down],
     angleScrubSurface: document.querySelector('.joy-center'),
     canAcceptInput: () => !!game && !paused && game.phase === 'player'
-      && els.modal.hidden && els.rotateNotice.hidden && els.weaponPicker.hidden,
+      && els.modal.hidden && els.rotateNotice.hidden && els.weaponPicker.hidden && els.mapPicker.hidden,
     onChargeStart: beginPlayerCharge,
     onChargeRelease: releasePlayerCharge,
     onChargeCancel: cancelPlayerCharge,
@@ -1547,6 +1657,16 @@ function setupEvents() {
     openWeaponPicker();
     els.weaponButton.blur();
   });
+  els.carryButton?.addEventListener('click', (event) => {
+    if (event.detail === 0 || !game) return;
+    unlockSound();
+    if (game.toggleCarry()) {
+      showToast(game.carryArmed
+        ? '飞行已就绪：下一发是传送弹，落到哪里你就飞到哪里'
+        : '已取消飞行', { duration: 2200 });
+    }
+    els.carryButton.blur();
+  });
   els.weaponConfirm.addEventListener('click', () => confirmWeaponChoice());
   els.weaponGrid.addEventListener('click', (event) => {
     const option = event.target.closest('.weapon-option');
@@ -1694,6 +1814,8 @@ function exposeTestApi() {
         angleMax: game.angleMax,
         weaponLocked: (game.stats?.playerShots ?? 0) > 0,
         powSelected: game.powSelected,
+        carryArmed: game.carryArmed,
+        canCarry: game.canCarry,
         energy: game.energy,
         stamina: Number.isFinite(game.stamina) ? game.stamina : '∞',
         showCountdown: game.showCountdown,
@@ -1799,6 +1921,22 @@ function exposeTestApi() {
     charging: () => !!game?.charging,
     audioReady: () => sound.ready(),
     audioPlay: (name, weapon = null) => { sound.play(name, weapon); },
+    // SOURCE: SimpleBomb.BombImp emits damage + critical separately. This
+    // test-only hook replays one WASM event and lets the browser rendering of
+    // a critical / the result cards be asserted deterministically.
+    debugEvent(type, data) {
+      if (!game || typeof game._applyGameEvent !== 'function') return false;
+      game._applyGameEvent({ type, data });
+      return true;
+    },
+    effects() {
+      if (!game) return null;
+      return {
+        floats: game.effects.floats.map((f) => ({ text: f.text, color: f.color, size: f.size || 22 })),
+        shake: game.effects.shake,
+        flash: game.effects.flash,
+      };
+    },
     setWind(value, target = Math.round(value * 10)) {
       if (!game) return;
       game.setWind(value, target);
@@ -1844,6 +1982,9 @@ function exposeTestApi() {
     },
     togglePow() {
       return game?.togglePow() ?? false;
+    },
+    toggleCarry() {
+      return game?.toggleCarry() ?? false;
     },
     heal() {
       if (!game?.canHeal()) return false;
@@ -2043,6 +2184,70 @@ function setupCheatPanel() {
   }
 }
 
+/* ---------- Map picker (开局选图, ?map= 驱动重载) ---------- */
+const hasExplicitMap = MAPS.some((m) => m.id === params.get('map'));
+let mapPickerBound = false;
+let selectedMapId = currentMapId;
+
+function buildMapPicker() {
+  els.mapGrid.innerHTML = MAPS.map((map) => `
+    <button class="map-option" type="button" role="radio" data-map="${map.id}" aria-checked="false">
+      <span class="map-id">${map.id}</span>
+      <img src="assets/map-${map.id}-thumb.jpg" alt="${map.name}">
+      <span class="map-name">${map.name}</span>
+      <span class="map-trait">${map.trait}</span>
+    </button>
+  `).join('');
+}
+
+function paintMapPicker() {
+  for (const option of els.mapGrid.querySelectorAll('.map-option')) {
+    const active = option.dataset.map === selectedMapId;
+    option.classList.toggle('is-selected', active);
+    option.setAttribute('aria-checked', String(active));
+  }
+  const chosen = getMap(selectedMapId);
+  els.mapSource.textContent = `已选 ${chosen.name}（${chosen.id}）· ${chosen.trait}`;
+}
+
+function openMapPicker() {
+  buildMapPicker();
+  selectedMapId = currentMapId;
+  paintMapPicker();
+  els.mapPicker.hidden = false;
+  paused = true;
+  input?.cancelAll('map-picker');
+}
+
+function closeMapPicker() {
+  els.mapPicker.hidden = true;
+  paused = !els.modal.hidden || !els.rotateNotice.hidden;
+  lastFrame = performance.now();
+}
+
+function goToMap(mapId) {
+  const url = new URL(location.href);
+  url.searchParams.set('map', mapId);
+  location.href = url.toString();
+}
+
+function setupMapPicker() {
+  if (mapPickerBound) return;
+  mapPickerBound = true;
+  els.mapGrid.addEventListener('click', (event) => {
+    const option = event.target.closest('.map-option');
+    if (!option) return;
+    selectedMapId = option.dataset.map;
+    paintMapPicker();
+  });
+  els.mapConfirm.addEventListener('click', () => goToMap(selectedMapId));
+  els.mapButton?.addEventListener('click', (event) => {
+    if (event.detail === 0) return;
+    openMapPicker();
+    els.mapButton.blur();
+  });
+}
+
 async function boot() {
   try {
     setViewportVariables();
@@ -2053,22 +2258,30 @@ async function boot() {
       4: { shape: 'assets/crater-4.png', brink: 'assets/craterbrink-4.png' },
     };
     const weaponIds = ['axe', 'bow', 'gun', 'goldgun', 'fire', 'cannon', 'wind', 'thunder', 'brick', 'fruit', 'scalpel', 'toilet', 'appliance'];
-    const [back, playerSheet, enemySheet, shell, loadedTerrain, weaponImages, projectileImages, fruitPowImage] = await Promise.all([
-      loadImage('assets/map-1156-back.jpg'),
+    const mapBackUrl = `assets/map-${currentMapId}-back.jpg`;
+    const mapForeUrl = `assets/map-${currentMapId}-fore.png`;
+    // Reflect the chosen map in the minimap header (was hard-coded "亚特兰蒂斯").
+    const minimapTitle = document.querySelector('.minimap-title');
+    if (minimapTitle) minimapTitle.textContent = currentMap.name;
+    const [back, playerSheet, enemySheet, shell, loadedTerrain, weaponImages, projectileImages, fruitPowImage, carryImage] = await Promise.all([
+      loadImage(mapBackUrl),
       loadImage('assets/character-player-sheet.png'),
       loadImage('assets/character-enemy-sheet.png'),
       loadImage('assets/shell-bomb.png'),
       Terrain.load({
-        foregroundUrl: 'assets/map-1156-fore.png',
+        foregroundUrl: mapForeUrl,
         craterArtUrls,
       }),
       Promise.all(weaponIds.map(async (id) => [id, await loadImage(`assets/weapon-${id}.png`)])).then(Object.fromEntries),
       Promise.all(weaponIds.map(async (id) => [id, await loadImage(`assets/projectile-${id}.png`)])).then(Object.fromEntries),
       loadImage('assets/projectile-fruit-pow.png'),
+      loadImage('assets/projectile-carry.png'),
     ]);
     // POW ammo visual: original durian item art replaces the tomato on a
     // fruit-basket POWER shot (browser-only, see README).
     projectileImages['fruit-pow'] = fruitPowImage;
+    // SOURCE: SetBall(3) fly/carry ball — a paper-plane teleport shell.
+    projectileImages['carry'] = carryImage;
     terrain = loadedTerrain;
     renderer = new Renderer({
       canvas: els.canvas,
@@ -2084,12 +2297,17 @@ async function boot() {
     setupInput();
     setupEvents();
     setupMinimap();
+    setupMapPicker();
     exposeTestApi();
     if (isCheat) setupCheatPanel();
     booted = true;
     measureLayout();
     selectedWeaponId = game.weapon || selectedWeaponId;
-    if (isTest) {
+    // 开局先选地图（无 ?map= 且非测试/作弊时）；选完重载后再弹武器选择器。
+    const showMapPicker = !hasExplicitMap && !isTest && !isCheat;
+    if (showMapPicker) {
+      openMapPicker();
+    } else if (isTest) {
       els.weaponPicker.hidden = true;
     } else {
       openWeaponPicker({ force: true });

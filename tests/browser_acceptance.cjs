@@ -44,7 +44,11 @@ async function open(browser, width, height) {
   await page.setViewport({ width, height, deviceScaleFactor: 1 });
   const logs = [];
   page.on('console', (message) => {
-    if (message.type() === 'error' || message.type() === 'warning') logs.push(`${message.type()}: ${message.text()}`);
+    if (message.type() !== 'error' && message.type() !== 'warning') return;
+    // A static host has no Go backend: index.html probes /api/state and the
+    // expected 404 is what selects the WASM engine (docs/VALIDATION.md).
+    if ((message.location()?.url || '').includes('/api/state')) return;
+    logs.push(`${message.type()}: ${message.text()}`);
   });
   page.on('pageerror', (error) => logs.push(`PAGEERROR: ${error.message}`));
   await page.goto(`${URL}&fresh=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 60000 });

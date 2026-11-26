@@ -21,11 +21,14 @@ type Stats struct {
 }
 
 type Impact struct {
-	X          float64 `json:"x"`
-	Y          float64 `json:"y"`
-	Type       string  `json:"type"`
-	Owner      int     `json:"owner"`
-	Damage     int     `json:"damage"`
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+	Type   string  `json:"type"`
+	Owner  int     `json:"owner"`
+	Damage int     `json:"damage"`
+	// SOURCE: SimpleBomb.BombImp passes damage and critical separately to
+	// Living.TakeDamage; the victim loses damage + critical.
+	Critical   int     `json:"critical,omitempty"`
 	Distance   float64 `json:"distance"`
 	Removed    int     `json:"removed"`
 	CraterKind string  `json:"craterKind"`
@@ -129,6 +132,12 @@ type Match struct {
 	SkillUses      map[string]int
 	HealsRemaining int
 
+	// SOURCE: FlyCommand.cs / Player.UseFlySkill() / CarrySpell.cs. Using the
+	// "carry" (fly) item (TemplateID 10016, BallList ID=3) arms the NEXT shot as
+	// a teleport ball. CanCarry mirrors Player.CanFly: once per own turn.
+	CarryArmed bool
+	CanCarry   bool
+
 	Shots             []*Projectile
 	Shot              *Projectile
 	QueuedShots       []*Projectile
@@ -158,8 +167,13 @@ type Match struct {
 	EventLog    []Event
 	Subscribers map[chan Event]struct{}
 	RNG         *rand.Rand
-	LowPower    bool
-	AllowDebug  bool
+	// SOURCE: Living.MakeCriticalDamage uses m_game.Random.Next(100). A
+	// dedicated stream keeps crit rolls out of the wind / AI random sequence,
+	// so the fixed-seed duel stays fully reproducible.
+	CritRNG    *rand.Rand
+	critSeed   int64
+	LowPower   bool
+	AllowDebug bool
 }
 
 func NewMatch(terrain *Terrain, seed int64, lowPower bool) *Match {
@@ -168,6 +182,7 @@ func NewMatch(terrain *Terrain, seed int64, lowPower bool) *Match {
 		Subscribers: map[chan Event]struct{}{},
 		RNG:         rand.New(rand.NewSource(seed)),
 		LowPower:    lowPower,
+		critSeed:    seed ^ 0x43524954, // "CRIT"
 	}
 	m.resetLocked()
 	return m
@@ -192,6 +207,7 @@ func (m *Match) resetLocked() {
 	m.Turn = 0
 	m.Phase = "player"
 	m.Timer = 0
+	m.CritRNG = rand.New(rand.NewSource(m.critSeed))
 	if _, ok := WeaponDefs[m.PlayerWeapon]; !ok {
 		m.PlayerWeapon = DefaultPlayerWeapon
 	}
@@ -207,6 +223,8 @@ func (m *Match) resetLocked() {
 	m.SelectedSkill = ""
 	m.SelectedBuffs = nil
 	m.PowSelected = false
+	m.CarryArmed = false
+	m.CanCarry = true
 	m.Energy = 0
 	m.Stamina = StaminaMax
 	m.SkillUses = map[string]int{}
@@ -431,6 +449,16 @@ func (m *Match) Command(c Command) error {
 			m.SelectedSkill = c.Skill
 		}
 		m.EmitLocked("skill-select", map[string]any{"skill": m.SelectedSkill, "buffs": append([]string(nil), m.SelectedBuffs...)})
+		return nil
+	case "carry":
+		// SOURCE: FlyCommand.cs (GameCommand 40) -> Player.UseFlySkill() ->
+		// CarrySpell: SetBall(3). "使用飞行技能" arms the next shot as a
+		// teleport ball; it is a toggle available once per own turn.
+		if m.Phase != "player" || m.Charging || !m.CanCarry {
+			return nil
+		}
+		m.CarryArmed = !m.CarryArmed
+		m.EmitLocked("carry", map[string]any{"armed": m.CarryArmed, "available": m.CanCarry})
 		return nil
 	case "pow":
 		if m.Phase != "player" || m.Charging {

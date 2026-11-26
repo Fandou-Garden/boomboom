@@ -5,9 +5,9 @@
  * snapshot and sends intent commands over HTTP; server events arrive through
  * SSE. Local physics remains only for the non-firing aim recommendation.
  */
-import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=19';
-import { solveForceForAngle } from './ai.js?v=19';
-import { muzzlePoint } from './physics.js?v=19';
+import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=21';
+import { solveForceForAngle } from './ai.js?v=21';
+import { muzzlePoint } from './physics.js?v=21';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const FIRE_ANIM_SECONDS = 0.28;
@@ -61,6 +61,9 @@ export class RemoteMatch {
     this.selectedBuffs = [];
     this.skillUses = {};
     this.powSelected = false;
+    // SOURCE: FlyCommand / UseFlySkill — carry (fly/teleport) ball state.
+    this.carryArmed = false;
+    this.canCarry = true;
     this.energy = 0;
     this.stamina = Infinity;
     this.healsRemaining = BATTLE.healsPerRound;
@@ -214,6 +217,8 @@ export class RemoteMatch {
     if (Number.isFinite(s.angleMin)) this.angleMin = s.angleMin;
     if (Number.isFinite(s.angleMax)) this.angleMax = s.angleMax;
     this.powSelected = !!s.powSelected;
+    this.carryArmed = !!s.carryArmed;
+    this.canCarry = s.canCarry !== false;
     if (this._energyOverride && nowMs < this._energyOverride.until) {
       this.energy = this._energyOverride.value;
       if (s.energy >= this._energyOverride.value) this._energyOverride = null;
@@ -330,10 +335,10 @@ export class RemoteMatch {
       return;
     }
     if (type === 'impact') {
-      if (data.damage > 0) this._markHurt(1 - data.owner);
+      if (data.damage > 0 || data.critical > 0) this._markHurt(1 - data.owner);
       this._spawnImpact(data);
       if (data.owner === 0 && this.playerVolley) {
-        this.playerVolley.impacts.push({ x: data.x, y: data.y, type: data.type, damage: data.damage || 0 });
+        this.playerVolley.impacts.push({ x: data.x, y: data.y, type: data.type, damage: data.damage || 0, critical: data.critical || 0 });
         if (this.playerVolley.impacts.length > 8) this.playerVolley.impacts.shift();
       }
       this.onEvent('impact', data);
@@ -358,7 +363,7 @@ export class RemoteMatch {
       return;
     }
     if (type === 'toast' || type === 'sound' || type === 'skill-select' || type === 'weapon-select' || type === 'pow-select'
-      || type === 'volley-resolve' || type === 'wind') {
+      || type === 'volley-resolve' || type === 'wind' || type === 'carry' || type === 'translate') {
       this.onEvent(type, data);
     }
   }
@@ -393,18 +398,28 @@ export class RemoteMatch {
         maxLife: 0.5 + Math.random() * 0.75,
       });
     }
-    if (data.damage > 0) {
+    // SOURCE: SimpleBomb.BombImp -> Living.TakeDamage(source, ref damage,
+    // ref critical, "Fire"). The victim loses damage + critical and the
+    // original client draws the critical as a second, larger number.
+    const total = (data.damage || 0) + (data.critical || 0);
+    if (total > 0) {
       this.effects.floats.push({
-        x: data.x, y: data.y - 42, text: `-${data.damage}`,
+        x: data.x, y: data.y - 42, text: `-${total}`,
         color: '#ffd36a', life: 1.15, maxLife: 1.15,
       });
-      this.effects.shake = Math.min(22, 7 + data.damage / 35);
+      if (data.critical > 0) {
+        this.effects.floats.push({
+          x: data.x, y: data.y - 86, text: `暴击 -${data.critical}`,
+          color: '#ff6b4a', life: 1.35, maxLife: 1.35, size: 30, weight: 900,
+        });
+      }
+      this.effects.shake = Math.min(22, 7 + total / 35);
     } else if (data.type !== 'out') {
       this.effects.floats.push({
         x: data.x, y: data.y - 34, text: 'MISS', color: '#ffb38b', life: 0.9, maxLife: 0.9,
       });
     }
-    this.effects.flash = Math.min(0.7, 0.28 + (data.damage || 0) / 1200);
+    this.effects.flash = Math.min(0.7, 0.28 + total / 1200);
   }
 
   _markFire(index) {
@@ -626,6 +641,35 @@ export class RemoteMatch {
     this.powSelected = !this.powSelected;
     this._post({ type: 'pow', value: this.energy });
     return true;
+  }
+
+  // SOURCE: FlyCommand.cs (cmd 40) / Player.UseFlySkill() -> SetBall(3).
+  // Arms the next shot as a zero-damage teleport ball; once per own turn.
+  toggleCarry() {
+    if (this.phase !== 'player' || this.charging || !this.canCarry) return false;
+    this.carryArmed = !this.carryArmed;
+    this._post({ type: 'carry' });
+    return true;
+  }
+
+  // SOURCE: ActionType.TRANSLATE -> Living.transmit() + TransmissionGate
+  // ("asset.game.transmitted"). A short ring of pale-blue sparks marks the
+  // spot the owner was teleported to by the carry ball.
+  spawnTranslateEffect(x, y) {
+    for (let i = 0; i < 22; i += 1) {
+      const angle = (i / 22) * Math.PI * 2;
+      this.effects.particles.push({
+        x, y: y - 32,
+        vx: Math.cos(angle) * (60 + Math.random() * 40),
+        vy: Math.sin(angle) * (60 + Math.random() * 40) - 30,
+        size: 2 + Math.random() * 4,
+        color: i % 2 ? '#bff0ff' : '#6fd0f5',
+        shape: 'dirt', smoke: false,
+        life: 0.5 + Math.random() * 0.4,
+        maxLife: 0.9,
+      });
+    }
+    this.effects.flash = Math.max(this.effects.flash, 0.22);
   }
 
   canHeal() {

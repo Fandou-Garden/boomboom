@@ -1,7 +1,7 @@
 /** Canvas renderer. World layers use world coordinates; HUD stays in DOM. */
-import { PHYSICS, COMBAT, WORLD, COLORS } from './config.js?v=19';
-import { clamp, muzzlePoint, weaponGripPoint } from './physics.js?v=19';
-import { projectPoint } from './camera.js?v=19';
+import { PHYSICS, COMBAT, WORLD, COLORS } from './config.js?v=21';
+import { clamp, muzzlePoint, weaponGripPoint } from './physics.js?v=21';
+import { projectPoint } from './camera.js?v=21';
 
 // SOURCE: GameCharacter.as action frame arrays. The 3×13 sheet is a frame atlas,
 // not three independent suit rows: STAND/WALK/SHOWGUN/SHOT/HIT all index into it.
@@ -268,9 +268,94 @@ export class Renderer {
     return ACTOR_FRAMES.stand[index];
   }
 
+  // SOURCE: GamePlayer death handler creates a TombView at the death spot and
+  // lifts the player to y-70 in the SOUL/SOUL_MOVE state; GhostMoveAction then
+  // drifts the soul upward with a gentle sway. TombView draws its bitmap at
+  // (-20,-50). We reproduce the same pairing with a vector gravestone plus a
+  // translucent rising soul so the death reads before the result screen.
+  _drawTombAndSoul(ctx, game, actor, x, y) {
+    const t = game.visualTime ?? game.time ?? 0;
+    ctx.save();
+    // Gravestone: a rounded stone slab with a carved cross and a soil mound.
+    ctx.translate(x, y);
+    ctx.fillStyle = 'rgba(6,20,28,0.32)';
+    ctx.beginPath();
+    ctx.ellipse(0, 2, 30, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#7d8a8f';
+    ctx.strokeStyle = '#3c4a50';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-18, 0);
+    ctx.lineTo(-18, -30);
+    ctx.arc(0, -30, 18, Math.PI, 0);
+    ctx.lineTo(18, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // bevel highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.beginPath();
+    ctx.moveTo(-14, -2);
+    ctx.lineTo(-14, -30);
+    ctx.arc(-2, -30, 12, Math.PI, 0);
+    ctx.lineTo(10, -6);
+    ctx.closePath();
+    ctx.fill();
+    // carved cross
+    ctx.strokeStyle = '#e9f2f4';
+    ctx.lineWidth = 3.4;
+    ctx.beginPath();
+    ctx.moveTo(0, -40); ctx.lineTo(0, -18);
+    ctx.moveTo(-8, -32); ctx.lineTo(8, -32);
+    ctx.stroke();
+    ctx.restore();
+
+    // Soul: the character's faint, bluish silhouette rising and fading, with
+    // a soft halo. GHOST_MOVE_SPEED=8 in the source; here it is a slow drift
+    // that keeps looping until the result screen takes over.
+    const rise = 70 + Math.sin(t * 0.9 + actor.index) * 4;
+    const sway = Math.sin(t * 1.6 + actor.index * 2) * 6;
+    const alpha = 0.34 + Math.sin(t * 2.2 + actor.index) * 0.08;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0.18, alpha);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.translate(x + sway, y - rise);
+    // halo
+    const halo = ctx.createRadialGradient(0, -18, 4, 0, -18, 40);
+    halo.addColorStop(0, 'rgba(180,240,255,0.55)');
+    halo.addColorStop(1, 'rgba(180,240,255,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, -18, 40, 0, Math.PI * 2);
+    ctx.fill();
+    // ghost body (rounded head + tapered tail)
+    ctx.fillStyle = 'rgba(198,244,255,0.85)';
+    ctx.beginPath();
+    ctx.arc(0, -30, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-12, -26);
+    ctx.quadraticCurveTo(-16, 4, -6, 12);
+    ctx.quadraticCurveTo(0, 4, 4, 12);
+    ctx.quadraticCurveTo(12, 6, 12, -26);
+    ctx.closePath();
+    ctx.fill();
+    // eyes
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(30,80,110,0.85)';
+    ctx.beginPath(); ctx.arc(-4.5, -31, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(4.5, -31, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
   _drawActor(ctx, game, actor) {
     const x = actor.renderX ?? actor.x;
     const y = actor.renderY ?? actor.y;
+    if (!actor.alive) {
+      this._drawTombAndSoul(ctx, game, actor, x, y);
+      return;
+    }
     const opponent = game.actors[1 - actor.index];
     const direction = actor.walkDirection
       ? (Math.sign(actor.facing) || 1)
@@ -529,22 +614,28 @@ export class Renderer {
     }
 
     // POWER shot of the fruit basket swaps the tomato for the original durian
-    // item art; every other shell keeps its normal projectile image.
-    const ammoKey = shot.pow && shot.weapon === 'fruit' ? 'fruit-pow' : shot.weapon;
+    // item art; a carry (fly/teleport) ball uses the original paper-plane art.
+    const ammoKey = shot.carry ? 'carry'
+      : (shot.pow && shot.weapon === 'fruit') ? 'fruit-pow' : shot.weapon;
     const image = this.images.projectiles?.[ammoKey] || this.images.projectiles?.[shot.weapon] || this.images.shell;
-    const maxSide = shot.weapon === 'fire' ? 78
-      : shot.weapon === 'thunder' ? 74
-      : shot.weapon === 'scalpel' ? 70 : 64;
-    const k = maxSide / Math.max(image.width || image.naturalWidth || 32, image.height || image.naturalHeight || 32);
-    const drawW = (image.width || image.naturalWidth || 32) * k;
-    const drawH = (image.height || image.naturalHeight || 32) * k;
+    // Draw shells at a uniform fraction of their ORIGINAL art instead of
+    // stretching every weapon to a fixed ~70 px. The old rule blew small
+    // shells (e.g. 27 px cannon / 轰天) up to 64–78 px and looked oversized.
+    const natW = image.naturalWidth || image.width || 32;
+    const natH = image.naturalHeight || image.height || 32;
+    const AMMO_SCALE = 0.82, AMMO_MAX = 52, AMMO_MIN = 24;
+    let drawW = natW * AMMO_SCALE;
+    let drawH = natH * AMMO_SCALE;
+    const longest = Math.max(drawW, drawH);
+    if (longest > AMMO_MAX) { const k = AMMO_MAX / longest; drawW *= k; drawH *= k; }
+    else if (longest < AMMO_MIN) { const k = AMMO_MIN / longest; drawW *= k; drawH *= k; }
     const heading = Math.atan2(shot.vy || 0, shot.vx || shot.direction || 1);
     const spin = shot.weapon === 'fruit' ? (game.visualTime ?? game.time) * 4.2 * Math.sign(shot.direction || 1)
       : shot.weapon === 'brick' ? (game.visualTime ?? game.time) * 3.4 * Math.sign(shot.direction || 1) : 0;
     ctx.translate(x, y);
     ctx.rotate(heading + spin);
     ctx.shadowColor = `rgba(${tint},0.9)`;
-    ctx.shadowBlur = 24;
+    ctx.shadowBlur = 14;
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(image, -drawW / 2, -drawH / 2, drawW, drawH);
     ctx.restore();
@@ -676,8 +767,10 @@ export class Renderer {
       if (point.x < -50 || point.x > this.width + 50 || point.y < -30 || point.y > this.height + 30) continue;
       const alpha = clamp(f.life / f.maxLife, 0, 1);
       ctx.globalAlpha = Math.min(1, alpha * 1.8);
-      ctx.font = '800 22px "PingFang SC", "Microsoft YaHei", sans-serif';
-      ctx.lineWidth = 5;
+      // SOURCE: a critical is drawn as a second, larger damage number.
+      const size = f.size || 22;
+      ctx.font = `${f.weight || 800} ${size}px "PingFang SC", "Microsoft YaHei", sans-serif`;
+      ctx.lineWidth = size > 22 ? 6 : 5;
       ctx.strokeStyle = 'rgba(4,26,36,0.82)';
       ctx.strokeText(f.text, point.x, point.y);
       ctx.fillStyle = f.color;

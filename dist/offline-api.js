@@ -50,7 +50,7 @@
     bootPromise = (async () => {
       if (typeof window.Go !== 'function') throw new Error('wasm_exec.js 未加载');
       const go = new window.Go();
-      const response = await fetch('wasm/gunny.wasm?v=19', { cache: 'force-cache' });
+      const response = await fetch('wasm/gunny.wasm?v=21', { cache: 'force-cache' });
       if (!response.ok) throw new Error(`gunny.wasm: HTTP ${response.status}`);
       const bytes = await response.arrayBuffer();
       let instantiated;
@@ -65,13 +65,19 @@
       });
       for (let i = 0; i < 200 && !window.GunnyWasm; i += 1) await sleep(10);
       if (!window.GunnyWasm) throw new Error('WASM 引擎未挂载 GunnyWasm');
-      const [map, crater50, crater401, crater4] = await Promise.all([
-        loadBytes('data/1156.fore.map?v=19'),
-        loadBytes('assets/crater-50.png?v=19'),
-        loadBytes('assets/crater-401.png?v=19'),
-        loadBytes('assets/crater-4.png?v=19'),
-      ]);
       const params = new URLSearchParams(location.search);
+      // The selected map id is shared with the client (main.js). All map
+      // bitmasks are resampled to the engine's fixed 1843x1020 world, so the
+      // authoritative match can be initialised with any of them unchanged.
+      const mapIds = ['1156','1001','1002','1003','1008','1014','1035','1038','1157','1190','1192'];
+      const mapId = mapIds.includes(params.get('map')) ? params.get('map') : '1156';
+      window.__GUNNY_MAP_ID__ = mapId;
+      const [map, crater50, crater401, crater4] = await Promise.all([
+        loadBytes(`data/${mapId}.fore.map?v=21`),
+        loadBytes('assets/crater-50.png?v=21'),
+        loadBytes('assets/crater-401.png?v=21'),
+        loadBytes('assets/crater-4.png?v=21'),
+      ]);
       const debug = params.get('test') === '1' || params.get('cheat') === '1';
       const error = window.GunnyWasm.init(map, crater50, crater401, crater4, debug);
       if (error) throw new Error(error);

@@ -272,6 +272,92 @@ func TestSourceDamage(t *testing.T) {
 	}
 }
 
+// SOURCE: Game.Logic/Living.cs MakeCriticalDamage(). The original rolls
+// lucky*45/(800+lucky) against Random.Next(100) and returns
+// (int)((0.5 + lucky*0.00015) * baseDamage) reduced by the target's
+// ReduceCrit gems/pet value.
+func TestSourceCriticalDamageMatchesSource(t *testing.T) {
+	lucky := CriticalLucky
+	base := 400                        // use variables so the formula is a runtime float, not a constant
+	rate := lucky * 45 / (800 + lucky) // ~8.27%
+	crit := int((0.5 + lucky*0.00015) * float64(base))
+	if got := SourceCriticalDamage(lucky, 0, base, 0); got != crit {
+		t.Fatalf("roll 0 crit = %d, want %d", got, crit)
+	}
+	if got := SourceCriticalDamage(lucky, 0, base, int(math.Ceil(rate))); got != 0 {
+		t.Fatalf("roll above %.2f%% threshold crit = %d, want 0", rate, got)
+	}
+	if got := SourceCriticalDamage(lucky, 0, base, 99); got != 0 {
+		t.Fatalf("roll 99 crit = %d, want 0", got)
+	}
+	if got := SourceCriticalDamage(lucky, 50, base, 0); got != crit/2 {
+		t.Fatalf("50%% crit reduction = %d, want %d", got, crit/2)
+	}
+	if got := SourceCriticalDamage(lucky, 0, 0, 0); got != 0 {
+		t.Fatalf("zero damage crit = %d, want 0", got)
+	}
+}
+
+// critRNGWithFirstRoll returns a deterministic stream whose first Intn(100)
+// equals want, so the impact test can force or suppress a critical hit.
+func critRNGWithFirstRoll(want int) *rand.Rand {
+	for seed := int64(0); seed < 10000; seed++ {
+		if r := rand.New(rand.NewSource(seed)); r.Intn(100) == want {
+			return rand.New(rand.NewSource(seed))
+		}
+	}
+	return rand.New(rand.NewSource(0))
+}
+
+// SOURCE: SimpleBomb.BombImp passes damage and critical separately to
+// Living.TakeDamage: the victim loses damage + critical.
+func TestCriticalDamageIsAppliedOnImpact(t *testing.T) {
+	tr := testTerrain(t)
+	makeImpact := func(forceCrit bool) (*Match, int, int) {
+		m := NewMatch(tr, 7, false)
+		if forceCrit {
+			m.CritRNG = critRNGWithFirstRoll(0)
+		} else {
+			m.CritRNG = critRNGWithFirstRoll(99)
+		}
+		target := m.Actors[1]
+		hpBefore := target.HP
+		p := &Projectile{
+			Owner: 0, X: target.X, Y: target.Y - 38,
+			Impact: "actor", Alive: false, DamageScale: 1,
+			Weapon: m.playerWeapon().ID, CraterArt: "401", Shells: 1,
+		}
+		m.resolveImpactLocked(p)
+		if m.LastImpact == nil {
+			t.Fatal("missing impact")
+		}
+		return m, hpBefore, m.LastImpact.Damage + m.LastImpact.Critical
+	}
+
+	mCrit, hpCrit, lossCrit := makeImpact(true)
+	if mCrit.LastImpact.Critical <= 0 {
+		t.Fatalf("forced crit: damage=%d critical=%d", mCrit.LastImpact.Damage, mCrit.LastImpact.Critical)
+	}
+	if mCrit.Actors[1].HP != hpCrit-lossCrit {
+		t.Fatalf("crit hp %d -> %d, want loss %d", hpCrit, mCrit.Actors[1].HP, lossCrit)
+	}
+	if mCrit.Stats.PlayerDamageDealt != lossCrit {
+		t.Fatalf("crit stats damage = %d, want %d", mCrit.Stats.PlayerDamageDealt, lossCrit)
+	}
+
+	mPlain, hpPlain, lossPlain := makeImpact(false)
+	if mPlain.LastImpact.Critical != 0 {
+		t.Fatalf("suppressed crit = %d, want 0", mPlain.LastImpact.Critical)
+	}
+	if lossCrit <= lossPlain || lossCrit-lossPlain != mCrit.LastImpact.Critical {
+		t.Fatalf("crit total %d should be plain total %d + critical %d",
+			lossCrit, lossPlain, mCrit.LastImpact.Critical)
+	}
+	if mPlain.Actors[1].HP != hpPlain-lossPlain {
+		t.Fatalf("plain hp %d -> %d, want loss %d", hpPlain, mPlain.Actors[1].HP, lossPlain)
+	}
+}
+
 func TestMatchStartsOnGround(t *testing.T) {
 	tr := testTerrain(t)
 	m := NewMatch(tr, 7, false)
@@ -410,3 +496,74 @@ func TestFixedWindTrajectoryIsDeterministic(t *testing.T) {
 }
 
 func mathRand() *rand.Rand { return rand.New(rand.NewSource(7)) }
+
+// Regression: the "carry"/fly item (SOURCE FlyCommand.cs / CarrySpell.cs /
+// SimpleBomb.cs BombType.FLY / BallList ID=3) arms ONE zero-damage, no-crater
+// teleport ball and moves its owner to the landing point. Once used it is
+// unavailable until the next own turn (Player.CanFly).
+func TestCarryBallTeleportsOwnerWithoutDamageOrCrater(t *testing.T) {
+	m := NewMatch(testTerrain(t), 7, false)
+	m.SetDebug(true)
+	if !m.CanCarry {
+		t.Fatal("CanCarry should start true")
+	}
+	// Arm via the same command the client sends.
+	if err := m.Command(Command{Type: "carry"}); err != nil {
+		t.Fatalf("carry command: %v", err)
+	}
+	if !m.CarryArmed {
+		t.Fatal("carry should be armed after command")
+	}
+	before := m.Terrain.SolidCount()
+	startX := m.Actors[0].X
+	hpBefore := m.Actors[1].HP
+	if !m.fireLocked(0, 45, 1200) {
+		t.Fatal("carry fire rejected")
+	}
+	if len(m.Shots) != 1 || !m.Shots[0].Carry {
+		t.Fatalf("expected a single carry shell, got %d (carry=%v)", len(m.Shots), len(m.Shots) > 0 && m.Shots[0].Carry)
+	}
+	if m.Shots[0].DamageScale != 0 || m.Shots[0].CraterArt != "" {
+		t.Fatal("carry ball must have zero damage and no crater art")
+	}
+	if m.CarryArmed || m.CanCarry {
+		t.Fatal("carry must be consumed after firing (once per turn)")
+	}
+	// Run the flight to completion; the shell lands on terrain and translates
+	// the player. No crater and no damage must result.
+	for i := 0; i < 2000 && m.Phase == "flight"; i++ {
+		m.Update(PhysicsDT)
+	}
+	if m.Actors[1].HP != hpBefore {
+		t.Fatalf("carry ball dealt damage: %d -> %d", hpBefore, m.Actors[1].HP)
+	}
+	if m.Terrain.SolidCount() != before {
+		t.Fatalf("carry ball carved terrain: %d -> %d", before, m.Terrain.SolidCount())
+	}
+	if math.Abs(m.Actors[0].X-startX) < 1 {
+		t.Fatalf("owner was not translated (x still %v)", m.Actors[0].X)
+	}
+	// A second carry command in the same turn must be rejected.
+	if err := m.Command(Command{Type: "carry"}); err != nil {
+		t.Fatalf("carry command error: %v", err)
+	}
+	if m.CarryArmed {
+		t.Fatal("carry must not re-arm in the same turn")
+	}
+}
+
+func TestCarryAvailableAgainOnNewPlayerTurn(t *testing.T) {
+	m := NewMatch(testTerrain(t), 7, false)
+	m.SetDebug(true)
+	if err := m.Command(Command{Type: "carry"}); err != nil {
+		t.Fatal(err)
+	}
+	m.fireLocked(0, 45, 1200)
+	if m.CanCarry {
+		t.Fatal("consumed")
+	}
+	m.beginTurnLocked(0, false)
+	if !m.CanCarry || m.CarryArmed {
+		t.Fatalf("new player turn should restore CanCarry (armed=%v available=%v)", m.CarryArmed, m.CanCarry)
+	}
+}
