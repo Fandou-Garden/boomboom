@@ -97,7 +97,7 @@ cd7321bdd228e229c11ba835e1d0a4e9fbf193f1013277617b9706381c475041  ./dist/js/net-
 93bace24e4236c61f16ed395c0009e0169573f17646ae7959ea7d786a993a132  ./dist/manifest.webmanifest
 94407dc0303a945d2b8e9fbc0b7a533668f8348d933970ea0aa029b4c9060c8c  ./dist/offline-api.js
 68ad5f4507f109ada82cd382aaf08e4a6e362efd106341f1a1078a8a4d2269be  ./dist/styles.css
-42b582e87824045762604a21df291bbcf183b27d0036d2ae18558120712ae94f  ./dist/wasm/gunny.wasm
+7c3a6483e815a46fdc2f7835b9c68ae5dee96d2c1f7b47622cab7747016c409c  ./dist/wasm/gunny.wasm
 0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14  ./dist/wasm/wasm_exec.js
 951671247b41d2c1ef8a6f6cbb6cb4900fa8c3f442af692700273b09d1c6185a  ./docs/AUDIO_MAPPING.md
 2fa581783f4c83f63e7ffdaed634181a3190d9a46fdea07a154f10e7d48d3515  ./docs/CODE_LAYOUT.md
@@ -154,6 +154,6 @@ e14322c7bcacecc460ed0c2f9624fc1d73007008e114e1012aee3e91e83d0a45  ./server/main.
 a0431a7860a2ec6243561773af7a9ba044c4897fc1042390e1314553097e785c  ./tests/browser_acceptance.cjs
 c3230a52d6be40286f9054dbfd1addf98ffc7fe097bf6b7140429fb700deeb6d  ./tests/browser_controls_audio.cjs
 a95dbb693fc69c43eb4047db6e7c282af50f966438f3628ac93b09920e6d101f  ./tests/browser_mobile.cjs
-47c649ae60baa0fb75daaeb48dc0dd55f051bdd98dc3972513347676240d5cc7  ./tests/browser_static.cjs
+6a2fb51a923eb58d2462e50ca1d60ea49b968cb5d0fe5198a7dcac35a7ce3551  ./tests/browser_static.cjs
 7477cc902fa80e31adabcbb69fdcd01cfbc0787f7479a047b5bbc976eed130be  ./tests/physics.test.mjs
 75a927e96ad53d5d15fb5403400bd36d8358408f332db685b2a32c259346af5a  ./tests/verify_map_parity.py
