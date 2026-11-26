@@ -1,11 +1,11 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW } from './config.js?v=18';
-import { loadImage, Terrain } from './terrain.js?v=18';
-import { RemoteMatch } from './net-client.js?v=18';
-import { Renderer } from './renderer.js?v=18';
-import { Camera, projectPoint } from './camera.js?v=18';
-import { InputController } from './input.js?v=18';
-import { solvePerfect } from './ai.js?v=18';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=18';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW } from './config.js?v=19';
+import { loadImage, Terrain } from './terrain.js?v=19';
+import { RemoteMatch } from './net-client.js?v=19';
+import { Renderer } from './renderer.js?v=19';
+import { Camera, projectPoint } from './camera.js?v=19';
+import { InputController } from './input.js?v=19';
+import { solvePerfect } from './ai.js?v=19';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=19';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -45,6 +45,7 @@ const els = {
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const params = new URLSearchParams(location.search);
 const isTest = params.get('test') === '1';
+const isCheat = params.get('cheat') === '1';
 const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -1917,6 +1918,113 @@ function exposeTestApi() {
   };
 }
 
+/**
+ * Opt-in cheat dashboard (?cheat=1).
+ * It only appears behind an explicit query flag and uses the existing debug
+ * energy command. Static WASM is the intended target; HTTP needs -debug.
+ */
+function setupCheatPanel() {
+  if (document.getElementById('cheatDock')) return;
+  const style = document.createElement('style');
+  style.id = 'cheatStyles';
+  style.textContent = `
+    .cheat-dock { position: fixed; right: 10px; top: 64px; z-index: 90; font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .cheat-toggle { display: block; margin-left: auto; padding: 6px 10px; border: 1px solid rgba(79,209,255,.55); border-radius: 8px; background: rgba(5,25,38,.92); color: #9fe9ff; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.35); }
+    .cheat-panel { width: 226px; margin-top: 6px; padding: 10px; border: 1px solid rgba(79,209,255,.45); border-radius: 10px; background: rgba(4,20,30,.96); color: #eaf6ff; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+    .cheat-panel[hidden] { display: none; }
+    .cheat-panel header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; color: #9fe9ff; }
+    .cheat-panel header button { border: 0; background: transparent; color: #9fc7d6; font-size: 16px; line-height: 1; cursor: pointer; }
+    .cheat-line { display: flex; justify-content: space-between; gap: 8px; margin: 5px 0; }
+    .cheat-line b { color: #ffd36a; font-weight: 600; }
+    .cheat-panel .cheat-action { display: block; width: 100%; margin-top: 8px; padding: 8px; border: 1px solid rgba(79,209,255,.45); border-radius: 7px; background: #15506a; color: #fff; cursor: pointer; }
+    .cheat-panel .cheat-action.secondary { background: transparent; color: #9fc7d6; }
+    .cheat-panel .cheat-action:disabled { opacity: .45; cursor: not-allowed; }
+    .cheat-status { margin: 8px 0 0; color: #9fc7d6; font-size: 11px; line-height: 1.45; }
+    @media (max-width: 700px) { .cheat-dock { top: 52px; right: 6px; } .cheat-panel { width: 198px; } }
+  `;
+  document.head.append(style);
+
+  const dock = document.createElement('div');
+  dock.id = 'cheatDock';
+  dock.className = 'cheat-dock';
+  dock.innerHTML = `
+    <button type="button" class="cheat-toggle" data-cheat-toggle aria-expanded="false" aria-controls="cheatPanel">⚡ 外挂看板</button>
+    <section class="cheat-panel" id="cheatPanel" data-cheat-panel hidden aria-label="外挂看板">
+      <header><strong>战斗看板</strong><button type="button" data-cheat-close aria-label="关闭">×</button></header>
+      <div class="cheat-line"><span>能量</span><b data-cheat-energy>0%</b></div>
+      <div class="cheat-line"><span>POW</span><b data-cheat-pow>未选中</b></div>
+      <div class="cheat-line"><span>阶段</span><b data-cheat-phase>—</b></div>
+      <button type="button" class="cheat-action" data-cheat-arm>能量拉满并选中 POW</button>
+      <button type="button" class="cheat-action secondary" data-cheat-cancel>取消 POW</button>
+      <p class="cheat-status" data-cheat-status>仅 ?cheat=1 可见；静态 WASM 可直接使用。</p>
+    </section>
+  `;
+  document.body.append(dock);
+
+  const toggle = dock.querySelector('[data-cheat-toggle]');
+  const panel = dock.querySelector('[data-cheat-panel]');
+  const energyEl = dock.querySelector('[data-cheat-energy]');
+  const powEl = dock.querySelector('[data-cheat-pow]');
+  const phaseEl = dock.querySelector('[data-cheat-phase]');
+  const statusEl = dock.querySelector('[data-cheat-status]');
+  const armBtn = dock.querySelector('[data-cheat-arm]');
+  const cancelBtn = dock.querySelector('[data-cheat-cancel]');
+  let timer = 0;
+
+  function refresh() {
+    if (!game) return;
+    energyEl.textContent = `${Math.round(game.energy)}%`;
+    powEl.textContent = game.powSelected ? '已选中' : '未选中';
+    phaseEl.textContent = game.phase;
+    const canAct = game.phase === 'player' && !game.charging;
+    armBtn.disabled = !canAct;
+    cancelBtn.disabled = !game.powSelected;
+  }
+
+  function setStatus(text) { statusEl.textContent = text; }
+
+  function setOpen(open) {
+    panel.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    if (open) {
+      refresh();
+      if (!timer) timer = window.setInterval(refresh, 250);
+    } else if (timer) {
+      window.clearInterval(timer);
+      timer = 0;
+    }
+  }
+
+  toggle.addEventListener('click', () => setOpen(panel.hidden));
+  dock.querySelector('[data-cheat-close]').addEventListener('click', () => setOpen(false));
+  armBtn.addEventListener('click', () => {
+    if (!game) return;
+    if (game.phase !== 'player' || game.charging) {
+      setStatus('只能在你自己的回合、未蓄力时使用。');
+      refresh();
+      return;
+    }
+    game.setEnergy(BATTLE.energyMax);
+    if (!game.powSelected) game.togglePow();
+    if (window.__GUNNY_BACKEND__ === 'go' && !location.hostname.match(/^(127\.0\.0\.1|localhost)$/)) {
+      setStatus('HTTP 模式需要服务端以 -debug 启动；静态 WASM 不受影响。');
+    } else {
+      setStatus('能量已拉满并选中 POW；现在按住发射键开炮。');
+    }
+    refresh();
+  });
+  cancelBtn.addEventListener('click', () => {
+    if (game?.powSelected) game.togglePow();
+    setStatus('已取消 POW 选中。');
+    refresh();
+  });
+
+  setOpen(false);
+  if (window.__GUNNY_BACKEND__ === 'go') {
+    setStatus('HTTP 模式需要服务端以 -debug 启动；静态 WASM 可直接使用。');
+  }
+}
+
 async function boot() {
   try {
     setViewportVariables();
@@ -1958,6 +2066,7 @@ async function boot() {
     setupEvents();
     setupMinimap();
     exposeTestApi();
+    if (isCheat) setupCheatPanel();
     booted = true;
     measureLayout();
     selectedWeaponId = game.weapon || selectedWeaponId;
