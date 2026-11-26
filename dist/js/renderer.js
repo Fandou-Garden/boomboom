@@ -1,7 +1,7 @@
 /** Canvas renderer. World layers use world coordinates; HUD stays in DOM. */
-import { PHYSICS, COMBAT, WORLD, COLORS } from './config.js?v=17';
-import { clamp, muzzlePoint, weaponGripPoint } from './physics.js?v=17';
-import { projectPoint } from './camera.js?v=17';
+import { PHYSICS, COMBAT, WORLD, COLORS } from './config.js?v=18';
+import { clamp, muzzlePoint, weaponGripPoint } from './physics.js?v=18';
+import { projectPoint } from './camera.js?v=18';
 
 // SOURCE: GameCharacter.as action frame arrays. The 3×13 sheet is a frame atlas,
 // not three independent suit rows: STAND/WALK/SHOWGUN/SHOT/HIT all index into it.
@@ -40,6 +40,16 @@ function ellipseShadow(ctx, x, y, width, alpha = 0.26) {
   ctx.restore();
 }
 
+// A plain 2D surface used for one-time asset baking. Kept local to the renderer
+// so the baked sprites can be blitted with drawImage instead of rebuilding a
+// gradient every frame (the same "bake once, reuse" idea as the reference game).
+function makeSurface(width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(width));
+  canvas.height = Math.max(1, Math.round(height));
+  return canvas;
+}
+
 export class Renderer {
   constructor({ canvas, terrain, images }) {
     this.canvas = canvas;
@@ -53,6 +63,8 @@ export class Renderer {
     this.hintBoxes = [];
     this._skyGradient = null;
     this._skyGradientHeight = 0;
+    this._overlayCanvas = null;
+    this._glowSprite = null;
   }
 
   resize(width, height, dpr) {
@@ -66,6 +78,47 @@ export class Renderer {
     this.dpr = Math.max(1, Math.min(2, dpr || 1));
     this.canvas.width = Math.round(this.width * this.dpr);
     this.canvas.height = Math.round(this.height * this.dpr);
+    // Full-screen finish (vignette + bottom shade) and the muzzle glow are
+    // static; bake them once per resize instead of rebuilding gradients in the
+    // per-frame hot path. Redrawing here keeps them correct after a rotate.
+    this._bakeOverlay();
+    this._bakeGlow();
+  }
+
+  _bakeOverlay() {
+    const { width, height } = this;
+    const surface = makeSurface(width, height);
+    const ctx = surface.getContext('2d');
+    const vignette = ctx.createRadialGradient(
+      width / 2, height * 0.48, Math.min(width, height) * 0.2,
+      width / 2, height * 0.48, Math.max(width, height) * 0.72,
+    );
+    vignette.addColorStop(0, 'rgba(8,38,52,0)');
+    vignette.addColorStop(1, 'rgba(3,23,34,0.3)');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, width, height);
+
+    const bottom = ctx.createLinearGradient(0, height * 0.72, 0, height);
+    bottom.addColorStop(0, 'rgba(3,24,35,0)');
+    bottom.addColorStop(1, 'rgba(3,20,30,0.2)');
+    ctx.fillStyle = bottom;
+    ctx.fillRect(0, height * 0.72, width, height * 0.28);
+    this._overlayCanvas = surface;
+  }
+
+  _bakeGlow() {
+    const radius = 62;
+    const size = radius * 2;
+    const surface = makeSurface(size, size);
+    const ctx = surface.getContext('2d');
+    const glow = ctx.createRadialGradient(radius, radius, 4, radius, radius, radius);
+    glow.addColorStop(0, 'rgba(255,255,235,0.9)');
+    glow.addColorStop(1, 'rgba(255,255,235,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(radius, radius, radius, 0, Math.PI * 2);
+    ctx.fill();
+    this._glowSprite = surface;
   }
 
   draw(game, view, reducedMotion = false) {
@@ -303,17 +356,11 @@ export class Renderer {
       ctx.restore();
     }
 
-    if (actor.flash > 0) {
+    if (actor.flash > 0 && this._glowSprite) {
       ctx.save();
       ctx.globalAlpha = Math.min(0.45, actor.flash * 0.5);
       ctx.globalCompositeOperation = 'lighter';
-      const glow = ctx.createRadialGradient(visualX, visualY - 32, 4, visualX, visualY - 32, 62);
-      glow.addColorStop(0, 'rgba(255,255,235,0.9)');
-      glow.addColorStop(1, 'rgba(255,255,235,0)');
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(visualX, visualY - 32, 62, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.drawImage(this._glowSprite, visualX - 62, visualY - 32 - 62, 124, 124);
       ctx.restore();
     }
 
@@ -722,20 +769,8 @@ export class Renderer {
   }
 
   _drawScreenFinish(ctx, width, height, game) {
-    const vignette = ctx.createRadialGradient(
-      width / 2, height * 0.48, Math.min(width, height) * 0.2,
-      width / 2, height * 0.48, Math.max(width, height) * 0.72,
-    );
-    vignette.addColorStop(0, 'rgba(8,38,52,0)');
-    vignette.addColorStop(1, 'rgba(3,23,34,0.3)');
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, width, height);
-
-    const bottom = ctx.createLinearGradient(0, height * 0.72, 0, height);
-    bottom.addColorStop(0, 'rgba(3,24,35,0)');
-    bottom.addColorStop(1, 'rgba(3,20,30,0.2)');
-    ctx.fillStyle = bottom;
-    ctx.fillRect(0, height * 0.72, width, height * 0.28);
+    // Pre-baked in resize(); one blit replaces two gradient allocations/frame.
+    if (this._overlayCanvas) ctx.drawImage(this._overlayCanvas, 0, 0, width, height);
 
     if (game.effects.flash > 0) {
       ctx.fillStyle = `rgba(255,240,200,${game.effects.flash * 0.25})`;
