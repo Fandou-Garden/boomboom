@@ -687,6 +687,15 @@ func (m *Match) stepActorLocked(a, other *Actor, direction int) bool {
 	}
 	x2, y2, ok := m.Terrain.FindNextWalkPoint(int(a.X), int(a.Y), direction, MoveStepX, MoveStepY)
 	if ok {
+		// FindNextWalkPoint probes the two shoulder columns (x2-1 / x2+1),
+		// exactly as the original does. After a crater those shoulders can
+		// hold isolated leftover pixels, whose y would seat the actor above or
+		// *inside* the surface of the column it actually stands on. Re-seat on
+		// the real ground of the destination column so the feet stay planted
+		// and never sink into the dug-out terrain.
+		if gy, found := m.Terrain.FindGroundY(x2, int(a.Y)-MoveStepY-2, int(a.Y)+MoveStepY+2); found {
+			y2 = gy
+		}
 		a.X = float64(x2)
 		a.Y = float64(y2)
 		a.VY = 0

@@ -229,4 +229,46 @@ func TestAIPlanIsReachable(t *testing.T) {
 	}
 }
 
+// Regression: a crater under the actor must not leave the actor floating on
+// stale ground, and walking over dug-out terrain must seat the feet on the
+// real surface of the destination column (not a leftover shoulder pixel),
+// otherwise the character visually sinks into the floor.
+func TestCraterReseatsActorAndWalkStaysOnSurface(t *testing.T) {
+	tr := testTerrain(t)
+	m := NewMatch(tr, 7, false)
+	a := m.Actors[0]
+
+	// Carve right under the player's feet, then refresh support as an impact
+	// now does. The actor must either start falling or sit on a lower surface.
+	feetX, feetY := int(a.X), int(a.Y)
+	tr.Carve(feetX, feetY, "401", "medium")
+	m.refreshSupportLocked(a)
+	if !a.Falling {
+		gy, found := tr.FindGroundY(feetX, feetY-4, tr.Height-1)
+		if !found {
+			t.Fatal("no ground below carved feet")
+		}
+		if a.Y < float64(gy)-1 {
+			t.Fatalf("actor left floating above new ground: y=%v ground=%d", a.Y, gy)
+		}
+	}
+
+	// Let the actor settle, then walk several steps across the crater and
+	// assert its feet are never below the destination column's real surface.
+	for i := 0; i < 200 && a.Falling; i++ {
+		m.Update(PhysicsDT)
+	}
+	if a.Falling {
+		t.Fatal("actor never landed after crater")
+	}
+	for step := 0; step < 12; step++ {
+		m.stepActorLocked(a, m.Actors[1], 1)
+		gy, found := tr.FindGroundY(int(a.X), int(a.Y)-MoveStepY-2, int(a.Y)+MoveStepY+2)
+		if found && a.Y < float64(gy)-1 {
+			t.Fatalf("step %d: feet sink below surface column x=%d: y=%v ground=%d",
+				step, int(a.X), a.Y, gy)
+		}
+	}
+}
+
 func mathRand() *rand.Rand { return rand.New(rand.NewSource(7)) }

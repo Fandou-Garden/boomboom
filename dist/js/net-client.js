@@ -42,6 +42,12 @@ export class RemoteMatch {
     this.weapon = null;
     this.enemyWeapon = null;
     this.weapons = [];
+    // Locally chosen weapon awaiting server confirmation. A snapshot captured
+    // before the select_weapon command was processed must not revert the HUD
+    // back to the previous (default "fruit") weapon. Cleared once a snapshot
+    // reports the chosen weapon or after a short timeout.
+    this._pendingWeapon = null;
+    this._pendingWeaponUntil = 0;
     this.force = 0;
     this.charging = false;
     this.chargeElapsed = 0;
@@ -194,7 +200,15 @@ export class RemoteMatch {
     this.selectedSkill = s.selectedSkill || null;
     this.selectedBuffs = Array.isArray(s.selectedBuffs) ? s.selectedBuffs : [];
     this.skillUses = s.skillUses || {};
-    this.weapon = s.weapon || this.weapon;
+    // Keep a just-selected weapon stable against in-flight stale snapshots.
+    if (this._pendingWeapon && nowMs < this._pendingWeaponUntil && s.weapon !== this._pendingWeapon) {
+      // ignore the stale weapon from this snapshot
+    } else {
+      if (this._pendingWeapon && s.weapon === this._pendingWeapon) {
+        this._pendingWeapon = null;
+      }
+      this.weapon = s.weapon || this.weapon;
+    }
     this.enemyWeapon = s.enemyWeapon || this.enemyWeapon;
     this.weapons = Array.isArray(s.weapons) ? s.weapons : this.weapons;
     if (Number.isFinite(s.angleMin)) this.angleMin = s.angleMin;
@@ -594,6 +608,9 @@ export class RemoteMatch {
     const def = this.weapons.find((w) => w.id === id);
     if (!def) return false;
     this.weapon = id;
+    // Hold this choice against stale snapshots until the server echoes it.
+    this._pendingWeapon = id;
+    this._pendingWeaponUntil = performance.now() + 1500;
     this.angleMin = def.angleMin;
     this.angleMax = def.angleMax;
     this.angle = def.startAngle;

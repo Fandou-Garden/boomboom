@@ -212,6 +212,13 @@ func (m *Match) resolveImpactLocked(p *Projectile) {
 		removed, _, ok := m.Terrain.Carve(ix, iy, art, kind)
 		impact.Removed, impact.CraterKind, impact.CraterArt = removed, kind, art
 		_ = ok
+		// A crater can erase the ground directly under a living actor. Refresh
+		// support at the moment of the blast (not only at volley end) so the
+		// actor starts falling / re-seats on the new surface immediately,
+		// instead of walking on stale ground and sinking into the hole later.
+		for _, a := range m.Actors {
+			m.refreshSupportLocked(a)
+		}
 		damage, distance := BlastDamage(target, float64(ix), float64(iy), attacker, radius)
 		damage = int(float64(damage) * p.DamageScale)
 		if p.Pow {
