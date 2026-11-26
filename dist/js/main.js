@@ -1,11 +1,11 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=18';
-import { loadImage, Terrain } from './terrain.js?v=18';
-import { RemoteMatch } from './net-client.js?v=18';
-import { Renderer } from './renderer.js?v=18';
-import { Camera, projectPoint } from './camera.js?v=18';
-import { InputController } from './input.js?v=18';
-import { solvePerfect } from './ai.js?v=18';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=18';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=19';
+import { loadImage, Terrain } from './terrain.js?v=19';
+import { RemoteMatch } from './net-client.js?v=19';
+import { Renderer } from './renderer.js?v=19';
+import { Camera, projectPoint } from './camera.js?v=19';
+import { InputController } from './input.js?v=19';
+import { solvePerfect } from './ai.js?v=19';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=19';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -1935,7 +1935,6 @@ function exposeTestApi() {
     ready: true,
   };
 }
-
 
 /**
  * Opt-in cheat dashboard (?cheat=1).
