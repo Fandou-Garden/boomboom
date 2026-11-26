@@ -133,13 +133,13 @@
         </div>
         <div id="chargeTrack" class="power-track" role="progressbar" aria-label="蓄力力度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <i id="chargeFill" class="charge-fill"></i>
-          <span class="power-ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="power-ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
           <span id="recommendBand" class="recommend-band" hidden aria-hidden="true"></span>
           <span id="lastPowerMarker" class="last-power-marker" hidden aria-hidden="true"></span>
           <span id="recommendMarker" class="recommend-marker" hidden aria-hidden="true"></span>
           <span id="chargeThumb" class="charge-thumb" aria-hidden="true"></span>
         </div>
-        <div class="power-scale" aria-hidden="true"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+        <div class="power-scale" aria-hidden="true"><span>0</span><span>10</span><span>20</span><span>30</span><span>40</span><span>50</span><span>60</span><span>70</span><span>80</span><span>90</span><span>100</span></div>
         <div class="power-foot">
           <span id="forceRaw">力度 0 / 2000</span>
           <span id="aimStatus" class="aim-status">读取风场…</span>
@@ -156,42 +156,65 @@
       <section class="skill-rail" aria-label="战斗道具栏 1 到 8">
         <button id="skillExtra2" class="skill-button attack-skill" type="button" data-skill="extra2" data-kind="attack" aria-label="1 攻击+2：原版 10001，同轨迹连续3发，每发伤害60%" aria-keyshortcuts="1">
           <kbd class="skill-key" aria-hidden="true">1</kbd>
-          <svg class="skill-icon icon-double-bolt" viewBox="0 0 32 32" aria-hidden="true"><path d="M14.2 2 5.6 17.2h6.1L9.4 30l9.4-15.4h-6.2L14.2 2Z"/><path d="M26.8 2 18.2 17.2h6.1L20.6 30l9.4-15.4h-6.2L26.8 2Z"/></svg>
+          <svg class="skill-icon icon-double-bolt" viewBox="0 0 32 32" aria-hidden="true">
+            <path class="bolt-back" d="M13 3 4.5 18.5h6.2L8 30l10-14h-6.4L13 3Z"/>
+            <path class="bolt-front" d="M25 3 16.5 18.5h6.2L20 30l10-14h-6.4L25 3Z"/>
+          </svg>
           <span class="skill-copy">攻击</span><b class="skill-badge" id="skillExtra2Count">+2</b>
         </button>
         <button id="skillScatter" class="skill-button attack-skill" type="button" data-skill="scatter" data-kind="attack" aria-label="2 三向散射：原版 10003，0°、-5°、+5°各一发，每发伤害50%" aria-keyshortcuts="2">
           <kbd class="skill-key" aria-hidden="true">2</kbd>
-          <svg class="skill-icon icon-trispark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 28 6 12M16 28V4M16 28l10-16"/><path d="m3 16 3-4 4 3M13 8V4h6v4M22 12l4 3 3-4"/></svg>
+          <svg class="skill-icon icon-trispark" viewBox="0 0 32 32" aria-hidden="true">
+            <path class="fan" d="M16 30 3.5 12.5 9 15 7.5 4 16 13 24.5 4 23 15l5.5-2.5L16 30Z"/>
+            <path class="fan-shine" d="M16 30 12 17l4 3 4-3-4 13Z"/>
+          </svg>
           <span class="skill-copy">三向</span><b class="skill-badge" id="skillScatterCount">×3</b>
         </button>
         <button id="skillExtra1" class="skill-button attack-skill" type="button" data-skill="extra1" data-kind="attack" aria-label="3 攻击+1：原版 10002，同轨迹连续2发，每发伤害90%" aria-keyshortcuts="3">
           <kbd class="skill-key" aria-hidden="true">3</kbd>
-          <svg class="skill-icon icon-single-bolt" viewBox="0 0 32 32" aria-hidden="true"><path d="M18.8 2 6.6 18.4h7.2L12.4 30l12.2-16.6h-7.2L18.8 2Z"/></svg>
+          <svg class="skill-icon icon-single-bolt" viewBox="0 0 32 32" aria-hidden="true">
+            <path d="M19 2 6 18.5h7.5L11.5 30 25 13h-7.6L19 2Z"/>
+          </svg>
           <span class="skill-copy">攻击</span><b class="skill-badge" id="skillExtra1Count">+1</b>
         </button>
         <button id="skillBoost50" class="skill-button boost-skill" type="button" data-skill="boost50" data-kind="boost" aria-label="4 伤害增幅50%，原版 10004，可与其他增幅叠加" aria-keyshortcuts="4">
           <kbd class="skill-key" aria-hidden="true">4</kbd>
-          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.6 29 16h-7.2v10.2H10.2V16H3L16 2.6Z"/><path d="M6.5 29.4h19"/></svg>
+          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true">
+            <path class="power-star" d="M16 2 19.6 9.4 27.5 10l-5.7 5.6 1.4 8L16 19.8 8.8 23.6l1.4-8L4.5 10l7.9-.6L16 2Z"/>
+            <path class="power-arrow" d="M16 12 24 21h-4.4v6.5h-7.2V21H8L16 12Z"/>
+          </svg>
           <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost50Count">50%</b>
         </button>
         <button id="skillBoost40" class="skill-button boost-skill" type="button" data-skill="boost40" data-kind="boost" aria-label="5 伤害增幅40%，原版 10005，可与其他增幅叠加" aria-keyshortcuts="5">
           <kbd class="skill-key" aria-hidden="true">5</kbd>
-          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.6 29 16h-7.2v10.2H10.2V16H3L16 2.6Z"/><path d="M6.5 29.4h19"/></svg>
+          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true">
+            <path class="power-star" d="M16 2 19.6 9.4 27.5 10l-5.7 5.6 1.4 8L16 19.8 8.8 23.6l1.4-8L4.5 10l7.9-.6L16 2Z"/>
+            <path class="power-arrow" d="M16 12 24 21h-4.4v6.5h-7.2V21H8L16 12Z"/>
+          </svg>
           <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost40Count">40%</b>
         </button>
         <button id="skillBoost30" class="skill-button boost-skill" type="button" data-skill="boost30" data-kind="boost" aria-label="6 伤害增幅30%，原版 10006，可与其他增幅叠加" aria-keyshortcuts="6">
           <kbd class="skill-key" aria-hidden="true">6</kbd>
-          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.6 29 16h-7.2v10.2H10.2V16H3L16 2.6Z"/><path d="M6.5 29.4h19"/></svg>
+          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true">
+            <path class="power-star" d="M16 2 19.6 9.4 27.5 10l-5.7 5.6 1.4 8L16 19.8 8.8 23.6l1.4-8L4.5 10l7.9-.6L16 2Z"/>
+            <path class="power-arrow" d="M16 12 24 21h-4.4v6.5h-7.2V21H8L16 12Z"/>
+          </svg>
           <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost30Count">30%</b>
         </button>
         <button id="skillBoost20" class="skill-button boost-skill" type="button" data-skill="boost20" data-kind="boost" aria-label="7 伤害增幅20%，原版 10007，可与其他增幅叠加" aria-keyshortcuts="7">
           <kbd class="skill-key" aria-hidden="true">7</kbd>
-          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.6 29 16h-7.2v10.2H10.2V16H3L16 2.6Z"/><path d="M6.5 29.4h19"/></svg>
+          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true">
+            <path class="power-star" d="M16 2 19.6 9.4 27.5 10l-5.7 5.6 1.4 8L16 19.8 8.8 23.6l1.4-8L4.5 10l7.9-.6L16 2Z"/>
+            <path class="power-arrow" d="M16 12 24 21h-4.4v6.5h-7.2V21H8L16 12Z"/>
+          </svg>
           <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost20Count">20%</b>
         </button>
         <button id="skillBoost10" class="skill-button boost-skill" type="button" data-skill="boost10" data-kind="boost" aria-label="8 伤害增幅10%，原版 10008，可与其他增幅叠加" aria-keyshortcuts="8">
           <kbd class="skill-key" aria-hidden="true">8</kbd>
-          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2.6 29 16h-7.2v10.2H10.2V16H3L16 2.6Z"/><path d="M6.5 29.4h19"/></svg>
+          <svg class="skill-icon icon-power" viewBox="0 0 32 32" aria-hidden="true">
+            <path class="power-star" d="M16 2 19.6 9.4 27.5 10l-5.7 5.6 1.4 8L16 19.8 8.8 23.6l1.4-8L4.5 10l7.9-.6L16 2Z"/>
+            <path class="power-arrow" d="M16 12 24 21h-4.4v6.5h-7.2V21H8L16 12Z"/>
+          </svg>
           <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost10Count">10%</b>
         </button>
       </section>
@@ -204,8 +227,12 @@
           <i class="pow-ring" aria-hidden="true"></i>
         </button>
         <button id="fire" class="fire-button" type="button" aria-label="按住蓄力，松手发射" title="按住蓄力；桌面向上拖动可增加力度">
-          <span class="fire-glyph" aria-hidden="true">
-            <svg viewBox="0 0 32 32"><path d="M7 21h11l5-7h4l-2 7 2 7h-4l-5-7H7Z"/><path d="M5 16h7M9 11l4 5M9 26l4-5"/><circle cx="25" cy="21" r="1.5"/></svg>
+          <span class="fire-glyph fire-plane" aria-hidden="true">
+            <svg viewBox="0 0 32 32">
+              <path class="plane-body" d="M6 4c7-2 13 1 17 9l-6 3 3 8-4 4-6-9-8 2 4-17Z"/>
+              <path class="plane-fold" d="M6 4 6 21l8-2-8-15Z"/>
+              <path class="plane-line" d="M9 6 23 13M12 10l-1 8"/>
+            </svg>
           </span>
           <span class="fire-copy"><b id="fireLabel">发射</b><small>长按蓄力</small></span>
         </button>

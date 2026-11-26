@@ -541,42 +541,61 @@ svg { display: block; }
 .power-recommend .last-value { color: #f2fcff; }
 .power-recommend .power-sep { font-style: normal; color: #6c9ba8; }
 .power-recommend.unreachable .recommend-value { color: #ffbda8; }
+/* Faithful to the original Gunny EnergyView ruler: a metallic strip with
+   0–100 fine graduations, a red/orange charge fill, a blue recommended band,
+   a grey previous-shot record and a white sliding pointer. Mechanics are
+   unchanged — only the skin is redrawn. */
 .power-track {
   position: relative;
-  height: 9px;
+  height: 12px;
   margin: 3px 0 1px;
-  border: 1px solid rgba(193, 236, 247, 0.23);
-  border-radius: 6px;
-  background: rgba(2, 16, 22, 0.6);
+  border: 1px solid rgba(214, 226, 226, 0.55);
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.14), rgba(0,0,0,0.16)),
+    repeating-linear-gradient(90deg, rgba(30,46,52,0.75) 0 1px, transparent 1px 2%),
+    linear-gradient(180deg, #b9c6c3, #7d8d8c 45%, #aebbb8);
   overflow: visible;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.34);
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.4), 0 1px 2px rgba(0,0,0,0.3);
 }
 .charge-fill {
   position: absolute;
   inset: 1px auto 1px 1px;
   width: calc(var(--charge, 0%) - 1px);
   max-width: calc(100% - 2px);
-  border-radius: 4px;
-  background: linear-gradient(90deg, #18a7ba, #5cddf0 65%, #ffd36a);
-  box-shadow: 0 0 9px rgba(83, 218, 239, 0.45);
+  border-radius: 1px;
+  background: linear-gradient(180deg, #ff9d5c 0%, #f0462e 45%, #b81c10 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 218, 170, 0.7), 0 0 5px rgba(240, 70, 46, 0.4);
   pointer-events: none;
+  z-index: 1;
 }
-.power-ticks { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(5, 1fr); pointer-events: none; }
-.power-ticks i { border-left: 1px solid rgba(207, 245, 255, 0.15); }
+.power-ticks { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(10, 1fr); pointer-events: none; z-index: 2; }
+.power-ticks i { border-left: 1px solid rgba(24, 38, 42, 0.5); }
 .power-ticks i:first-child { border-left: 0; }
 .charge-thumb {
   position: absolute;
   top: 50%;
   left: var(--charge, 0%);
-  width: 11px;
-  height: 16px;
-  margin-left: -5.5px;
-  border-radius: 5px;
-  background: linear-gradient(180deg, #f7ffff, #94e8f4);
-  border: 1px solid rgba(20, 104, 120, 0.65);
-  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.38);
+  width: 3px;
+  height: 18px;
+  margin-left: -1.5px;
+  border-radius: 0;
+  background: linear-gradient(180deg, #ffffff, #d7e6e8);
+  border: 0;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.55);
   transform: translateY(-50%);
   pointer-events: none;
+  z-index: 3;
+}
+.charge-thumb::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -3px;
+  border-left: 4.5px solid transparent;
+  border-right: 4.5px solid transparent;
+  border-top: 5px solid #ffffff;
+  filter: drop-shadow(0 1px 0 rgba(0,0,0,0.35));
 }
 .last-power-marker, .recommend-marker {
   position: absolute;
@@ -593,13 +612,14 @@ svg { display: block; }
   bottom: 1px;
   left: var(--recommend-start, 0%);
   width: calc(var(--recommend-end, 0%) - var(--recommend-start, 0%));
-  border-radius: 4px;
-  background: linear-gradient(90deg, rgba(62, 192, 255, 0.16), rgba(101, 221, 255, 0.34), rgba(62, 192, 255, 0.16));
-  box-shadow: inset 0 0 0 1px rgba(116, 224, 255, 0.26);
+  border-radius: 1px;
+  background: linear-gradient(180deg, #7fe3ff, #34aef0 60%, #1d84d6);
+  box-shadow: inset 0 0 0 1px rgba(180, 240, 255, 0.55);
   pointer-events: none;
-  z-index: 0;
+  z-index: 2;
 }
-.last-power-marker { left: var(--last, 0%); background: rgba(239, 251, 255, 0.95); box-shadow: 0 0 4px rgba(255, 255, 255, 0.8); }
+/* Original keeps the previous shot's force as a white/grey overlay stripe. */
+.last-power-marker { left: var(--last, 0%); background: rgba(235, 244, 244, 0.92); box-shadow: 0 0 4px rgba(255, 255, 255, 0.7); z-index: 3; }
 .last-power-marker::after {
   content: "";
   position: absolute;
@@ -621,9 +641,9 @@ svg { display: block; }
   border-bottom: 8px solid #65d9ff;
   transform: none;
   filter: drop-shadow(0 0 4px rgba(72, 201, 255, 0.9));
-  z-index: 2;
+  z-index: 4;
 }
-.power-scale { display: flex; justify-content: space-between; padding: 0 1px; color: #7ca9b3; font-size: 7px; line-height: 1; font-variant-numeric: tabular-nums; }
+.power-scale { display: flex; justify-content: space-between; padding: 0 1px; color: #9fb4b6; font-size: 7px; line-height: 1; font-variant-numeric: tabular-nums; }
 .power-foot { display: flex; align-items: center; justify-content: space-between; gap: 5px; min-width: 0; color: #9dc5ce; font-size: 7px; line-height: 1.1; }
 .power-foot span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .aim-status { text-align: right; color: #b9e8c9; }
@@ -701,16 +721,16 @@ svg { display: block; }
   transition: transform 110ms ease, filter 110ms ease;
 }
 .skill-button svg.skill-icon { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-/* Icon language follows the original 10001–10008 art: double red bolts for
-   +2, a blue three-ray fan for ×3, one amber bolt for +1, and an upward
-   power arrow for the damage amplifiers. */
-.skill-button svg.icon-double-bolt path { fill: #ff7a32; stroke: #ffe0a3; stroke-width: 1.1; }
-.skill-button svg.icon-double-bolt path + path { fill: #ef3f2f; }
-.skill-button svg.icon-trispark { stroke: #63ddff; stroke-width: 2.2; }
-.skill-button svg.icon-trispark path + path { stroke: #d8f8ff; stroke-width: 1.7; }
-.skill-button svg.icon-single-bolt path { fill: #ffd84a; stroke: #fff4b5; stroke-width: 1.1; }
-.skill-button svg.icon-power path:first-child { fill: #ffb33f; stroke: #ffe3a6; stroke-width: 1.1; }
-.skill-button svg.icon-power path + path { stroke: #ffcf76; stroke-width: 2.4; }
+/* Icon language follows the original 10001–10008 art, redrawn as solid vector
+   shapes: double orange/red bolts for +2, a filled blue three-ray fan for ×3,
+   one gold bolt for +1, and a gold power star + arrow for the amplifiers. */
+.skill-button svg.icon-double-bolt path.bolt-back { fill: #ff8a2b; stroke: #fff1cf; stroke-width: 1.2; }
+.skill-button svg.icon-double-bolt path.bolt-front { fill: #e8341f; stroke: #ffd9a8; stroke-width: 1.2; }
+.skill-button svg.icon-trispark path.fan { fill: #2f9de0; stroke: #bff0ff; stroke-width: 1.4; }
+.skill-button svg.icon-trispark path.fan-shine { fill: #9fe8ff; stroke: #e8fbff; stroke-width: 0.8; }
+.skill-button svg.icon-single-bolt path { fill: #ffca3d; stroke: #fff6cd; stroke-width: 1.2; }
+.skill-button svg.icon-power path.power-star { fill: #ffc93d; stroke: #fff2bf; stroke-width: 1; }
+.skill-button svg.icon-power path.power-arrow { fill: #ff9d2e; stroke: #ffd98a; stroke-width: 1; }
 .skill-button.is-selected .skill-icon { transform: translateY(-1px) scale(1.06); filter: drop-shadow(0 0 5px rgba(255, 228, 142, 0.62)); }
 .skill-copy { max-width: 100%; color: currentColor; font-size: 6px; font-weight: 700; line-height: 1; letter-spacing: 0; white-space: nowrap; opacity: 0.88; }
 .skill-badge {
@@ -933,6 +953,12 @@ svg { display: block; }
 .fire-button:active, .fire-button.is-held, .fire-button.is-charging { filter: brightness(1.14) saturate(1.08); }
 .fire-glyph { width: clamp(30px, 4.2vw, 38px); height: clamp(30px, 4.2vw, 38px); filter: drop-shadow(0 2px 3px rgba(0, 38, 67, 0.35)); }
 .fire-glyph svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+/* Original fire button art: a white/cyan paper plane (paper-airplane rider
+   item). Redrawn as solid vector shapes over the existing blue round button. */
+.fire-glyph.fire-plane svg { stroke: none; }
+.fire-glyph.fire-plane .plane-body { fill: #eaf8ff; stroke: #7fd4f5; stroke-width: 1; }
+.fire-glyph.fire-plane .plane-fold { fill: #bfe6f7; stroke: #7fd4f5; stroke-width: 0.8; }
+.fire-glyph.fire-plane .plane-line { fill: none; stroke: #6abfe6; stroke-width: 1; stroke-linecap: round; }
 .fire-copy { display: flex; flex-direction: column; align-items: center; gap: 0; line-height: 1; text-shadow: 0 1px 4px rgba(0, 32, 57, 0.45); }
 .fire-copy b { font-size: clamp(12px, 1.55vw, 14px); letter-spacing: 0.03em; }
 .fire-copy small { font-size: clamp(6px, 0.9vw, 8px); opacity: 0.8; }
