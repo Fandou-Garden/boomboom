@@ -8,7 +8,9 @@
 线上试玩：**https://slnp165x30zq.reakh.fun/**（测试钩子：`?test=1`）
 
 当前版本把权威战斗逻辑整体迁到 **Go 服务端**（`server/`），前端只保留 Canvas 渲染、
-输入、音效和非权威的瞄准推荐。世界恢复为原版 **2000×1425** 单幅地图，出生点
+输入、音效和非权威的瞄准推荐。同一份 Go 战斗逻辑也能编译成 **WebAssembly**，在没有
+`/api` 后端的纯静态站点里直接运行（见「纯静态部署」）。世界恢复为原版 **2000×1425**
+单幅地图，出生点
 `300 / 1700`，初始水平距离 1400 px（HUD 显示 70 m）。瞄准时双方同屏，炮弹飞行时
 镜头跟弹而 HUD 固定；瞄准只显示角色旁的短方向提示，不画完整抛物线。没有加入商城、
 房间、登录或联机。
@@ -50,13 +52,34 @@ npm start                 # sh server/run.sh，默认 http://127.0.0.1:8000/
 GUNNY_DEBUG=1 npm start   # 开放 ?test=1 所需的调试命令
 ```
 
-需要 **Go 1.21+**（服务端）和 Node 18+（仅测试/开发脚本）。Go 进程同时提供
+需要 **Go 1.21+**（服务端/WASM）和 Node 18+（仅测试/开发脚本）。Go 进程同时提供
 `dist/` 静态文件、`GET /api/state`、`GET /api/events`（SSE）和
 `POST /api/command`。
 
 > 不要直接双击 `dist/index.html`：页面使用 ES Module 和 EventSource，`file://`
 > 无法连接服务端。`server/run.sh` 会自动寻找 `go`，找不到时可用
 > `GO_BIN=/path/to/go npm start` 指定。
+
+### 纯静态部署（公网）
+
+```bash
+npm run build:static
+# 产物：gunny-static.zip，index.html 在压缩包根目录
+```
+
+`dist/index.html` 启动时先探测 `/api/state`：
+
+- 返回 JSON：走本地/线上 **Go 服务端**，SSE 同步状态；
+- 返回 404/HTML：自动加载 `wasm/wasm_exec.js` 与 `wasm/gunny.wasm`，由
+  **浏览器内 Go 引擎**接管 `/api/events` 与 `/api/command`，不需要任何后端。
+
+静态引擎使用同一份 `server/game` 代码、同一张 `reference/map/1001/fore.map` 和同一组
+原版弹坑 PNG；`dist/data/1001.fore.map` 与 `dist/wasm/gunny.wasm` 必须一起部署。
+首次加载约 3.6 MB WASM + 349 KB 地图，之后由浏览器缓存。公网站点
+**https://slnp165x30zq.reakh.fun/** 使用这条路径。
+
+`npm run test:browser:static` 会在本机起一个没有 `/api` 的静态服务器，验证
+WASM 启动、完整回合、AI 行动、弹坑和重开，不需要 Go 服务端。
 
 ### 操作
 

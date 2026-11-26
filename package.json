@@ -12,7 +12,10 @@
     "check": "sh server/check.sh",
     "test:browser": "npm run test:browser:visual && npm run test:browser:controls",
     "test:browser:visual": "sh scripts/node.sh tests/browser_acceptance.cjs",
-    "test:browser:controls": "sh scripts/node.sh tests/browser_controls_audio.cjs"
+    "test:browser:controls": "sh scripts/node.sh tests/browser_controls_audio.cjs",
+    "build:wasm": "sh scripts/build-wasm.sh",
+    "build:static": "sh scripts/build-static.sh",
+    "test:browser:static": "sh scripts/node.sh tests/browser_static.cjs"
   },
   "devDependencies": {
     "puppeteer-core": "^23.11.1"

@@ -18,7 +18,7 @@ if [ ! -x "$GOFMT" ]; then
   exit 1
 fi
 NODE="sh $ROOT/scripts/node.sh"
-for f in "$ROOT"/dist/js/*.js; do
+for f in "$ROOT"/dist/js/*.js "$ROOT"/dist/offline-api.js; do
   $NODE --check "$f"
 done
 UNFORMATTED=$("$GOFMT" -l .)

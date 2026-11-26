@@ -77,6 +77,10 @@ firing --resolve done--> enemyThink -> enemy -> ...
 | `dist/js/input.js` | Pointer/键盘/取消，只产生命令 |
 | `dist/js/explosion.js` | 粒子形状与视觉噪声（不修改 mask） |
 | `dist/js/main.js` | 启动 `RemoteMatch`、HUD、全屏、PWA、测试钩子 |
+| `dist/offline-api.js` | 静态站点适配：用 WASM 实现 EventSource + `/api/command` |
+| `dist/wasm/gunny.wasm` | `server/game` 经 `server/wasm` 编译的浏览器引擎（3.6 MB） |
+| `dist/wasm/wasm_exec.js` | 与 Go 工具链匹配的 WASM 运行时 |
+| `dist/data/1001.fore.map` | 服务端地图碰撞位图，WASM 初始化时读取 |
 
 前端 `physics.js` 与服务端 `physics.go` 的公式必须保持一致；任何偏差只影响
 “推荐力度”，不会影响真实命中。
@@ -93,6 +97,9 @@ ddt debug                 # 调试模式（浏览器测试）
 npm start                 # sh server/run.sh
 GUNNY_DEBUG=1 npm start   # 浏览器测试需要
 npm test                  # Go + JS 物理测试
+npm run build:wasm        # 编译 dist/wasm/gunny.wasm
+npm run build:static      # 生成 gunny-static.zip（index.html 在根目录）
+npm run test:browser:static # 无 Go 后端的静态 WASM 验收
 npm run check             # JS 语法 + gofmt + go vet
 npm run test:browser      # 需要 Chrome + puppeteer-core
 ```

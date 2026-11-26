@@ -1,11 +1,11 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW } from './config.js?v=13';
-import { loadImage, Terrain } from './terrain.js?v=13';
-import { RemoteMatch } from './net-client.js?v=13';
-import { Renderer } from './renderer.js?v=13';
-import { Camera, projectPoint } from './camera.js?v=13';
-import { InputController } from './input.js?v=13';
-import { solvePerfect } from './ai.js?v=13';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=13';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW } from './config.js?v=14';
+import { loadImage, Terrain } from './terrain.js?v=14';
+import { RemoteMatch } from './net-client.js?v=14';
+import { Renderer } from './renderer.js?v=14';
+import { Camera, projectPoint } from './camera.js?v=14';
+import { InputController } from './input.js?v=14';
+import { solvePerfect } from './ai.js?v=14';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=14';
 
 const $ = (id) => document.getElementById(id);
 const els = {

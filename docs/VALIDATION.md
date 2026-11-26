@@ -19,6 +19,9 @@ BROWSER ACCEPTANCE PASS
 
 npm run test:browser:controls
 CONTROLS + AUDIO ACCEPTANCE PASS
+
+npm run test:browser:static
+STATIC WASM ACCEPTANCE PASS
 ```
 
 `tests/browser_acceptance.cjs` 使用真实 Pointer Events、游戏循环和 Web Audio，不绕过
@@ -28,8 +31,8 @@ CONTROLS + AUDIO ACCEPTANCE PASS
 
 | 视口 | 初始 zoom | 蓄力截图 | 飞行截图 | 结果 |
 | --- | --- | --- | --- | --- |
-| 844×390 | 0.2011 | `charge-844x390.png` | `flight-844x390.png` | PASS |
-| 667×375 | 0.1585 | `charge-667x375.png` | `flight-667x375.png` | PASS |
+| 844×390 | 0.4494 | `charge-844x390.png` | `flight-844x390.png` | PASS |
+| 667×375 | 0.3541 | `charge-667x375.png` | `flight-667x375.png` | PASS |
 
 两个视口均完整跑过“瞄准 → 蓄力 → 发射 → 飞行 → 落地 → 电脑回合”：
 
@@ -89,27 +92,48 @@ CONTROLS + AUDIO ACCEPTANCE PASS
 `tau=22 ms` 指数平滑，炮弹用 `x+v·t+½a·t²` 外推（上限 60 ms）。本机 headless Chromium
 启用 GPU 时实测约 120 fps；触摸设备/小窗口将画布 backing store 限制在 1.5× DPR。
 
-## 6. 保留项
+## 6. 静态站点（WASM）
 
-- 世界仍为 4000×1425，玩家 x=300、电脑 x=3700，初始水平距离 3400 px（170.0 m）。
-- 角色、地形、炮弹、弹坑素材未换；没有移动出生点来强行同屏。
+`npm run test:browser:static` 在 Node 里起一个不带 `/api` 的静态 HTTP 服务，只提供
+`dist/`，然后走真实浏览器：
+
+| 项目 | 结果 |
+| --- | --- |
+| 后端探测 | `__GUNNY_BACKEND__='wasm'` |
+| 引擎 | `GunnyWasm` 初始化成功，地图 2000×1425 |
+| 待机帧 | `STAND frame 0`，`weaponVisible=false` |
+| 帧率 | 121 fps（844×390，headless Chromium） |
+| 玩家开炮 | 1 发，落地生成 1 个弹坑，`removed>0` |
+| 电脑回合 | `enemyShots=1`，再生成 1 个弹坑（共 2 个） |
+| 重开 | `playerShots=0`，弹坑归零 |
+| 页面错误 | 0（只忽略探测 `/api/state` 的 404） |
+
+WASM 包 3.6 MB，地图 349 KB；`dist/wasm/gunny.wasm`、`dist/wasm/wasm_exec.js`、
+`dist/data/1001.fore.map` 和 `dist/offline-api.js` 必须一起部署。
+
+## 7. 保留项
+
+- 世界为 **2000×1425**，玩家 x=300、电脑 x=1700，初始水平距离 1400 px（70.0 m）。
+- 角色图集换成原版完整套装 `m/suits/suits571` 与 `f/suits/suits45`；地形、炮弹、弹坑
+  素材未换，没有移动出生点来强行同屏。
 - 单机回合、风力、连续碰撞、分块 Alpha Mask 地形破坏和确定性弹坑规则未改。
 - 没有商城、房间、登录、联机或网络同步。
 
-## 7. 已知未覆盖
+## 8. 已知未覆盖
 
 - 真实 iPhone Safari 的元素全屏限制只能按降级逻辑模拟；无法在沙箱验证真实
   Home Indicator、地址栏动画和触摸延迟。
 - 设备性能只在 headless Chromium 中观察；低端 Android 的 Canvas/内存表现需真机复测。
 - 本版仍只有 map/1001，没有地图选择/切换 UI。
-- 角色 sheet 是网页对装备 PNG 的合成；待机/移动/举枪/开炮/受击帧序已按
+- 角色贴图来自原版完整套装图集，待机/移动/举枪/开炮/受击帧序已按
   `GameCharacter.as` 对齐，但不是完整 SWF 时间线（攀爬、跳跃等动作未使用）。
 
-## 8. 公网发布
+## 9. 公网发布
 
 - 稳定地址：`https://slnp165x30zq.reakh.fun/`，`site_id=slnp165x30zq`。
-- 上次发布为 **版本 4**，静态资源查询版本 `?v=9`；当前源码已到 `?v=13`，尚未重新发布。
-- 上次发布时边缘前三次返回 HTTP 425，第四次 HTTP 200；公网 `index.html` 已确认引用
-  `styles.css?v=9` 与 `js/main.js?v=9`。本轮未改动公网版本。
-- 公网 844×390 与 667×375 冒烟：双方 x=300/3700、两名角色完整在屏、蓝色主键
-  74×74、console/page error 为 0。
+- 本轮发布为 **版本 6**，静态资源查询版本 `?v=14`，状态 `PUBLISHED`。
+- 公网 `index.html` 已确认引用 `styles.css?v=14` 与 `js/main.js?v=14`；
+  `wasm/gunny.wasm?v=14` 返回 HTTP 200。
+- 公网 844×390 冒烟：后端 `wasm`、双方 x=300/1700、待机帧 0/8、120 fps、
+  玩家 1 发落地生成 1 个弹坑、console/page error 为 0。
+- 公网资源首次加载约 3.6 MB WASM + 349 KB 地图；浏览器随后使用版本化缓存。

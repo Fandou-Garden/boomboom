@@ -10,10 +10,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="风场弹道">
   <title>风场弹道 · Gunny Wind Arena</title>
-  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=13">
+  <link rel="icon" href="assets/favicon.svg?v=14" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=14">
+  <link rel="manifest" href="manifest.webmanifest?v=14">
+  <link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
   <div id="app" class="app">
@@ -22,7 +22,7 @@
     <header id="topbar" class="topbar">
       <section class="battle-hud" aria-label="双方状态与风力">
         <article class="combatant player-card" aria-label="玩家状态">
-          <span class="portrait"><img src="assets/portrait-player.png" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-player.png?v=14" alt=""></span>
           <div class="combatant-copy">
             <div class="name-row"><span class="team-dot"></span><strong>蓝波</strong><span class="role">你</span></div>
             <div class="hp-track"><i id="hpBar0"></i></div>
@@ -48,7 +48,7 @@
             <div class="hp-track"><i id="hpBar1"></i></div>
             <div class="hp-number" id="hp1">2000</div>
           </div>
-          <span class="portrait"><img src="assets/portrait-enemy.png" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-enemy.png?v=14" alt=""></span>
         </article>
       </section>
 
@@ -241,7 +241,7 @@
     <div id="loading" class="loading" role="status">
       <div class="loader-orbit" aria-hidden="true"><i></i><i></i><i></i></div>
       <strong>正在装载海湾战场</strong>
-      <span>原版地图 1001 · 4000×1425 · 可破坏地形</span>
+      <span>原版地图 1001 · 2000×1425 · 可破坏地形</span>
     </div>
 
     <div id="fatal" class="fatal" hidden>
@@ -250,6 +250,54 @@
     </div>
   </div>
   <noscript>需要启用 JavaScript 才能游玩。</noscript>
-  <script type="module" src="js/main.js?v=13"></script>
+  <script>
+    (async () => {
+      let online = false;
+      try {
+        const response = await fetch('/api/state', {
+          cache: 'no-store',
+          headers: { accept: 'application/json' },
+        });
+        const type = response.headers.get('content-type') || '';
+        if (response.ok && type.includes('application/json')) {
+          const state = await response.json();
+          online = !!state && typeof state.phase === 'string';
+        }
+      } catch (error) {
+        online = false;
+      }
+      window.__GUNNY_BACKEND__ = online ? 'go' : 'wasm';
+      if (!online) {
+        const preload = document.createElement('link');
+        preload.rel = 'preload';
+        preload.as = 'fetch';
+        preload.type = 'application/wasm';
+        preload.href = 'wasm/gunny.wasm?v=14';
+        document.head.appendChild(preload);
+        const loadScript = (src) => new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = src;
+          script.onload = resolve;
+          script.onerror = () => reject(new Error(`脚本加载失败：${src}`));
+          document.head.appendChild(script);
+        });
+        try {
+          await loadScript('wasm/wasm_exec.js?v=14');
+          await loadScript('offline-api.js?v=14');
+        } catch (error) {
+          console.error('离线引擎加载失败', error);
+        }
+      }
+      try {
+        await import('./js/main.js?v=14');
+      } catch (error) {
+        console.error('前端入口加载失败', error);
+        const fatal = document.getElementById('fatal');
+        const text = document.getElementById('fatalText');
+        if (fatal) fatal.hidden = false;
+        if (text) text.textContent = `前端入口加载失败：${error.message}`;
+      }
+    })();
+  </script>
 </body>
 </html>

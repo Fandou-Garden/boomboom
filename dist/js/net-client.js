@@ -5,9 +5,9 @@
  * snapshot and sends intent commands over HTTP; server events arrive through
  * SSE. Local physics remains only for the non-firing aim recommendation.
  */
-import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=13';
-import { solveForceForAngle } from './ai.js?v=13';
-import { muzzlePoint } from './physics.js?v=13';
+import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=14';
+import { solveForceForAngle } from './ai.js?v=14';
+import { muzzlePoint } from './physics.js?v=14';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const FIRE_ANIM_SECONDS = 0.28;
@@ -95,9 +95,9 @@ export class RemoteMatch {
     });
     this._readyTimer = window.setTimeout(() => {
       if (this.phase === 'loading') {
-        this._readyReject?.(new Error('连接 Go 服务端超时：请确认 npm start 已启动并通过 HTTP 打开页面'));
+        this._readyReject?.(new Error('连接战斗引擎超时：本地请确认 npm start；静态站请检查 wasm 资源'));
       }
-    }, 8000);
+    }, 30000);
 
     this._source = null;
     this._connect();
@@ -134,9 +134,9 @@ export class RemoteMatch {
     });
     this._source.addEventListener('error', () => {
       this.connected = false;
-      this.connectionError = 'Go 服务端连接中断，正在重连…';
+      this.connectionError = '战斗引擎连接中断，正在重连…';
       if (this.phase === 'loading') {
-        this._readyReject?.(new Error('无法连接 Go 服务端：请先运行 npm start'));
+        this._readyReject?.(new Error('无法连接战斗引擎：本地请先运行 npm start'));
       }
     });
   }

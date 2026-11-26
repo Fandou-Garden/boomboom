@@ -1,6 +1,7 @@
 package game
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"hash/fnv"
@@ -43,6 +44,21 @@ func LoadTerrain(mapPath, assetsDir string) (*Terrain, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read map: %w", err)
 	}
+	arts := map[string][]byte{}
+	for _, id := range []string{"50", "401", "4"} {
+		name := filepath.Join(assetsDir, "crater-"+id+".png")
+		raw, err := os.ReadFile(name)
+		if err != nil {
+			return nil, fmt.Errorf("open crater art %s: %w", id, err)
+		}
+		arts[id] = raw
+	}
+	return LoadTerrainFromBytes(data, arts)
+}
+
+// LoadTerrainFromBytes is the browser/WASM entry point: the map bitmask and
+// the three original crater PNGs are supplied by JS instead of the filesystem.
+func LoadTerrainFromBytes(data []byte, arts map[string][]byte) (*Terrain, error) {
 	if len(data) < 8 {
 		return nil, fmt.Errorf("map file too short: %d", len(data))
 	}
@@ -68,7 +84,11 @@ func LoadTerrain(mapPath, assetsDir string) (*Terrain, error) {
 		Art: map[string]*CraterArt{},
 	}
 	for _, id := range []string{"50", "401", "4"} {
-		art, err := loadCraterArt(assetsDir, id)
+		raw, ok := arts[id]
+		if !ok {
+			return nil, fmt.Errorf("missing crater art %s", id)
+		}
+		art, err := decodeCraterArt(id, raw)
 		if err != nil {
 			return nil, err
 		}
@@ -79,12 +99,15 @@ func LoadTerrain(mapPath, assetsDir string) (*Terrain, error) {
 
 func loadCraterArt(dir, id string) (*CraterArt, error) {
 	name := filepath.Join(dir, "crater-"+id+".png")
-	f, err := os.Open(name)
+	raw, err := os.ReadFile(name)
 	if err != nil {
 		return nil, fmt.Errorf("open crater art %s: %w", id, err)
 	}
-	defer f.Close()
-	img, _, err := image.Decode(f)
+	return decodeCraterArt(id, raw)
+}
+
+func decodeCraterArt(id string, raw []byte) (*CraterArt, error) {
+	img, _, err := image.Decode(bytes.NewReader(raw))
 	if err != nil {
 		return nil, fmt.Errorf("decode crater art %s: %w", id, err)
 	}

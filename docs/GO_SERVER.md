@@ -57,10 +57,39 @@ cd server && go run .
 
 环境变量：`GUNNY_ADDR`（默认 `:8000`）、`GUNNY_DEBUG=1`、`GO_BIN`（`run.sh` 用）。
 
-## 6. 测试
+## 6. 静态 WASM 模式
+
+公网站点没有 Go 进程，`dist/index.html` 探测 `/api/state` 失败后加载
+`dist/wasm/gunny.wasm`。`server/wasm/main.go` 只做一层 JS 绑定：
+
+| JS | Go |
+| --- | --- |
+| `GunnyWasm.init(map, c50, c401, c4, debug)` | `game.LoadTerrainFromBytes` + `game.NewMatch` |
+| `GunnyWasm.command(json)` | `Match.Command` |
+| `GunnyWasm.update(dt)` | `Match.Update` |
+| `GunnyWasm.snapshot()` | `Match.Snapshot` |
+| `GunnyWasm.events()` | `Match.EventsSince` |
+
+`dist/offline-api.js` 用 `LocalEventSource` 每 40 ms 调用 `update`，把事件包成
+`{seq,type,data}` 的 `game` 事件、把快照包成 `{seq,type:"state",data}`，与 SSE 格式
+完全一致，因此 `RemoteMatch` 不需要分支。`/api/command` 被同文件拦截并转给
+`GunnyWasm.command`；`fetch` 失败时仍按原逻辑提示。
+
+构建：
+
+```bash
+npm run build:wasm   # server/wasm -> dist/wasm/gunny.wasm + wasm_exec.js
+npm run build:static # 再打包 gunny-static.zip
+```
+
+WASM 使用 `game.SetDebug(URLSearchParams.has("test"))`，只有 `?test=1` 才开放
+`debug_fire` 等测试命令；普通公网页面没有测试钩子。
+
+## 7. 测试
 
 ```bash
 cd server && go test ./...
+npm run test:browser:static
 ```
 
 覆盖：fore.map 头/尺寸、弹坑像素数、风范围、ShootImp 偏移、伤害衰减、
