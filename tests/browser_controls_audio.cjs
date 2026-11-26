@@ -142,8 +142,8 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       assert.ok([22, 23, 26, 27].includes(fired.poses[0].frame), `firing must use SHOT, got ${fired.poses[0].frame}`);
       await page.evaluate(() => window.__GUNNY_TEST__.audioReady());
       const fire = await audioEvents(page, 'fire');
-      assert.equal(fire.length, 1, 'one extra2 volley must emit one launch sound');
-      assert.equal(fire[0].sample, '114', 'fruit launch must use Ball 401 ShootSound 114');
+      assert.equal(fire.length, 3, 'each sequential extra2 shell must emit its launch sound');
+      assert.ok(fire.every((event) => event.sample === '114'), 'fruit launches must use Ball 401 ShootSound 114');
       assert.equal((await audioEvents(page, 'pow')).length, 0);
       assert.equal(logs.length, 0, `A console: ${logs.join(' | ')}`);
       out.focusSkillSpace = { selected: 'extra2', shells: fired.stats.playerShots, fireEvents: fire.length, fireSample: fire[0].sample };
@@ -401,7 +401,7 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().charging === true, { timeout: 800 });
       await sleep(220);
       await page.keyboard.up('Space');
-      await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().phase === 'flight', { timeout: 2500 });
+      await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().stats.playerShots === 3, { timeout: 5000 });
       const s = await snapshot(page);
       assert.equal(s.audio.enabled, false);
       assert.equal(s.stats.playerShots, 3, 'audio-unlock failure must not block an extra2 volley');
@@ -445,7 +445,7 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().charging === true, { timeout: 800 });
       await sleep(180);
       await page.keyboard.up('Space');
-      await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().phase === 'flight', { timeout: 2500 });
+      await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().stats.playerShots === 3, { timeout: 5000 });
       assert.equal((await snapshot(page)).stats.playerShots, 3);
       assert.equal(logs.length, 0, `G console: ${logs.join(' | ')}`);
       out.inputIsolation = { inputBlocked: true, helpBlocked: true, postCloseShots: 3 };
