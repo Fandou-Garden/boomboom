@@ -116,9 +116,9 @@ export const BATTLE = Object.freeze({
   // item is a three-ray fan (DamageScale 0.5) with Living.ShootImp's
   // 0°/-5°/+5° force scales.
   skillDefs: {
-    extra2: { label: '攻击 +2', kind: 'attack', badge: '+2', offsets: [0, 0, 0], forceScales: [1, 1, 1], damageScale: 0.6 },
+    extra2: { label: '攻击 +2', kind: 'attack', badge: '+2', offsets: [0, 0, 0], forceScales: [1, 1, 1], sequential: true, damageScale: 0.6 },
     scatter: { label: '三向散射', kind: 'attack', badge: '×3', offsets: [0, -5, 5], forceScales: [1, 0.9, 1.1], damageScale: 0.5 },
-    extra1: { label: '攻击 +1', kind: 'attack', badge: '+1', offsets: [0, 0], forceScales: [1, 1], damageScale: 0.9 },
+    extra1: { label: '攻击 +1', kind: 'attack', badge: '+1', offsets: [0, 0], forceScales: [1, 1], sequential: true, damageScale: 0.9 },
     boost50: { label: '伤害增幅 50%', kind: 'boost', badge: '50', damageBonus: 0.5 },
     boost40: { label: '伤害增幅 40%', kind: 'boost', badge: '40', damageBonus: 0.4 },
     boost30: { label: '伤害增幅 30%', kind: 'boost', badge: '30', damageBonus: 0.3 },

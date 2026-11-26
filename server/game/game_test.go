@@ -214,6 +214,71 @@ func TestDamageBuffsStackAndSpend(t *testing.T) {
 	}
 }
 
+func TestAttackItemsAndBoostsStack(t *testing.T) {
+	m := NewMatch(testTerrain(t), 7, false)
+	for _, id := range []string{"extra2", "scatter", "boost50", "boost40", "boost30", "boost20", "boost10"} {
+		if err := m.Command(Command{Type: "skill", Skill: id}); err != nil {
+			t.Fatalf("select %s: %v", id, err)
+		}
+	}
+	s := m.Snapshot()
+	if len(s.SelectedAttacks) != 2 || s.SelectedAttacks[0] != "extra2" || s.SelectedAttacks[1] != "scatter" {
+		t.Fatalf("selected attacks = %v, want [extra2 scatter]", s.SelectedAttacks)
+	}
+	if len(s.SelectedBuffs) != 5 {
+		t.Fatalf("selected buffs = %v, want all five", s.SelectedBuffs)
+	}
+	if s.SelectedSkill != "scatter" {
+		t.Fatalf("selected skill = %q, want last selected scatter", s.SelectedSkill)
+	}
+}
+
+func TestStackedAttackItemsFireScatterWaves(t *testing.T) {
+	m := NewMatch(testTerrain(t), 7, false)
+	m.SelectedAttacks = []string{"extra2", "scatter"}
+	m.SelectedBuffs = []string{"boost50", "boost40", "boost30", "boost20", "boost10"}
+	if !m.fireLocked(0, AngleMax, ForceMax) {
+		t.Fatal("stacked attack fire rejected")
+	}
+	if len(m.Shots) != 3 || len(m.QueuedShots) != 6 || m.VolleyTotal != 9 {
+		t.Fatalf("active/queued/total = %d/%d/%d, want 3/6/9", len(m.Shots), len(m.QueuedShots), m.VolleyTotal)
+	}
+	all := append(append([]*Projectile{}, m.Shots...), m.QueuedShots...)
+	for i, shot := range all {
+		if shot.Skill != "extra2+scatter" || math.Abs(shot.DamageScale-0.75) > 1e-9 {
+			t.Fatalf("shot %d skill/scale = %q/%v, want extra2+scatter ×0.75", i, shot.Skill, shot.DamageScale)
+		}
+		if shot.Waves != 3 || shot.WaveSize != 3 || shot.Wave != i/3 || shot.Slot != i {
+			t.Fatalf("shot %d wave fields = %+v", i, shot)
+		}
+	}
+	if m.Stats.PlayerShots != 3 {
+		t.Fatalf("first wave shots = %d, want 3", m.Stats.PlayerShots)
+	}
+	for _, shot := range m.Shots {
+		shot.Alive = false
+	}
+	m.finishFlightLocked()
+	if len(m.Shots) != 3 || len(m.QueuedShots) != 3 || m.Stats.PlayerShots != 6 {
+		t.Fatalf("second wave active/queued/shots = %d/%d/%d, want 3/3/6", len(m.Shots), len(m.QueuedShots), m.Stats.PlayerShots)
+	}
+	for _, shot := range m.Shots {
+		shot.Alive = false
+	}
+	m.finishFlightLocked()
+	if len(m.Shots) != 3 || len(m.QueuedShots) != 0 || m.Stats.PlayerShots != 9 {
+		t.Fatalf("third wave active/queued/shots = %d/%d/%d, want 3/0/9", len(m.Shots), len(m.QueuedShots), m.Stats.PlayerShots)
+	}
+	for _, id := range []string{"extra2", "scatter", "boost50", "boost40", "boost30", "boost20", "boost10"} {
+		if m.SkillUses[id] != 0 {
+			t.Fatalf("%s uses = %d, want 0", id, m.SkillUses[id])
+		}
+	}
+	if m.SelectedSkill != "" || len(m.SelectedAttacks) != 0 || len(m.SelectedBuffs) != 0 {
+		t.Fatalf("selection not spent: skill=%q attacks=%v buffs=%v", m.SelectedSkill, m.SelectedAttacks, m.SelectedBuffs)
+	}
+}
+
 func TestWeaponLocksAfterFirstShot(t *testing.T) {
 	tr := testTerrain(t)
 	m := NewMatch(tr, 7, false)

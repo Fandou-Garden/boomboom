@@ -141,6 +141,10 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       assert.equal(fired.poses[0].weaponVisible, true, 'firing must keep the weapon raised');
       assert.ok([22, 23, 26, 27].includes(fired.poses[0].frame), `firing must use SHOT, got ${fired.poses[0].frame}`);
       await page.evaluate(() => window.__GUNNY_TEST__.audioReady());
+      await page.waitForFunction(
+        () => window.__GUNNY_TEST__.snapshot().audio.events.filter((event) => event.name === 'fire').length >= 3,
+        { timeout: 10000 },
+      );
       const fire = await audioEvents(page, 'fire');
       assert.equal(fire.length, 3, 'each sequential extra2 shell must emit its launch sound');
       assert.ok(fire.every((event) => event.sample === '114'), 'fruit launches must use Ball 401 ShootSound 114');

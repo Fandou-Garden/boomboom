@@ -18,23 +18,25 @@ type Snapshot struct {
 	EnemyWeapon   string      `json:"enemyWeapon"`
 	Weapons       []WeaponDef `json:"weapons"`
 
-	Actors []Actor      `json:"actors"`
-	Shots  []Projectile `json:"shots"`
-	Shot   *Projectile  `json:"shot"`
+	Actors      []Actor      `json:"actors"`
+	Shots       []Projectile `json:"shots"`
+	Shot        *Projectile  `json:"shot"`
+	VolleyTotal int          `json:"volleyTotal"`
 
 	LastImpact        *Impact  `json:"lastImpact"`
 	LastPlayerSummary string   `json:"lastPlayerSummary"`
 	LastPower         *float64 `json:"lastPower"`
 	Winner            *int     `json:"winner"`
 
-	Stats          Stats          `json:"stats"`
-	HealsRemaining int            `json:"healsRemaining"`
-	SkillUses      map[string]int `json:"skillUses"`
-	SelectedSkill  string         `json:"selectedSkill"`
-	SelectedBuffs  []string       `json:"selectedBuffs"`
-	PowSelected    bool           `json:"powSelected"`
-	Energy         float64        `json:"energy"`
-	Stamina        float64        `json:"stamina"`
+	Stats           Stats          `json:"stats"`
+	HealsRemaining  int            `json:"healsRemaining"`
+	SkillUses       map[string]int `json:"skillUses"`
+	SelectedSkill   string         `json:"selectedSkill"`
+	SelectedAttacks []string       `json:"selectedAttacks"`
+	SelectedBuffs   []string       `json:"selectedBuffs"`
+	PowSelected     bool           `json:"powSelected"`
+	Energy          float64        `json:"energy"`
+	Stamina         float64        `json:"stamina"`
 
 	Countdown     float64 `json:"countdown"`
 	ShowCountdown bool    `json:"showCountdown"`
@@ -65,7 +67,8 @@ func (m *Match) snapshotLocked() Snapshot {
 		Weapon: m.PlayerWeapon, EnemyWeapon: m.EnemyWeapon,
 		LastPlayerSummary: m.LastPlayerSummary,
 		Stats:             m.Stats, HealsRemaining: m.HealsRemaining,
-		SelectedSkill: m.SelectedSkill, SelectedBuffs: append([]string{}, m.SelectedBuffs...),
+		SelectedSkill: m.SelectedSkill, SelectedAttacks: append([]string{}, m.SelectedAttacks...),
+		SelectedBuffs: append([]string{}, m.SelectedBuffs...), VolleyTotal: m.VolleyTotal,
 		PowSelected: m.PowSelected,
 		Energy:      m.Energy, Stamina: m.Stamina,
 		Countdown: m.Countdown, ShowCountdown: m.ShowCountdown,
