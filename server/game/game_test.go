@@ -315,4 +315,43 @@ func TestCraterReseatsActorAndWalkStaysOnSurface(t *testing.T) {
 	}
 }
 
+// Regression: the source fore.map has a fully-solid bedrock floor at
+// y >= BedrockY. No crater, however deep or stacked, may dig through it.
+func TestBedrockFloorCannotBeCarved(t *testing.T) {
+	tr := testTerrain(t)
+	// Carve a big POW crater centered right at the bedrock boundary.
+	tr.Carve(300, BedrockY+20, "4", "large")
+	for _, y := range []int{BedrockY, BedrockY + 1, BedrockY + 40, tr.Height - 1} {
+		if !tr.IsSolid(300, y) {
+			t.Fatalf("bedrock breached at y=%d (x=300)", y)
+		}
+	}
+	// Sample across several columns to be sure the whole floor survives.
+	for x := 260; x <= 340; x += 10 {
+		for _, y := range []int{BedrockY, tr.Height - 1} {
+			if !tr.IsSolid(x, y) {
+				t.Fatalf("bedrock breached at (%d,%d)", x, y)
+			}
+		}
+	}
+}
+
+// Regression: with FixedWind enabled, the same angle + force + origin always
+// produces the same trajectory, so players can reproduce a shot.
+func TestFixedWindTrajectoryIsDeterministic(t *testing.T) {
+	if !FixedWind {
+		t.Skip("FixedWind disabled")
+	}
+	tr := testTerrain(t)
+	m := NewMatch(tr, 7, false)
+	originX, originY := 300.0, 1186.0
+	a := &m.Actors[0]
+	r1 := SimulateShot(originX, originY, 35, 800, 1, m.Wind, nil, tr, MaxFlightSeconds, true)
+	r2 := SimulateShot(originX, originY, 35, 800, 1, m.Wind, nil, tr, MaxFlightSeconds, true)
+	if math.Abs(r1.X-r2.X) > 1e-9 || math.Abs(r1.Y-r2.Y) > 1e-9 {
+		t.Fatalf("same shot diverged: (%v,%v) vs (%v,%v)", r1.X, r1.Y, r2.X, r2.Y)
+	}
+	_ = a
+}
+
 func mathRand() *rand.Rand { return rand.New(rand.NewSource(7)) }

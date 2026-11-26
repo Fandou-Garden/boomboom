@@ -557,9 +557,13 @@ export class Terrain {
       chunk.holeCtx.drawImage(this.scratch, 0, 0);
 
       // Actual cut. destination-out keeps the authored bitmap's antialiased
-      // edge; the mask is refreshed from these pixels below.
+      // edge; the mask is refreshed from these pixels below. Clipped above the
+      // source bedrock floor so the arena bottom can never be dug through.
       tctx.save();
       tctx.translate(-chunk.x, -chunk.y);
+      tctx.beginPath();
+      tctx.rect(x0, y0, x1 - x0 + 1, Math.min(y1, WORLD.bedrockY - 1) - y0 + 1);
+      tctx.clip();
       tctx.globalCompositeOperation = 'destination-out';
       tctx.drawImage(art.shape, drawX, drawY, drawW, drawH);
       for (const c of shape.circles) {
@@ -638,10 +642,15 @@ export class Terrain {
     const y1 = y0 + h - 1;
     const affected = this._affectedChunks(x0, y0, x1, y1);
     if (!affected.length) return { removed: 0, bounds: null };
+    // Protect the source bedrock floor: clip the erase to rows above bedrockY.
+    const cutBottom = Math.min(y1, WORLD.bedrockY - 1);
     for (const chunk of affected) {
       const ctx = chunk.ctx;
       ctx.save();
       ctx.translate(-chunk.x, -chunk.y);
+      ctx.beginPath();
+      ctx.rect(x0, y0, x1 - x0 + 1, cutBottom - y0 + 1);
+      ctx.clip();
       ctx.globalCompositeOperation = 'destination-out';
       ctx.drawImage(mask, x0, y0);
       ctx.restore();
@@ -651,7 +660,7 @@ export class Terrain {
       const lx0 = Math.max(0, x0 - chunk.x);
       const ly0 = Math.max(0, y0 - chunk.y);
       const lx1 = Math.min(chunk.w - 1, x1 - chunk.x);
-      const ly1 = Math.min(chunk.h - 1, y1 - chunk.y);
+      const ly1 = Math.min(chunk.h - 1, cutBottom - chunk.y);
       if (lx1 < lx0 || ly1 < ly0) continue;
       const rw = lx1 - lx0 + 1;
       const rh = ly1 - ly0 + 1;

@@ -482,7 +482,10 @@ export class Renderer {
       ctx.stroke();
     }
 
-    const image = this.images.projectiles?.[shot.weapon] || this.images.shell;
+    // POWER shot of the fruit basket swaps the tomato for the original durian
+    // item art; every other shell keeps its normal projectile image.
+    const ammoKey = shot.pow && shot.weapon === 'fruit' ? 'fruit-pow' : shot.weapon;
+    const image = this.images.projectiles?.[ammoKey] || this.images.projectiles?.[shot.weapon] || this.images.shell;
     const maxSide = shot.weapon === 'fire' ? 78 : 64;
     const k = maxSide / Math.max(image.width || image.naturalWidth || 32, image.height || image.naturalHeight || 32);
     const drawW = (image.width || image.naturalWidth || 32) * k;

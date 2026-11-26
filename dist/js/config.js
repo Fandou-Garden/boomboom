@@ -21,6 +21,9 @@ export const WORLD = Object.freeze({
   sourceWidth: 2000,
   mirrorAxis: 2000,
   backgroundTileWidth: 1526,
+  // SOURCE: fore.map rows y>=1282 are a fully-solid bedrock base that craters
+  // never reach in the original game. Keep it intact on the client as well.
+  bedrockY: 1282,
   // PORT: source MapInfo PosX/PosX1 are not in the readable XML export.
   // These symmetric beach columns are the same values used by server/game.
   spawnX: [300, 1700],
