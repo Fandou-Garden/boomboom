@@ -107,7 +107,7 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       const { page, logs } = await open(browser);
       await page.evaluate(() => window.__GUNNY_TEST__.audioReset());
       const idle = await snapshot(page);
-      assert.ok([0, 6, 7, 8, 9, 10].includes(idle.poses[0].frame), `idle player must use STAND, got ${idle.poses[0].frame}`);
+      assert.ok([0, 8, 9, 10].includes(idle.poses[0].frame), `idle player must use STAND, got ${idle.poses[0].frame}`);
       assert.equal(idle.poses[0].weaponVisible, false, 'idle player weapon must stay on the back');
       assert.equal(idle.poses[1].weaponVisible, false, 'idle enemy weapon must stay on the back');
       const p = await center(page, '#skillExtra2');

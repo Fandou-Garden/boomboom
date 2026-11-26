@@ -6,7 +6,11 @@ import { projectPoint } from './camera.js?v=14';
 // SOURCE: GameCharacter.as action frame arrays. The 3×13 sheet is a frame atlas,
 // not three independent suit rows: STAND/WALK/SHOWGUN/SHOT/HIT all index into it.
 const ACTOR_FRAMES = {
-  stand: [0, 6, 7, 8, 9, 10],
+  // Frames 6 and 7 in the sheet throw the head back / flip the face (they are
+  // reaction poses, not idle). Looping them made the character's head jerk
+  // upward several times a second. Idle now only cycles the calm, forward-
+  // facing prone frames so the head stays steady.
+  stand: [0, 8, 9, 10],
   walk: [1, 2, 3, 4, 5],
   show: [19, 20, 21],
   shot: [22, 23, 26, 27, 27],
@@ -47,11 +51,16 @@ export class Renderer {
     this.dpr = 1;
     this.lastView = null;
     this.hintBoxes = [];
+    this._skyGradient = null;
+    this._skyGradientHeight = 0;
   }
 
   resize(width, height, dpr) {
     this.width = Math.max(1, width);
     this.height = Math.max(1, height);
+    // Sky gradient only depends on height; cache it instead of allocating a
+    // fresh CanvasGradient every frame (that churn shows up on mobile GPUs).
+    this._skyGradient = null;
     // Limit DPR on phones/tablets: a 4000 px world with chunk canvases does
     // not need 3× backing-store pixels.
     this.dpr = Math.max(1, Math.min(2, dpr || 1));
@@ -66,11 +75,15 @@ export class Renderer {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
 
-    const sky = ctx.createLinearGradient(0, 0, 0, height);
-    sky.addColorStop(0, '#8fd7ef');
-    sky.addColorStop(0.52, '#b7dfe1');
-    sky.addColorStop(1, '#edcda9');
-    ctx.fillStyle = sky;
+    if (!this._skyGradient || this._skyGradientHeight !== height) {
+      const sky = ctx.createLinearGradient(0, 0, 0, height);
+      sky.addColorStop(0, '#8fd7ef');
+      sky.addColorStop(0.52, '#b7dfe1');
+      sky.addColorStop(1, '#edcda9');
+      this._skyGradient = sky;
+      this._skyGradientHeight = height;
+    }
+    ctx.fillStyle = this._skyGradient;
     ctx.fillRect(0, 0, width, height);
 
     const shake = game.effects.shake || 0;
@@ -197,7 +210,7 @@ export class Renderer {
     // SOURCE: STAND loops [0,6,7,8,9,10]. Frame 0 is the resting pose with the
     // weapon stowed on the back; frame 19 is SHOWGUN, not an idle frame.
     const t = game.visualTime ?? game.time ?? 0;
-    const index = Math.floor(t * 8 + actor.index * 3) % ACTOR_FRAMES.stand.length;
+    const index = Math.floor(t * 5 + actor.index * 2) % ACTOR_FRAMES.stand.length;
     return ACTOR_FRAMES.stand[index];
   }
 

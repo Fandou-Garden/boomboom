@@ -56,6 +56,7 @@ let minimapBase = null;
 let layout = { width: 1, height: 1, topInset: 0, bottomInset: 0, dpr: 1 };
 let view = null;
 let lastFrame = performance.now();
+let minimapAccum = 0;
 let paused = true;
 let modalMode = 'help';
 let toastTimer = 0;
@@ -437,7 +438,14 @@ function frame(now) {
     reducedMotion,
   });
   renderer.draw(game, view, reducedMotion);
-  drawMinimap();
+  // The minimap redraws cached layers plus several shadowBlur strokes; at
+  // 120 Hz that is wasted work on a tiny widget. Cap it at ~30 Hz while the
+  // main canvas keeps the full refresh rate.
+  minimapAccum += dt;
+  if (minimapAccum >= 1 / 30) {
+    minimapAccum = 0;
+    drawMinimap();
+  }
   syncUI();
   requestAnimationFrame(frame);
 }
