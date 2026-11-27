@@ -7,6 +7,10 @@
   "scripts": {
     "start": "sh server/run.sh",
     "start:debug": "GUNNY_DEBUG=1 sh server/run.sh",
+    "start:server": "npx tsx server-node/src/index.ts",
+    "dev:server": "DDT_DEBUG=1 npx tsx watch server-node/src/index.ts",
+    "typecheck:server": "tsc --noEmit -p server-node/tsconfig.json",
+    "test:server": "node --test tests/server/*.test.mjs",
     "test": "sh server/test.sh && sh scripts/node.sh --test tests/physics.test.mjs tests/engine/match.test.mjs tests/engine/parity.test.mjs tests/engine/embed.test.mjs",
     "test:map": "python3 tests/verify_map_parity.py",
     "check": "sh server/check.sh",
@@ -21,6 +25,15 @@
     "serve:dist": "python3 -m http.server 8077 --directory dist"
   },
   "devDependencies": {
-    "puppeteer-core": "^23.11.1"
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.11",
+    "@types/ws": "^8.18.2",
+    "puppeteer-core": "^23.11.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "ws": "^8.23.1"
   }
 }

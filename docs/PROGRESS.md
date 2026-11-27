@@ -61,15 +61,67 @@
 - [x] 核实参考仓库可达性。
 - [x] 创建开发分支 `feat/node-server-mode`。
 - [x] 建立本进度文件。
+- [x] **阶段 1：Node + TypeScript + SQLite 服务端骨架**（可运行）。
+  - `server-node/`：tsx 开发运行器（`npm run start:server` / `dev:server`），`tsconfig.json`，
+    迁移 `migrations/001_init.sql`，`node:sqlite`（WAL + 外键 + busy_timeout），
+    固定本地玩家 `local-player`，Express 5 + ws，静态托管同一份 `dist/`，只监听 127.0.0.1。
+  - 数据库表：players / item_catalog / inventory / weapon_instances / rooms / battles /
+    reward_boards / reward_picks / forge_operations / unmatched_items / schema_migrations。
+  - `.env.example`、`.gitignore`（data/、*.sqlite*、.env 均排除）、根 `package.json` 新增脚本，
+    原 `npm start`（Go 站点版）保持不变。
+  - 原版玄武石 1~5 级图标从 `art-source/items/` 移植到 `dist/assets/items/`，
+    sha256 逐一核对一致（原文件、导出文件、用途见后续素材清单）。
+- [x] **阶段 2：服务端权威战斗**（代码完成，待端到端验证）。
+  - 直接 `import('../../dist/js/engine/index.js?v=33')` 复用现有纯 JS 权威引擎，
+    **没有复制、没有重写物理**，Go/JS 一致性金标准 `parity.test.mjs` 不受影响。
+  - `server-node/src/battle/engine-host.ts`：按需加载并缓存当前地图 `dist/data/<id>.fore.map`，
+    开局冻结双方 `actor.attack`（进入原版 MakeDamage 公式），安装 `aiSolver` 钩子实现
+    **固定角度/力度、0.35 攻击倍率的弱机器人**，仍走同一弹道/碰撞/伤害/回合入口。
+  - `server-node/src/battle/session.ts`：40ms 固定步长；实现既有 `/api/state`、
+    `/api/events`(SSE)、`/api/command` 契约；命令白名单只允许操作意图，
+    拒绝 `restart`、结果字段与非 debug 的 `debug_*`；服务端检测 winner 后落库并创建奖励盘。
+  - WebSocket 只广播房间/钱包/奖励盘等低频事件，战斗帧仍走 SSE，不发送整张地图。
+- [x] **阶段 3：房间 / 奖励 / 铁匠铺服务端业务**（代码完成，待端到端验证）。
+  - 房间：12 张地图、13 把武器实例、装备切换、地图切换、机器人摘要、钱包与材料。
+  - 奖励：服务端种子生成 3x3 卡面，未翻卡不下发内容；`claimCard` 在事务内验证
+    归属/次数/卡片状态，`UNIQUE(request_id)` 防重放、`UNIQUE(board_id, card_index)` 防重复领，
+    同一请求返回完全相同的已存结果。
+  - 铁匠铺：单事务完成「归属→版本/上限→金币材料→结果→扣费扣料→版本条件更新→操作记录」，
+    `requestId` 防重放、`version` 条件更新防并发重复消费。
+  - 「神武石」在 `unmatched_items` 记录为未匹配，**未编造 TemplateID、未用玄武石冒充**。
 
 ## 当前任务
 
-按 `源码实现路径.md` 第十一节的开发顺序，下一步：搭建 Node + TypeScript + SQLite 服务端骨架
-（入口、迁移、固定本地玩家、HTTP/WebSocket、静态托管、配置与 `.env.example`）。
+前端统一数据访问接口（offline / server）与房间、铁匠铺、翻牌界面接入；随后端到端验证完整闭环。
+
+## 阶段 1 实测结果（非估算）
+
+- `npx tsc --noEmit -p server-node/tsconfig.json`：通过（0 错误）。
+- 启动 `npm run start:server`：监听 `http://127.0.0.1:8100/`，数据库
+  `data/ddt.sqlite`（WAL、外键开启），日志输出正常。
+- `GET /healthz` → `{"ok":true,"mode":"server","battleState":"idle","battleId":null}`。
+- `GET /api/state` → `phase=idle`、2 个 actors、13 个 weapons（满足 index.html 后端探测契约）。
+- `GET /api/server/room` → 地图 12 张、武器 13 把、装备 `水果篮` level 0 attack 100、
+  材料 5 种、金币 0、机器人 `42°/1180/0.35`、无待领奖励盘。
+- `GET /api/server/forge` → 13 把武器，0 级强化消耗 120 金币 / 1 材料单位 / 成功率 1（首级保底）、
+  强化后 attack 125，规则来源标记 `LOCAL_RULE`。
+- 静态资源：`/` 200、原版物品图标 200、`data/1156.fore.map` 200。
+- 首次启动曾因迁移表查询顺序报错（空库时 `schema_migrations` 尚不存在），已修复并重启验证通过。
 
 ## 阻塞
 
-- 无真实阻塞。主参考仓库 404 已按约定切换到上游，不影响业务闭环开发。
+- **【权限失败，待用户处理】推送开发分支失败（2026-11-28 实测）**。
+  - 本地提交 `d363a3e` 已生成；`git push -u origin feat/node-server-mode` 返回
+    `remote: Invalid username or token. Password authentication is not supported for Git operations.`
+  - 诊断：`credential.helper=store`，`~/.git-credentials` 内含一条 40 字符 `ghp_` 前缀 classic PAT
+    （另有 gitlab 条目）；`gh auth status` 亦报告 `The token in default is invalid.`；
+    SSH `git@github.com:22` 连接超时（网络侧阻断，非密钥问题）。匿名 HTTPS **读取**正常，
+    仅写操作认证失败。
+  - 判定：现有 GitHub 凭证已失效或被撤销，属准则第 8 条的「权限失败」真实阻塞。
+  - 处理：不打印/记录/提交任何 Token，不猜测或替换凭证，不做强制推送。
+    按准则第 9 条**保存现场并继续其他独立任务**：本地持续提交，代码全部完成后再尝试一次推送；
+    若仍失败，在最终交付中列出准确原因与需要用户执行的动作（提供有效 PAT 或改用可用认证方式）。
+- 主参考仓库 404 已按约定切换到上游 `phucdz2kk4/Gunny`，不构成阻塞。
 
 ## 下一步（顺序）
 
