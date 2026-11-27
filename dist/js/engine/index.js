@@ -12,8 +12,8 @@
  * masks pre-baked (scripts/gen_engine_assets.go), so the crater buffers are
  * accepted for signature compatibility but no longer required.
  */
-import { loadTerrainFromBytes } from './terrain.js?v=31';
-import { Match } from './match.js?v=31';
+import { loadTerrainFromBytes } from './terrain.js?v=32';
+import { Match } from './match.js?v=32';
 
 let seedCounter = 0;
 

@@ -43,7 +43,7 @@ tests/                    ← browser_acceptance / browser_controls_audio / brow
 10. **镜头垂直构图（v31）**：`VIEW.focusBottomFraction = 0.62` 已接入 `_desired()`，角色落在 62% 高度；`allowOverscanX = false`，贴边时宁可角色偏也不露地图外空白。
 11. **体力固定 2000（v31）**：`beginTurnLocked()` 直接 `= STAMINA_MAX`（不再累加 500），走路 `60/s` 扣，静止 0 回血，UI 显示 `x/2000`。
 12. 版本参数全站统一 `?v=31`（index.html / js/*.js / standalone-api.js）。
-13. **别再凭印象写素材位置**：`cardbox/*/icon.png` 是宝箱图标不是卡面；`1156` 的 fore.map 在服务端 `Fighting.Service/bin/Debug/net48/map/1156/`，客户端 `resource/v1.1/image/map/` 下**没有** 1156 目录，地图预览图需用站点自带 jpg。
+13. **别再凭印象写素材位置**：`cardbox/*/icon.png` 是独立宝箱图标文件（但原版卡背中央画的**就是宝箱**，见 `art-source/takeoutcard/cardMc/001.png`，橙红卷草纹边框；对照结论见 `art-source/REFERENCE_CHECK.md`）；`1156` 的 fore.map 在服务端 `Fighting.Service/bin/Debug/net48/map/1156/`，客户端 `resource/v1.1/image/map/` 下**没有** 1156 目录，地图预览图需用站点自带 jpg。
 
 ## 四、标准流程（每次改动的固定闭环）
 

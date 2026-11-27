@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<Error>
+	<Code>SignatureDoesNotMatch</Code>
+	<Message>The Signature you specified is invalid.</Message>
+	<StringToSign>sha1
+1795798504;1803574505
+2c60d0da4eb33c25f431776c13f09a2d62cbb675
+</StringToSign>
+	<FormatString>get
+/attachments/ca05de6c-fd77-4344-8152-d86e79227150/1795798504_2357e25b/image_picker_ABD242CB-F48E-416B-80CB-494E8B1545BA-88637-00000EB1DD8FB2C0.png
+
+host=workbuddy-bga-1258344699.cos.ap-beijing.myqcloud.com
+</FormatString>
+	<Resource>/attachments/ca05de6c-fd77-4344-8152-d86e79227150/1795798504_2357e25b/image_picker_ABD242CB-F48E-416B-80CB-494E8B1545BA-88637-00000EB1DD8FB2C0.png</Resource>
+	<RequestId>NmIwOWI5MjhfNTliNDI0MDlfMTFmNzBfMjM1YmM1NmI=</RequestId>
+	<TraceId>OGVmYzZiMmQzYjA2OWNhODk0NTRkMTBiOWVmMDAxODc0OWRkZjk0ZDM1NmI1M2E2MTRlY2MzZDhmNmI5MWI1OTQyYWVlY2QwZTk2MDVmZDQ3MmI2Y2I4ZmI5ZmM4ODFjNWUzMTJiNDQ5MjAyZTI4YmY3YzA0ODBkODE4ZjJmYmU=</TraceId>
+</Error>
+

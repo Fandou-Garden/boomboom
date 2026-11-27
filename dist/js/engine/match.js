@@ -14,15 +14,15 @@ import {
   MIN_FIRE_FORCE, MOVE_SPEED, MOVE_STEP_X, MOVE_STEP_Y, PIXELS_PER_METRE, PLAYER_MAX_HP,
   RESOLVE_DELAY, SHOOT_MINUS, SKILL_DEFS, SKILL_ORDER, SPAWN_PROBE_Y, SPAWN_X,
   STAMINA_MAX, STAMINA_MOVE_COST, SKILL_USES_PER_ROUND, WORLD_HEIGHT, WORLD_WIDTH, clamp, weaponFor, WEAPON_DEFS, LUCKY,
-} from './constants.js?v=31';
-import { nextWind } from './physics.js?v=31';
-import { GoRand } from './rng.js?v=31';
-import { chooseShotForWeapon, triangularNoise } from './ai.js?v=31';
+} from './constants.js?v=32';
+import { nextWind } from './physics.js?v=32';
+import { GoRand } from './rng.js?v=32';
+import { chooseShotForWeapon, triangularNoise } from './ai.js?v=32';
 import {
   beginTurnLocked, finishResolveLocked, fireLocked, healLocked, updateFlightLocked,
-} from './actions.js?v=31';
-import { buildSnapshot } from './snapshot.js?v=31';
-import { aiPlanJson } from './json.js?v=31';
+} from './actions.js?v=32';
+import { buildSnapshot } from './snapshot.js?v=32';
+import { aiPlanJson } from './json.js?v=32';
 
 function makeActor(overrides) {
   return {

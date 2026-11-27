@@ -1457,3 +1457,241 @@ svg { display: block; }
   .reward-claim { margin-top: 6px; gap: 4px; }
   .reward-claim-btn { min-height: 32px; font-size: 11px; }
 }
+
+/* ==========================================================================
+   v32 · 原版结算翻牌界面
+   依据：用户提供的原版截图 05/06（9 张卡 3×3、左侧角色与队友成绩、
+   金色木框、底部刻度尺），以及 SmallCardsView.as 的 _cardCnt=9 / _cardColumns=3。
+   卡片素材全部来自 gameover.swf：cardMc(102) 5 帧 / LuckyCard(122) 卡背 /
+   DefineSprite_106 绿色选中框 / asset.experience.friendViewBodyBg 成绩表 /
+   asset.experience.characterLightBg 角色光 / asset.takeoutCard.GoldBitmap+GoldTxt。
+   越南语文案（Bảng phần thưởng / Chiến đấu）不进交付，改用中文本地化。
+   ========================================================================== */
+.modal.is-result { padding: 8px; }
+.modal.is-result .dialog-card {
+  width: min(1000px, 96vw);
+  max-height: min(94vh, 780px);
+  padding: 0;
+  overflow: auto;
+  border: 0;
+  border-radius: 8px;
+  background:
+    radial-gradient(ellipse at 28% 18%, rgba(86, 122, 104, .34), transparent 58%),
+    radial-gradient(ellipse at 82% 92%, rgba(72, 58, 28, .30), transparent 55%),
+    linear-gradient(165deg, #1d2c2a 0%, #111d20 48%, #0a1216 100%);
+  box-shadow:
+    inset 0 0 0 2px #f6d78a,
+    inset 0 0 0 7px #8b5a1c,
+    inset 0 0 0 9px #d9ab52,
+    inset 0 0 0 13px #4a2d0d,
+    0 26px 80px rgba(0, 0, 0, .72);
+}
+.modal.is-result .dialog-kicker,
+.modal.is-result .dialog-card > h1 { display: none; }
+.modal.is-result .dialog-close { display: none; }
+.modal.is-result .dialog-body { color: #e7dcc0; font-size: 12px; }
+.modal.is-result .dialog-action {
+  display: block;
+  margin: 0 auto 8px;
+  min-width: 168px;
+  border: 1px solid #e6c274;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #c98f2c, #7d4c12);
+  color: #fff5dc;
+  box-shadow: 0 3px 0 #3a2209, 0 6px 16px rgba(0, 0, 0, .5);
+}
+
+.settle-frame { position: relative; padding: 10px 26px 0; }
+.settle-head {
+  display: flex; align-items: center; justify-content: flex-end; gap: 14px;
+  min-height: 48px; padding-right: 4px;
+}
+.settle-index { display: inline-flex; align-items: center; }
+.settle-index img { width: 34px; height: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,.7)); }
+.settle-head-text { text-align: right; }
+.settle-head-text h2 {
+  margin: 0; font-size: 28px; font-weight: 900; letter-spacing: .1em;
+  color: #fff3dc;
+  text-shadow: 0 2px 0 #b3221a, 0 0 10px rgba(255, 90, 40, .75), 0 3px 6px rgba(0,0,0,.8);
+}
+.settle-head-text p { margin: 3px 0 0; font-size: 10px; color: #d9b877; letter-spacing: .02em; }
+.settle-outcome {
+  padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 800;
+  border: 1px solid rgba(255, 214, 130, .45); color: #ffe6ad;
+}
+.settle-outcome.is-win { background: rgba(190, 60, 20, .35); }
+.settle-outcome.is-lose { background: rgba(60, 80, 100, .35); }
+
+.settle-main {
+  display: grid; grid-template-columns: 44% 56%; gap: 18px; align-items: start;
+  padding: 4px 0 10px;
+}
+.settle-left { min-width: 0; }
+.settle-hero { position: relative; height: 140px; display: grid; place-items: center; overflow: hidden; }
+.hero-light {
+  position: absolute; width: 190px; height: 190px; object-fit: contain;
+  opacity: .78; filter: saturate(.8) brightness(1.15);
+}
+.hero-figure {
+  position: relative; width: 104px; height: 206px; object-fit: contain; border-radius: 0;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .7));
+}
+.hero-caption {
+  position: absolute; bottom: 6px; left: 0; right: 0; text-align: center;
+  font-size: 11px; color: #ffe2a4; text-shadow: 0 2px 4px #000;
+  display: none;
+}
+.settle-team { margin-top: 2px; }
+.team-title {
+  height: 28px; display: grid; place-items: center;
+  font-size: 13px; font-weight: 800; color: #ffe6a8; letter-spacing: .22em;
+  background: linear-gradient(180deg, rgba(126, 84, 22, .9), rgba(58, 36, 10, .9));
+  border: 1px solid #c79a48; border-radius: 5px 5px 0 0;
+  text-shadow: 0 1px 2px #000;
+}
+.team-table {
+  position: relative; padding: 6px 10px 10px;
+  background: url("assets/ui/score-table.png?v=32") center / 100% 100% no-repeat;
+  min-height: 96px;
+}
+.team-row { display: grid; grid-template-columns: 1fr 1fr 1fr; height: 30px; align-items: center; text-align: center; }
+.team-row span { font-size: 11px; color: #f2dfae; text-shadow: 0 1px 2px #000; }
+.team-row.team-head span { color: #ffe6a8; font-weight: 800; letter-spacing: .12em; }
+.result-score { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; margin: 6px 0 4px; }
+.modal.is-result .result-stat {
+  border: 1px solid rgba(216, 172, 88, .42); border-radius: 5px;
+  background: linear-gradient(180deg, rgba(90, 66, 24, .55), rgba(30, 24, 12, .65));
+}
+.modal.is-result .result-stat b { color: #ffdf94; font-size: 17px; }
+.modal.is-result .result-stat span { color: #c9b489; font-size: 9px; }
+.modal.is-result .source-note { color: #9d9a8d; }
+
+.settle-right { min-width: 0; }
+.modal.is-result .result-cards { margin-top: 0; }
+.modal.is-result .cards-title {
+  margin: 0 0 6px; text-align: left; font-size: 12px; color: #ffdf94;
+  text-shadow: 0 1px 3px #000;
+}
+.modal.is-result .cards-countdown { display: inline; margin-left: 10px; color: #ffb38b; }
+
+/* 9 张卡 3×3，比例沿用 cardMc 的 107×160 */
+.modal.is-result .cards-row {
+  display: grid; grid-template-columns: repeat(3, 100px); gap: 10px;
+  justify-content: center;
+}
+.modal.is-result .result-card {
+  width: 100px; height: 149px; perspective: none;
+}
+.modal.is-result .result-card .card-inner { transform-style: flat; transition: none; }
+.modal.is-result .result-card.is-flipped .card-inner { transform: none; }
+.modal.is-result .result-card:hover:not(.is-flipped):not(.is-disabled) .card-inner {
+  transform: translateY(-4px);
+}
+.modal.is-result .card-back,
+.modal.is-result .card-face,
+.modal.is-result .card-flip {
+  position: absolute; inset: 0; border-radius: 6px;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+}
+.modal.is-result .card-back { display: flex; background: transparent; box-shadow: none; }
+.modal.is-result .card-back img {
+  width: 100%; height: 100%; object-fit: cover;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,.55));
+}
+/* 原版 cardMc 5 帧翻牌序列：LuckyCard.play() -> cardMc.gotoAndPlay(2) */
+.modal.is-result .card-flip {
+  display: none; z-index: 1;
+  background: url("assets/ui/card-flip-sprite.png?v=32") 0 0 / 500% 100% no-repeat;
+}
+.modal.is-result .result-card.is-flipped .card-back { display: none; }
+.modal.is-result .result-card.is-flipped .card-flip {
+  display: block; animation: cardFlipFrames 420ms steps(5) forwards;
+}
+@keyframes cardFlipFrames {
+  from { background-position: 0% 0; opacity: 1; }
+  to   { background-position: 100% 0; opacity: 1; }
+}
+.modal.is-result .card-face {
+  z-index: 2; opacity: 0; transform: none; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  padding: 14px 8px 0; gap: 2px;
+  background: transparent; box-shadow: none; color: #6b3410;
+}
+.modal.is-result .result-card.is-flipped .card-face { opacity: 1; transition: opacity 0s 420ms; }
+.modal.is-result .card-face-bg,
+.modal.is-result .card-frame {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; z-index: 0;
+}
+.modal.is-result .card-frame { z-index: 3; pointer-events: none; }
+.modal.is-result .card-gold-label,
+.modal.is-result .card-icon,
+.modal.is-result .card-face b,
+.modal.is-result .card-face small { position: relative; z-index: 2; }
+.modal.is-result .card-gold-label { width: 50px; height: auto; margin-top: 2px; }
+.modal.is-result .card-icon {
+  width: 42px; height: 42px; object-fit: contain; margin: 4px 0 2px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.35));
+}
+.modal.is-result .card-face b { font-size: 17px; line-height: 1; color: #7a3410; text-shadow: 0 1px 0 rgba(255,255,255,.6); }
+.modal.is-result .card-face small {
+  position: absolute; bottom: 8px; left: 8px; right: 8px;
+  font-size: 9px; color: #fff0c8; text-align: center;
+  text-shadow: 0 1px 2px rgba(0,0,0,.8);
+}
+.modal.is-result .result-card.is-disabled { cursor: default; }
+
+.modal.is-result .reward-claim {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 6px;
+}
+.modal.is-result .reward-sum { margin: 0; font-size: 11px; color: #ffe1a0; }
+.modal.is-result .reward-balance { margin: 0; font-size: 10px; color: #c4b48c; }
+.modal.is-result .reward-claim-btn {
+  min-height: 34px; padding: 7px 20px; font-size: 12px; font-weight: 800;
+  border: 1px solid #e6c274; border-radius: 6px;
+  background: linear-gradient(180deg, #c98f2c, #7d4c12); color: #fff5dc;
+  box-shadow: 0 3px 0 #3a2209;
+}
+.modal.is-result .reward-claim-btn:disabled { opacity: .55; filter: saturate(.5); }
+
+.settle-ruler {
+  display: flex; justify-content: space-between; align-items: center;
+  height: 26px; margin: 0 -26px; padding: 0 26px;
+  border-top: 2px solid rgba(214, 166, 84, .55);
+  background: linear-gradient(180deg, rgba(122, 84, 26, .55), rgba(48, 30, 10, .75));
+}
+.settle-ruler span { font-size: 10px; color: #e8cd94; text-shadow: 0 1px 2px #000; }
+
+@media (max-width: 900px), (max-height: 620px) {
+  .modal.is-result .dialog-card { width: 96vw; }
+  .settle-frame { padding: 10px 14px 0; }
+  .settle-main { grid-template-columns: 40% 60%; gap: 10px; }
+  .settle-head { min-height: 42px; }
+  .settle-head-text h2 { font-size: 20px; }
+  .settle-head-text p { display: none; }
+  .settle-index img { width: 24px; }
+  .settle-hero { height: 120px; }
+  .hero-light { width: 160px; height: 160px; }
+  .hero-figure { width: 86px; height: 86px; }
+  .team-table { min-height: 70px; }
+  .team-row { height: 22px; }
+  .modal.is-result .cards-row { grid-template-columns: repeat(3, 80px); gap: 7px; }
+  .modal.is-result .result-card { width: 80px; height: 120px; }
+  .modal.is-result .card-icon { width: 28px; height: 28px; }
+  .modal.is-result .card-gold-label { width: 36px; }
+  .modal.is-result .card-face b { font-size: 13px; }
+  .modal.is-result .card-face small { font-size: 7px; bottom: 5px; }
+  .modal.is-result .result-stat b { font-size: 13px; }
+  .settle-ruler { margin: 0 -14px; padding: 0 14px; }
+}
+@media (max-height: 480px) {
+  .settle-hero { display: none; }
+  .settle-team { display: none; }
+  .modal.is-result .cards-row { grid-template-columns: repeat(3, 62px); gap: 5px; }
+  .modal.is-result .result-card { width: 62px; height: 93px; }
+  .modal.is-result .card-face { padding: 8px 4px 0; }
+  .modal.is-result .card-icon { width: 22px; height: 22px; margin: 2px 0 0; }
+  .modal.is-result .card-face b { font-size: 11px; }
+  .modal.is-result .card-face small { font-size: 6px; bottom: 3px; }
+  .modal.is-result .dialog-card { max-height: 96vh; }
+  .settle-ruler { height: 20px; }
+}

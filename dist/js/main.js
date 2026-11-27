@@ -1,14 +1,14 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=31';
-import { loadImage, Terrain } from './terrain.js?v=31';
-import { RemoteMatch } from './net-client.js?v=31';
-import { Renderer, DEATH_SEQUENCE } from './renderer.js?v=31';
-import { Camera, projectPoint } from './camera.js?v=31';
-import { InputController } from './input.js?v=31';
-import { solvePerfect } from './ai.js?v=31';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=31';
-import { MAPS, getMap, resolveMapId } from './maps.js?v=31';
-import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=31';
-import { loadSave, claimReward, hasClaimed, resetSave, formatAmount } from './save.js?v=31';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=32';
+import { loadImage, Terrain } from './terrain.js?v=32';
+import { RemoteMatch } from './net-client.js?v=32';
+import { Renderer, DEATH_SEQUENCE } from './renderer.js?v=32';
+import { Camera, projectPoint } from './camera.js?v=32';
+import { InputController } from './input.js?v=32';
+import { solvePerfect } from './ai.js?v=32';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=32';
+import { MAPS, getMap, resolveMapId } from './maps.js?v=32';
+import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=32';
+import { loadSave, claimReward, hasClaimed, resetSave, formatAmount } from './save.js?v=32';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -1168,6 +1168,7 @@ function openHelp() {
   input?.cancelAll('help');
   game?.cancelCharge();
   modalMode = 'help';
+  els.modal.classList.remove('is-result');
   els.modalTitle.textContent = '看清战场，再算风';
   const weaponDef = game?.weapons?.find((w) => w.id === game.weapon);
   const weaponLabel = weaponDef?.label || '水果篮';
@@ -1289,10 +1290,15 @@ function setupResultCards(win) {
   row.innerHTML = rewards.map((prize, i) => `
     <button class="result-card" type="button" data-card="${i}" data-kind="${prize.kind}" data-amount="${prize.amount}" aria-label="第 ${i + 1} 张卡，点击翻开">
       <span class="card-inner">
-        <span class="card-back"><img src="assets/ui/card-back.png" alt="" draggable="false"></span>
+        <span class="card-back"><img src="assets/ui/card-back.png?v=32" alt="" draggable="false"></span>
+        <span class="card-flip" aria-hidden="true"></span>
         <span class="card-face">
-          <img class="card-frame" src="assets/ui/card-frame.png" alt="" draggable="false">
-          <img class="card-icon" src="${rewardIcon(prize.kind)}" alt="" draggable="false">
+          <img class="card-face-bg" src="assets/ui/card-face.png?v=32" alt="" draggable="false">
+          <img class="card-frame" src="assets/ui/card-selected.png?v=32" alt="" draggable="false">
+          ${prize.kind === 'coin'
+            ? '<img class="card-gold-label" src="assets/ui/card-gold-label.png?v=32" alt="Gold" draggable="false">'
+            : ''}
+          <img class="card-icon" src="${prize.kind === 'coin' ? 'assets/ui/card-gold.png?v=32' : rewardIcon(prize.kind)}" alt="" draggable="false">
           <b>+${prize.amount}</b><small>${rewardLabel(prize.kind)}</small>
         </span>
       </span>
@@ -1407,25 +1413,60 @@ function showResult(data) {
   const save = paintWallet();
   sound.play(win ? 'win' : 'lose');
   const accuracy = data.stats.playerShots ? Math.round(data.stats.playerHits / data.stats.playerShots * 100) : 0;
+  els.modal.classList.add('is-result');
   els.modalTitle.textContent = win ? '漂亮的一击，你赢了！' : '芽芽笑到了最后';
   els.modalBody.innerHTML = `
-    <p>${win ? '你让最后一发炮弹穿过了风场。再开一局，试试改变角度或换一种技能。' : '风向每回合都在变。记住上一发的“起/落”标记，先修角度，再微调力度。'}</p>
-    <div class="result-score">
-      <div class="result-stat"><b>${data.round}</b><span>回合</span></div>
-      <div class="result-stat"><b>${data.stats.playerShots}</b><span>你的炮弹</span></div>
-      <div class="result-stat"><b>${data.stats.playerHits}</b><span>命中</span></div>
-      <div class="result-stat"><b>${accuracy}%</b><span>命中率</span></div>
-      <div class="result-stat"><b>${data.stats.playerDamageDealt}</b><span>伤害</span></div>
-    </div>
-    <p class="source-note">本局电脑发射 ${data.stats.enemyShots} 发、命中 ${data.stats.enemyHits} 发。风场沿用原版 GetNextWind 规则。</p>
-    <div class="result-cards" aria-label="战后翻牌">
-      <p class="cards-title">${win ? '胜利翻牌 · 点击卡片抽取战利品' : '安慰翻牌 · 点击卡片查看'}<span class="cards-countdown" id="cardsCountdown"></span></p>
-      <div class="cards-row" id="cardsRow"></div>
-      <div class="reward-claim">
-        <p class="reward-sum" id="rewardSum"></p>
-        <p class="reward-balance" id="rewardBalance">存档余额：金币 ${save.coins} · 玄武石 ${save.stones}</p>
-        <button class="reward-claim-btn" id="claimReward" type="button" disabled>翻牌后可领取</button>
+    <div class="settle-frame">
+      <header class="settle-head">
+        <span class="settle-index" aria-hidden="true"><img src="assets/ui/num-0.png?v=32" alt=""><img src="assets/ui/num-1.png?v=32" alt=""></span>
+        <div class="settle-head-text">
+          <h2>游戏结算</h2>
+          <p>每个玩家可免费进行两次翻牌 · 也可花费点券增加一次翻牌机会</p>
+        </div>
+        <span class="settle-outcome ${win ? 'is-win' : 'is-lose'}">${win ? '胜利' : '惜败'}</span>
+      </header>
+
+      <div class="settle-main">
+        <section class="settle-left" aria-label="战绩">
+          <div class="settle-hero">
+            <img class="hero-light" src="assets/ui/character-light.png?v=32" alt="" draggable="false">
+            <img class="hero-figure" src="assets/ui/hero-figure.png?v=32" alt="" draggable="false">
+            <span class="hero-caption">${win ? '漂亮的收尾！' : '下一局再来'}</span>
+          </div>
+          <div class="settle-team">
+            <div class="team-title">队友成绩</div>
+            <div class="team-table">
+              <div class="team-row team-head"><span>名 称</span><span>经验值</span><span>功 勋</span></div>
+              <div class="team-row"><span>你</span><span>${data.stats.playerDamageDealt}</span><span>${data.stats.playerHits}</span></div>
+              <div class="team-row"><span>电脑</span><span>${data.stats.enemyHits}</span><span>${data.stats.enemyShots}</span></div>
+            </div>
+          </div>
+          <div class="result-score">
+            <div class="result-stat"><b>${data.round}</b><span>回合</span></div>
+            <div class="result-stat"><b>${data.stats.playerShots}</b><span>炮弹</span></div>
+            <div class="result-stat"><b>${data.stats.playerHits}</b><span>命中</span></div>
+            <div class="result-stat"><b>${accuracy}%</b><span>命中率</span></div>
+            <div class="result-stat"><b>${data.stats.playerDamageDealt}</b><span>伤害</span></div>
+          </div>
+          <p class="source-note">本局电脑发射 ${data.stats.enemyShots} 发、命中 ${data.stats.enemyHits} 发。风场沿用原版 GetNextWind 规则。</p>
+        </section>
+
+        <section class="settle-right" aria-label="战后翻牌">
+          <div class="result-cards">
+            <p class="cards-title">${win ? '胜利翻牌 · 点击卡片抽取战利品' : '安慰翻牌 · 点击卡片查看'}<span class="cards-countdown" id="cardsCountdown"></span></p>
+            <div class="cards-row" id="cardsRow"></div>
+            <div class="reward-claim">
+              <p class="reward-sum" id="rewardSum"></p>
+              <p class="reward-balance" id="rewardBalance">存档余额：金币 ${save.coins} · 玄武石 ${save.stones}</p>
+              <button class="reward-claim-btn" id="claimReward" type="button" disabled>翻牌后可领取</button>
+            </div>
+          </div>
+        </section>
       </div>
+
+      <footer class="settle-ruler" aria-hidden="true">
+        ${Array.from({ length: 10 }, (_, i) => `<span>${i + 1}</span>`).join('')}
+      </footer>
     </div>
   `;
   setupResultCards(win);
@@ -1462,6 +1503,7 @@ function restartMatch() {
   game.reset();
   camera.reset();
   camera.clearPan();
+  els.modal.classList.remove('is-result');
   els.modal.hidden = true;
   uiCache.hp = [null, null];
   uiCache.phase = '';
@@ -2224,6 +2266,7 @@ function exposeTestApi() {
       };
     },
     config: { CONTROLS, PHYSICS, COMBAT, WORLD, AI, BATTLE, TERRAIN, VIEW },
+    showResultForTest: (data) => showResult(data),
     layout: () => ({ ...layout }),
     controlRects() {
       const selectors = ['#left', '#right', '#up', '#down', '#fire', '#pow', '#heal', '#weaponButton', '#skillExtra2', '#skillScatter', '#skillExtra1', '#skillBoost50', '#skillBoost40', '#skillBoost30', '#skillBoost20', '#skillBoost10',
@@ -2595,7 +2638,7 @@ function startMapLoad(id) {
     () => loadImage(urls.thumb),
     () => loadImage(urls.fore),
     () => loadImage(urls.back),
-    () => fetch(`${urls.collision}?v=31`).then((res) => {
+    () => fetch(`${urls.collision}?v=32`).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.arrayBuffer();
     }),
