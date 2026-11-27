@@ -88,3 +88,14 @@ ffmpeg -i in.mp3 -af "volume=+0.9dB" -codec:a libmp3lame -b:a 128k out.mp3
 | `sound-102-boom-fruit.mp3` | 102 | `e7ae8feb8dced81d1f263a5ae9cc8dba7df8534a556b84f77c5196872d965f30` |
 | `sound-110-fire-appliance.mp3` | 110 | `b479e2f67205e021d61943fcb6b73e5703c2e884b0cab079253be89726f236fb` |
 | `sound-114-fire-fruit.mp3` | 114 | `a445268b44e986b27bbdea034c9a3de0764ba386983572daed6a13f8ccdff705` |
+
+## 进入战斗 / 加载音效（核实结论）
+
+`audio.swf` 的 `SoundManager.as` 只登记 `001–130` 通用音效与 `1001` 地图 BGM，
+**没有**“加载完成/进入战斗”的专用 SoundID；`GameView.as`、`MapView.as` 在构建战场时
+也不调用 `SoundManager.play()`。因此网页版不新增“原版加载音”：
+
+| 场景 | 使用音频 | 处理 |
+| --- | --- | --- |
+| 战斗加载过场 | 原版地图 1001 BGM（`assets/audio/bgm-map1001.mp3`） | 音量压到 45% 播放，进入战斗后 0.5 s 内升回 `bgmVolume`；同一条 loop，不会与战斗 BGM 叠加 |
+| 首次冷启动 | 同上 | 受浏览器手势限制，加载卡片提供“点击开启音效”，点击后才解锁；未点击则静默 |

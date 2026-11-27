@@ -1150,26 +1150,30 @@ svg { display: block; }
   font-weight: 800;
   cursor: pointer;
 }
-.result-score { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 12px 0; }
-.result-stat { padding: 9px 3px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.035); text-align: center; }
+.result-score { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 9px 0; }
+.result-stat { padding: 7px 3px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.035); text-align: center; }
 .result-stat b { display: block; color: #ffe9ae; font-size: 20px; }
 .result-stat span { color: #9dc1c9; font-size: 9px; }
 
 /* 战后翻牌：照抄 ExpView.showCard() 的结算翻牌表现 */
 .result-cards { margin-top: 6px; }
-.cards-title { margin: 0 0 8px; color: #ffdf94; font-size: 11px; text-align: center; letter-spacing: 0.03em; }
+.cards-title { margin: 0 0 6px; color: #ffdf94; font-size: 11px; text-align: center; letter-spacing: 0.03em; }
 .cards-countdown { display: block; margin-top: 3px; color: #ffb38b; font-size: 10px; letter-spacing: 0.06em; }
 /* SOURCE: SmallCardsView._cardCnt = 9, _cardColumns = 3, _countDownTime = 5 */
-.cards-row { display: grid; grid-template-columns: repeat(var(--card-columns, 3), 60px); gap: 8px; justify-content: center; }
-.result-card { width: 60px; height: 80px; padding: 0; border: 0; background: transparent; cursor: pointer; perspective: 600px; }
+.cards-row { display: grid; grid-template-columns: repeat(var(--card-columns, 3), 54px); gap: 5px; justify-content: center; }
+.result-card { width: 54px; height: 72px; padding: 0; border: 0; background: transparent; cursor: pointer; perspective: 600px; }
 .result-card .card-inner { position: relative; display: block; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 420ms cubic-bezier(.2,.7,.3,1); }
 .result-card.is-flipped .card-inner { transform: rotateY(180deg); }
 .card-back, .card-face { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border-radius: 10px; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .card-back {
   border: 2px solid rgba(255, 214, 130, 0.7);
-  background: repeating-linear-gradient(45deg, #1c4b5c 0 8px, #16404f 8px 16px);
+  background: radial-gradient(circle at 50% 42%, #2a6a7d, #10333f 72%);
   box-shadow: inset 0 0 0 3px rgba(6, 26, 36, 0.7), 0 6px 16px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
 }
+/* Back face art is the original cardbox/ruong chest icon (transparent PNG). */
+.card-back img { width: 78%; height: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,.45)); }
+.card-icon { width: 26px; height: auto; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
 .card-emblem { color: #ffd98a; font-size: 20px; text-shadow: 0 0 10px rgba(255, 200, 90, 0.7); }
 .card-face {
   transform: rotateY(180deg);
@@ -1339,3 +1343,94 @@ svg { display: block; }
   .weapon-dialog-foot { margin-top: 8px; }
 }
 
+
+/* ---------- 本地存档钱包（小地图下方） ---------- */
+.wallet { display: flex; gap: 6px; margin-top: 6px; }
+.wallet-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px 2px 3px; border-radius: 11px;
+  border: 1px solid rgba(150, 226, 240, 0.22);
+  background: rgba(5, 26, 36, 0.62); font-size: 10px; color: #ffe9b0;
+  font-variant-numeric: tabular-nums;
+}
+.wallet-chip img { width: 15px; height: auto; }
+
+/* ---------- 结算奖励领取 ---------- */
+.reward-claim { display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 8px; }
+.reward-sum { margin: 0; font-size: 10px; color: #ffd88f; letter-spacing: 0.02em; }
+.reward-claim-btn {
+  min-height: 36px; padding: 7px 18px; border-radius: 18px;
+  border: 1px solid rgba(255, 214, 130, 0.55);
+  background: linear-gradient(180deg, #2aa9c4, #12758c);
+  color: #fff; font-weight: 800; font-size: 12px; cursor: pointer;
+  transition: filter 160ms ease;
+}
+.reward-claim-btn:disabled { opacity: 0.55; cursor: default; filter: saturate(0.5); }
+.reward-claim-btn:not(:disabled):active { filter: brightness(1.15); }
+.reward-claim-btn.is-claimed {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #b9d6dc;
+}
+.reward-balance { margin: 0; font-size: 9px; color: #8fb4bd; }
+
+/* ---------- 战斗加载过场（房间确认进入战斗 -> 战场出现） ---------- */
+.battle-load { background: radial-gradient(circle at 50% 28%, #0a3346, #02121b 78%); }
+.load-card {
+  width: min(720px, 94vw); overflow: hidden; text-align: left;
+  border: 1px solid rgba(150, 230, 245, 0.24); border-radius: 20px;
+  background: #07222e; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.load-stage { position: relative; aspect-ratio: 16 / 7; overflow: hidden; }
+.load-backdrop {
+  width: 100%; height: 100%; object-fit: cover;
+  animation: load-drift 16s ease-in-out infinite alternate;
+}
+@keyframes load-drift { from { transform: scale(1.02); } to { transform: scale(1.09) translateY(-1.5%); } }
+.load-stage-shade {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(2, 16, 24, 0.3), rgba(2, 16, 24, 0.04) 38%, rgba(3, 20, 30, 0.92));
+}
+.load-mapname { position: absolute; left: 16px; top: 12px; display: flex; align-items: baseline; gap: 8px; color: #eafaff; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); }
+.load-mapname small { font-size: 9px; letter-spacing: 0.18em; opacity: 0.8; }
+.load-mapname b { font-size: 20px; }
+.load-mapname span { font-size: 9px; opacity: 0.7; }
+.load-vs { position: absolute; left: 0; right: 0; bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 18px; }
+.load-side { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 128px; text-align: center; color: #fff; }
+.load-side img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(160, 240, 255, 0.5); background: rgba(4, 28, 38, 0.6); }
+.load-side.enemy img { border-color: rgba(255, 180, 120, 0.55); }
+.load-side b { font-size: 12px; }
+.load-side span { font-size: 9px; color: #a9d3dc; }
+.load-vs em { font-style: normal; font-size: 11px; letter-spacing: 0.2em; color: #ffd88a; }
+.load-progress { padding: 10px 16px 14px; }
+.load-bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.load-bar i { display: block; width: 0; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #42d8ee, #8ef3c8); transition: width 220ms ease; }
+.load-status { display: flex; justify-content: space-between; margin: 6px 0 0; font-size: 10px; color: #a8ccd4; }
+.load-status b { color: #9ef0ff; font-variant-numeric: tabular-nums; }
+.load-tip { margin: 2px 0 0; font-size: 9px; color: #7fa6b0; }
+.load-audio { margin-top: 8px; padding: 5px 14px; border-radius: 14px; border: 1px solid rgba(150, 240, 255, 0.4); background: transparent; color: #bfeff8; font-size: 10px; cursor: pointer; }
+/* 加载完成：平滑退场，不遮挡战斗 */
+.loading.battle-load { transition: opacity 380ms ease, backdrop-filter 380ms ease; }
+.loading.battle-load.is-leaving { opacity: 0; backdrop-filter: blur(0); pointer-events: none; }
+.loading.battle-load.is-hidden { display: none; }
+.loading .load-card { transition: transform 380ms cubic-bezier(.2,.7,.3,1); }
+.loading.battle-load.is-leaving .load-card { transform: scale(1.02); }
+
+@media (max-height: 540px) {
+  .load-stage { aspect-ratio: auto; height: 132px; }
+  .load-side img { width: 32px; height: 32px; }
+  .load-mapname b { font-size: 16px; }
+  .load-progress { padding: 8px 12px 10px; }
+}
+.link-button { padding: 0; border: 0; background: none; color: #8fe1ed; font: inherit; text-decoration: underline; cursor: pointer; }
+
+/* 小屏横屏：结算面板高度有限，压缩卡片让“领取”按钮尽量不滚动即可见 */
+@media (max-height: 480px) {
+  .result-card { width: 46px; height: 62px; }
+  .cards-row { grid-template-columns: repeat(var(--card-columns, 3), 46px); gap: 4px; }
+  .card-face b { font-size: 15px; }
+  .card-icon { width: 20px; }
+  .result-score { margin: 6px 0; }
+  .reward-claim { margin-top: 6px; gap: 4px; }
+  .reward-claim-btn { min-height: 32px; font-size: 11px; }
+}

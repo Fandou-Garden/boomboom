@@ -11,13 +11,14 @@
     "test:map": "python3 tests/verify_map_parity.py",
     "check": "sh server/check.sh",
     "test:browser": "npm run test:browser:visual && npm run test:browser:controls && npm run test:browser:mobile",
-    "test:browser:visual": "sh scripts/node.sh tests/browser_acceptance.cjs",
-    "test:browser:controls": "sh scripts/node.sh tests/browser_controls_audio.cjs",
-    "test:browser:mobile": "sh scripts/node.sh tests/browser_mobile.cjs",
+    "test:browser:visual": "GAME_URL=\"http://127.0.0.1:8077/?test=1\" sh scripts/node.sh tests/browser_acceptance.cjs",
+    "test:browser:controls": "GAME_URL=\"http://127.0.0.1:8077/?test=1\" sh scripts/node.sh tests/browser_controls_audio.cjs",
+    "test:browser:mobile": "GAME_URL=\"http://127.0.0.1:8077/?test=1\" sh scripts/node.sh tests/browser_mobile.cjs",
     "build:wasm": "sh scripts/build-wasm.sh",
     "build:static": "sh scripts/build-static.sh",
     "test:browser:static": "sh scripts/node.sh tests/browser_static.cjs",
-    "test:engine": "sh scripts/node.sh --test tests/engine/match.test.mjs tests/engine/parity.test.mjs tests/engine/embed.test.mjs"
+    "test:engine": "sh scripts/node.sh --test tests/engine/match.test.mjs tests/engine/parity.test.mjs tests/engine/embed.test.mjs",
+    "serve:dist": "python3 -m http.server 8077 --directory dist"
   },
   "devDependencies": {
     "puppeteer-core": "^23.11.1"

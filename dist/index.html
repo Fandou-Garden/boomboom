@@ -10,10 +10,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="风场弹道">
   <title>风场弹道 · Gunny Wind Arena</title>
-  <link rel="icon" href="assets/favicon.svg?v=29" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=29">
-  <link rel="manifest" href="manifest.webmanifest?v=29">
-  <link rel="stylesheet" href="styles.css?v=29">
+  <link rel="icon" href="assets/favicon.svg?v=30" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=30">
+  <link rel="manifest" href="manifest.webmanifest?v=30">
+  <link rel="stylesheet" href="styles.css?v=30">
 </head>
 <body>
   <div id="app" class="app">
@@ -22,7 +22,7 @@
     <header id="topbar" class="topbar">
       <section class="battle-hud" aria-label="双方状态与风力">
         <article class="combatant player-card" aria-label="玩家状态">
-          <span class="portrait"><img src="assets/portrait-player.png?v=29" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-player.png?v=30" alt=""></span>
           <div class="combatant-copy">
             <div class="name-row"><span class="team-dot"></span><strong>蓝波</strong><span class="role">你</span></div>
             <div class="hp-track"><i id="hpBar0"></i></div>
@@ -48,7 +48,7 @@
             <div class="hp-track"><i id="hpBar1"></i></div>
             <div class="hp-number" id="hp1">2000</div>
           </div>
-          <span class="portrait"><img src="assets/portrait-enemy.png?v=29" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-enemy.png?v=30" alt=""></span>
         </article>
       </section>
 
@@ -96,6 +96,14 @@
         <span><i class="dot player"></i>蓝波</span>
         <span><i class="dot enemy"></i>芽芽</span>
         <span id="elevationNote">等高</span>
+      </div>
+      <div class="wallet" aria-label="本地存档余额">
+        <span class="wallet-chip" id="walletCoinsChip" aria-label="金币 0">
+          <img src="assets/ui/icon-gold.png?v=30" alt="" draggable="false"><b id="walletCoins">0</b>
+        </span>
+        <span class="wallet-chip" id="walletStonesChip" aria-label="玄武石 0">
+          <img src="assets/ui/icon-stones.png?v=30" alt="" draggable="false"><b id="walletStones">0</b>
+        </span>
       </div>
     </aside>
 
@@ -159,42 +167,42 @@
       <section class="skill-rail" aria-label="战斗道具栏 1 到 8">
         <button id="skillExtra2" class="skill-button attack-skill" type="button" data-skill="extra2" data-kind="attack" aria-label="1 攻击+2：原版 10001，同轨迹连续3发，每发伤害60%" aria-keyshortcuts="1">
           <kbd class="skill-key" aria-hidden="true">1</kbd>
-          <img class="skill-icon" src="assets/skill-10001.png?v=29" alt="" draggable="false">
+          <img class="skill-icon" src="assets/skill-10001.png?v=30" alt="" draggable="false">
           <span class="skill-copy">攻击</span><b class="skill-badge" id="skillExtra2Count">+2</b>
         </button>
         <button id="skillScatter" class="skill-button attack-skill" type="button" data-skill="scatter" data-kind="attack" aria-label="2 三向散射：原版 10003，0°、-5°、+5°各一发，每发伤害50%" aria-keyshortcuts="2">
           <kbd class="skill-key" aria-hidden="true">2</kbd>
-          <img class="skill-icon" src="assets/skill-10003.png?v=29" alt="" draggable="false">
+          <img class="skill-icon" src="assets/skill-10003.png?v=30" alt="" draggable="false">
           <span class="skill-copy">三向</span><b class="skill-badge" id="skillScatterCount">×3</b>
         </button>
         <button id="skillExtra1" class="skill-button attack-skill" type="button" data-skill="extra1" data-kind="attack" aria-label="3 攻击+1：原版 10002，同轨迹连续2发，每发伤害90%" aria-keyshortcuts="3">
           <kbd class="skill-key" aria-hidden="true">3</kbd>
-          <img class="skill-icon" src="assets/skill-10002.png?v=29" alt="" draggable="false">
+          <img class="skill-icon" src="assets/skill-10002.png?v=30" alt="" draggable="false">
           <span class="skill-copy">攻击</span><b class="skill-badge" id="skillExtra1Count">+1</b>
         </button>
         <button id="skillBoost50" class="skill-button boost-skill" type="button" data-skill="boost50" data-kind="boost" aria-label="4 伤害增幅50%，原版 10004，可与其他增幅叠加" aria-keyshortcuts="4">
           <kbd class="skill-key" aria-hidden="true">4</kbd>
-          <img class="skill-icon" src="assets/skill-10004.png?v=29" alt="" draggable="false">
+          <img class="skill-icon" src="assets/skill-10004.png?v=30" alt="" draggable="false">
           <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost50Count">50%</b>
         </button>
         <button id="skillBoost40" class="skill-button boost-skill" type="button" data-skill="boost40" data-kind="boost" aria-label="5 伤害增幅40%，原版 10005，可与其他增幅叠加" aria-keyshortcuts="5">
           <kbd class="skill-key" aria-hidden="true">5</kbd>
-          <img class="skill-icon" src="assets/skill-10005.png?v=29" alt="" draggable="false">
+          <img class="skill-icon" src="assets/skill-10005.png?v=30" alt="" draggable="false">
           <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost40Count">40%</b>
         </button>
         <button id="skillBoost30" class="skill-button boost-skill" type="button" data-skill="boost30" data-kind="boost" aria-label="6 伤害增幅30%，原版 10006，可与其他增幅叠加" aria-keyshortcuts="6">
           <kbd class="skill-key" aria-hidden="true">6</kbd>
-          <img class="skill-icon" src="assets/skill-10006.png?v=29" alt="" draggable="false">
+          <img class="skill-icon" src="assets/skill-10006.png?v=30" alt="" draggable="false">
           <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost30Count">30%</b>
         </button>
         <button id="skillBoost20" class="skill-button boost-skill" type="button" data-skill="boost20" data-kind="boost" aria-label="7 伤害增幅20%，原版 10007，可与其他增幅叠加" aria-keyshortcuts="7">
           <kbd class="skill-key" aria-hidden="true">7</kbd>
-          <img class="skill-icon" src="assets/skill-10007.png?v=29" alt="" draggable="false">
+          <img class="skill-icon" src="assets/skill-10007.png?v=30" alt="" draggable="false">
           <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost20Count">20%</b>
         </button>
         <button id="skillBoost10" class="skill-button boost-skill" type="button" data-skill="boost10" data-kind="boost" aria-label="8 伤害增幅10%，原版 10008，可与其他增幅叠加" aria-keyshortcuts="8">
           <kbd class="skill-key" aria-hidden="true">8</kbd>
-          <img class="skill-icon" src="assets/skill-10008.png?v=29" alt="" draggable="false">
+          <img class="skill-icon" src="assets/skill-10008.png?v=30" alt="" draggable="false">
           <span class="skill-copy">增伤</span><b class="skill-badge" id="skillBoost10Count">10%</b>
         </button>
       </section>
@@ -273,15 +281,41 @@
       <small class="rotate-note">竖屏下仅预览，横屏后操控可用。</small>
     </div>
 
-    <div id="loading" class="loading" role="status">
-      <div class="loader-orbit" aria-hidden="true"><i></i><i></i><i></i></div>
-      <strong>正在装载亚特兰蒂斯战场</strong>
-      <span>原版地图 1156 · 1843×1020 · 可破坏地形</span>
+    <div id="loading" class="loading battle-load" role="status" aria-live="polite">
+      <div class="load-card">
+        <div class="load-stage">
+          <img id="loadBackdrop" class="load-backdrop" src="assets/map-1156-back.jpg" alt="">
+          <span class="load-stage-shade" aria-hidden="true"></span>
+          <div class="load-mapname">
+            <small>战场</small>
+            <b id="loadMapName">亚特兰蒂斯</b>
+            <span id="loadMapId">1156</span>
+          </div>
+          <div class="load-vs">
+            <div class="load-side">
+              <img src="assets/portrait-player.png" alt="" draggable="false">
+              <b>蓝波</b><span>你 · 10000 HP</span>
+            </div>
+            <em>VS</em>
+            <div class="load-side enemy">
+              <img src="assets/portrait-enemy.png" alt="" draggable="false">
+              <b>芽芽</b><span>电脑 · 2000 HP</span>
+            </div>
+          </div>
+        </div>
+        <div class="load-progress">
+          <div class="load-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="loadBarTrack"><i id="loadBar"></i></div>
+          <p class="load-status"><span id="loadStep">正在装载战场资源</span><b id="loadPct">0%</b></p>
+          <p class="load-tip" id="loadTip">原版地图 · 可破坏地形 · 风向每回合变化</p>
+          <button id="loadAudioBtn" class="load-audio" type="button" hidden>点击开启音效</button>
+        </div>
+      </div>
     </div>
 
     <div id="fatal" class="fatal" hidden>
       <strong>游戏装载失败</strong>
       <p id="fatalText">请通过本地 HTTP 服务打开页面后再试。</p>
+      <button id="fatalRetry" class="dialog-action" type="button">重新加载</button>
     </div>
   </div>
   <noscript>需要启用 JavaScript 才能游玩。</noscript>
@@ -306,13 +340,13 @@
         // Static hosting: run the pure-JS engine as a local EventSource/fetch
         // backend. This must be installed before main.js constructs RemoteMatch.
         try {
-          await import('./standalone-api.js?v=29');
+          await import('./standalone-api.js?v=30');
         } catch (error) {
           console.error('离线引擎加载失败', error);
         }
       }
       try {
-        await import('./js/main.js?v=29');
+        await import('./js/main.js?v=30');
       } catch (error) {
         console.error('前端入口加载失败', error);
         const fatal = document.getElementById('fatal');

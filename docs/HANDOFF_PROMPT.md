@@ -29,19 +29,22 @@ tests/                    ← browser_acceptance / browser_controls_audio / brow
                             browser_static（.cjs，Puppeteer）+ engine/（match/parity/embed）
 ```
 
-## 三、当前已完成状态（版本 v=26，HEAD=1773379，本地远程一致、工作区干净）
+## 三、当前已完成状态（版本 v=30，含镜头/结算存档/加载过场）
 
 1. **蓄力条照抄原版 EnergyView**：SHOOT_FORCE_STEP=20/30fps，满 2000 后回减、弹回 0 未松手跳回合；回弹中松手按实时力度。时间源一律用引擎累计模拟时钟 `this.time`（帧率无关），**不要用墙钟**。
 2. **飞机（道具 10016）**：底部道具栏 F 键槽，紧邻 POW 的 R 槽；`FlyCommand(40)` → `SetBall(3)` 零伤害不炸坑传送弹，命中沿速度反方向退 5px 瞬移。
 3. **角色 1:1 绘制**（对照原版 GameLiving，仅 scaleX=±direction 翻转），已修掉"飘进地形"嵌地 bug。
 4. **地图分批懒加载**：核心 5 图随包，其余（含新增玛雅废墟 1049）点击后异步加载，地形显示用无损 WebP（exact=True，逐像素与 PNG 一致，勿改回有损）。
 5. **加载优化**：预 gzip + 前端 `DecompressionStream('gzip')` 解压；音效预载延后。
-6. 版本参数全站统一 `?v=26`（index.html / js/*.js / standalone-api.js）。
+6. **回合镜头拉远（v30）**：`VIEW.baseZoomFactor` 2.5→1.25，回合视角可见宽约 1450 世界像素；地图外由背景图边缘延展填充。
+7. **战后翻牌 + 本地存档（v30）**：`dist/js/save.js`（键 `gunny-wind-arena.profile.v1`，含 version/coins/stones/claims），9 张卡翻 3（胜）/2（负），领取后入账，每场 `matchId` 只能领一次，损坏存档自动重建，说明面板有重置入口。
+8. **战斗加载过场（v30）**：`boot()` 期间显示地图背景/双方/地图名/真实进度条，淡出后进入战斗；资源失败有重试；加载音用原版 1001 BGM 降音量（原版无加载音，勿伪造）。
+9. 版本参数全站统一 `?v=30`（index.html / js/*.js / standalone-api.js）。
 
 ## 四、标准流程（每次改动的固定闭环）
 
 1. 改 `dist/` 下的文件。
-2. **版本参数 +1**（当前 v=26 → v=27，全站统一替换，别漏 collision 拉取那一处）。
+2. **版本参数 +1**（当前 v=30 → v=31，全站统一替换，别漏 collision 拉取那一处）。
 3. 跑回归（在项目根目录）：
    ```bash
    npm run test:engine            # 引擎 55 项

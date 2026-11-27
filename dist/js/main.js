@@ -1,13 +1,14 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=29';
-import { loadImage, Terrain } from './terrain.js?v=29';
-import { RemoteMatch } from './net-client.js?v=29';
-import { Renderer, DEATH_SEQUENCE } from './renderer.js?v=29';
-import { Camera, projectPoint } from './camera.js?v=29';
-import { InputController } from './input.js?v=29';
-import { solvePerfect } from './ai.js?v=29';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=29';
-import { MAPS, getMap, resolveMapId } from './maps.js?v=29';
-import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=29';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=30';
+import { loadImage, Terrain } from './terrain.js?v=30';
+import { RemoteMatch } from './net-client.js?v=30';
+import { Renderer, DEATH_SEQUENCE } from './renderer.js?v=30';
+import { Camera, projectPoint } from './camera.js?v=30';
+import { InputController } from './input.js?v=30';
+import { solvePerfect } from './ai.js?v=30';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=30';
+import { MAPS, getMap, resolveMapId } from './maps.js?v=30';
+import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=30';
+import { loadSave, claimReward, hasClaimed, resetSave, formatAmount } from './save.js?v=30';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -102,6 +103,12 @@ let booted = false;
 let minimapDrag = null;
 let selectedWeaponId = 'fruit';
 let weaponPickerBuilt = false;
+// One id per battle. The profile stores claimed ids, so a refresh or a
+// re-opened result screen can never pay the same fight twice.
+let matchId = newMatchId();
+function newMatchId() {
+  return `b${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
 
 const uiCache = {
   phase: '', angle: null, forcePct: null, wind: null, hp: [null, null], distance: null,
@@ -307,7 +314,7 @@ class SoundEngine {
     if (!this.bgmBuffer) return false;
     if (this.bgmSource) {
       // Already playing (or scheduled); just make sure gain is up.
-      this._fadeBgm(this.bgmVolume);
+      this._fadeBgm(this.bgmDuck ?? this.bgmVolume);
       return true;
     }
     if (!this._ensureGraph()) return false;
@@ -320,8 +327,27 @@ class SoundEngine {
     source.connect(this.bgmGain);
     source.start();
     this.bgmSource = source;
-    this._fadeBgm(this.bgmVolume);
+    this._fadeBgm(this.bgmDuck ?? this.bgmVolume);
     return true;
+  }
+
+  /**
+   * Loading-screen hand-off. The original has no dedicated "loading" SoundID
+   * in audio.swf (SoundManager only maps 001-130 plus the 1001 BGM loop), so
+   * the entry cue is the original map-1001 BGM ducked to 45% and lifted back to
+   * battle level once the match starts — no extra clip is invented and nothing
+   * overlaps the battle BGM because it is the same loop.
+   */
+  enterBattleLoading() {
+    this.bgmDuck = this.bgmVolume * 0.45;
+    if (!this.enabled || !this.ctx) return false;
+    this.startBgm();
+    return true;
+  }
+
+  exitBattleLoading() {
+    this.bgmDuck = null;
+    if (this.bgmSource) this._fadeBgm(this.bgmVolume, 0.5);
   }
 
   /** Smoothly ramp the BGM gain (avoids clicks on start/stop/mute). */
@@ -1151,8 +1177,10 @@ function openHelp() {
       : '点右上角全屏按钮可进入系统全屏；若浏览器拒绝，横屏并隐藏地址栏后仍可完整操作。';
   els.modalBody.innerHTML = `
     <p class="intro-strip"><span class="chip"><em>1</em>移动</span><span class="chip"><em>2</em>调角</span><span class="chip"><em>3</em>蓄力</span><span class="chip"><em>4</em>松手</span></p>
+    <p><strong>本地存档：</strong>金币 <b id="saveCoinsInHelp">0</b> · 玄武石 <b id="saveStonesInHelp">0</b> · 已记录战绩 <b id="saveClaimsInHelp">0</b> 场。战后翻牌奖励领取后写入浏览器 localStorage（键 <code>gunny-wind-arena.profile.v1</code>，含版本号），刷新或重新部署后自动恢复；同一场战斗只能领取一次，存档损坏时会自动重建。 <button id="resetSaveBtn" class="link-button" type="button">重置本地存档</button></p>
+
     <dl class="help-grid">
-      <dt>镜头</dt><dd>瞄准时用同一比例缩放把双方装进画面，角色与脚下地形位于中下部，上方保留抛射空间。左上小地图显示双方和镜头框；拖动小地图只移动镜头，点“回战场”立即回到自动构图。距离过大时以小地图辅助，不挪近出生点。</dd>
+      <dt>镜头</dt><dd>回合视角跟随当前出手角色并保持居中，比例比旧版更远：桌面与手机横屏都能看到约 1450 世界像素宽（约地图的四分之三）的地形。镜头平滑跟随移动与飞行，小地图显示双方和视野框；拖动小地图只移动镜头，点“回战场”立即回到自动构图。</dd>
       <dt>飞行</dt><dd>炮弹出手后镜头跟随炮弹，允许飞入天空，双方可能暂时离屏。小地图、风向、力度尺、转盘、技能和发射键始终固定在屏幕原位；飞行中不能再次发射。最后一发爆炸并结算后，镜头平滑回到下一回合双方视角，不会在飞行中反复缩放。</dd>
       <dt>移动</dt><dd>按住左下转盘左右键，或键盘 A / D、← / →。角色在 ${WORLD.width} px 的亚特兰蒂斯地图上真实行走；本版本体力无限，移动不会耗尽体力。陡坎会挡住，脚下被炸空会受重力下落。</dd>
       <dt>角度</dt><dd>按住转盘上下键，或 W / S、↑ / ↓；桌面也可在中心角度数字上上下拖动。当前武器 <strong>${weaponLabel}</strong> 的范围是 ${weaponRange}。角色旁只显示一小段方向虚线与角度扇形，不预测整条弹道。</dd>
@@ -1169,6 +1197,25 @@ function openHelp() {
     <p><strong>音效来源：</strong> 原版 <code>SoundManager.as</code> 的 SoundID 经 <code>audio.swf</code> 离线解码为 MP3，不运行 Flash；触发点按 <code>ShootBombAction.executeImp()</code>、<code>SimpleBomb.bomb()</code>、<code>doUseItemAnimation()</code> 与 <code>die()</code> 对齐。</p>
     <p class="source-note">原仓库：<a href="${SOURCE_REPO}" target="_blank" rel="noopener">github.com/phucdz2kk4/Gunny</a> · 提交 <code>${SOURCE_COMMIT.slice(0, 7)}</code><br>地图 1156（亚特兰蒂斯）、13 件原版经典武器素材、角色素材与单机规则保持不变；手机 HUD、双方广角构图、多弹技能、推荐力度与音效为网页新增实现。</p>
   `;
+  const profile = loadSave();
+  const saveCoins = document.getElementById('saveCoinsInHelp');
+  const saveStones = document.getElementById('saveStonesInHelp');
+  const saveClaims = document.getElementById('saveClaimsInHelp');
+  if (saveCoins) saveCoins.textContent = String(profile.coins);
+  if (saveStones) saveStones.textContent = String(profile.stones);
+  if (saveClaims) saveClaims.textContent = String(profile.claims.length);
+  const resetBtn = document.getElementById('resetSaveBtn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (!window.confirm('确定清空本地存档？金币、玄武石与领奖记录都会删除，且无法恢复。')) return;
+      const fresh = resetSave();
+      paintWallet();
+      if (saveCoins) saveCoins.textContent = String(fresh.coins);
+      if (saveStones) saveStones.textContent = String(fresh.stones);
+      if (saveClaims) saveClaims.textContent = '0';
+      showToast('本地存档已重置', { duration: 2200 });
+    });
+  }
   els.modalAction.textContent = '回到对战';
   els.modal.hidden = false;
   els.modalClose.hidden = false;
@@ -1180,63 +1227,167 @@ function openHelp() {
 // _cardCnt = 9 face-down cards in _cardColumns = 3 columns, ticks a
 // CardCountDown of _countDownTime = 5 seconds and, on expiry, disables every
 // card and reveals the remaining ones. Only GetCardCount picks are allowed.
-// The single-player build has no inventory/backend, so cards reveal honour
-// badges instead of item drops.
+//
+// Payout: the original credits items through the account DB. This static build
+// pays 金币 / 玄武石 and writes the claim into the local profile (save.js),
+// keyed by matchId, so one battle can only ever be paid once.
+const REWARD_TABLE = {
+  win: { picks: 3, coins: [80, 260], stones: [1, 4] },
+  lose: { picks: 2, coins: [30, 90], stones: [1, 2] },
+};
+
+function rollRewards(win) {
+  const spec = win ? REWARD_TABLE.win : REWARD_TABLE.lose;
+  const rand = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
+  const cards = [];
+  for (let i = 0; i < 9; i += 1) {
+    // About one card in three is 玄武石; the rest pay 金币.
+    if (Math.random() < 0.34) cards.push({ kind: 'stone', amount: rand(spec.stones[0], spec.stones[1]) });
+    else cards.push({ kind: 'coin', amount: rand(spec.coins[0], spec.coins[1]) });
+  }
+  return cards;
+}
+
+function rewardLabel(kind) {
+  return kind === 'stone' ? '玄武石' : '金币';
+}
+
+function rewardIcon(kind) {
+  return kind === 'stone' ? 'assets/ui/icon-stones.png' : 'assets/ui/icon-gold.png';
+}
+
+/** Repaint the always-on wallet chips (top-left under the minimap). */
+function paintWallet() {
+  const save = loadSave();
+  const coins = document.getElementById('walletCoins');
+  const stones = document.getElementById('walletStones');
+  if (coins) coins.textContent = formatAmount(save.coins);
+  if (stones) stones.textContent = formatAmount(save.stones);
+  const coinsChip = document.getElementById('walletCoinsChip');
+  const stonesChip = document.getElementById('walletStonesChip');
+  if (coinsChip) coinsChip.setAttribute('aria-label', `金币 ${save.coins}`);
+  if (stonesChip) stonesChip.setAttribute('aria-label', `玄武石 ${save.stones}`);
+  return save;
+}
+
 function setupResultCards(win) {
   const row = document.getElementById('cardsRow');
   const timer = document.getElementById('cardsCountdown');
+  const claimBtn = document.getElementById('claimReward');
+  const sumEl = document.getElementById('rewardSum');
+  const balanceEl = document.getElementById('rewardBalance');
   if (!row) return;
   window.clearInterval(resultCardTimer);
-  const CARD_COUNT = 9;
   const CARD_COLUMNS = 3;
   const COUNTDOWN = 5;
   const MAX_PICKS = win ? 3 : 2;
-  const prizes = [
-    ['⚔', '英勇勋章'], ['✦', '精准之星'], ['★', '制胜之证'],
-    ['✧', '风之记忆'], ['◆', '幸运之石'], ['❖', '荣誉徽记'],
-    ['✺', '战利品箱'], ['⚜', '勇士印记'], ['✹', '经验加成'],
-  ];
+  const alreadyClaimed = hasClaimed(matchId);
+  const rewards = rollRewards(win);
   row.style.setProperty('--card-columns', String(CARD_COLUMNS));
-  row.innerHTML = prizes.slice(0, CARD_COUNT).map((prize, i) => `
-    <button class="result-card" type="button" data-card="${i}" aria-label="第 ${i + 1} 张卡，点击翻开">
+  row.innerHTML = rewards.map((prize, i) => `
+    <button class="result-card" type="button" data-card="${i}" data-kind="${prize.kind}" data-amount="${prize.amount}" aria-label="第 ${i + 1} 张卡，点击翻开">
       <span class="card-inner">
-        <span class="card-back"><span class="card-emblem">◆</span></span>
-        <span class="card-face"><b>${prize[0]}</b><small>${prize[1]}</small></span>
+        <span class="card-back"><img src="assets/ui/card-back.png" alt="" draggable="false"></span>
+        <span class="card-face"><img class="card-icon" src="${rewardIcon(prize.kind)}" alt="" draggable="false"><b>+${prize.amount}</b><small>${rewardLabel(prize.kind)}</small></span>
       </span>
     </button>
   `).join('');
   const cards = [...row.querySelectorAll('.result-card')];
   const picked = new Set();
+  const tally = { coins: 0, stones: 0 };
   let remaining = COUNTDOWN;
   let finished = false;
+  let claimed = alreadyClaimed;
+
+  const refreshClaim = () => {
+    if (!claimBtn) return;
+    if (claimed) {
+      claimBtn.disabled = true;
+      claimBtn.textContent = '本局奖励已领取';
+      claimBtn.classList.add('is-claimed');
+      return;
+    }
+    const ready = finished || picked.size >= MAX_PICKS;
+    claimBtn.disabled = !ready;
+    claimBtn.textContent = ready
+      ? `领取 ${tally.coins} 金币 · ${tally.stones} 玄武石`
+      : `再翻 ${MAX_PICKS - picked.size} 张可领取`;
+  };
+  const refreshSum = () => {
+    if (sumEl) {
+      sumEl.textContent = `已翻开 ${picked.size}/${MAX_PICKS} · 金币 +${tally.coins} · 玄武石 +${tally.stones}`;
+    }
+    refreshClaim();
+  };
   const reveal = (card, silent = false) => {
     if (card.classList.contains('is-flipped')) return false;
     card.classList.add('is-flipped');
     if (!silent) sound.play('item');
     return true;
   };
+  const bank = (card) => {
+    const amount = Number(card.dataset.amount) || 0;
+    if (card.dataset.kind === 'stone') tally.stones += amount;
+    else tally.coins += amount;
+  };
   const finish = (auto) => {
     if (finished) return;
     finished = true;
     window.clearInterval(resultCardTimer);
     cards.forEach((card) => card.classList.add('is-disabled'));
-    if (auto) cards.forEach((card) => reveal(card, true));
+    if (auto) cards.forEach((card) => { if (reveal(card, true)) bank(card); });
     if (timer) timer.textContent = auto ? '时间到 · 战利品自动揭晓' : '翻牌结束';
-    showToast(auto ? '翻牌时间到，战利品自动揭晓' : (win ? '战利品已全部翻开，漂亮的一局！' : '翻牌完成，再战一局换个角度试试'), { duration: 2400 });
+    refreshSum();
+    showToast(auto ? '翻牌时间到，战利品自动揭晓' : (win ? '战利品已全部翻开，别忘了领取' : '翻牌完成，再战一局换个角度试试'), { duration: 2400 });
   };
   if (timer) timer.textContent = `翻牌倒计时 ${remaining}s`;
-  resultCardTimer = window.setInterval(() => {
-    remaining -= 1;
-    if (timer) timer.textContent = `翻牌倒计时 ${Math.max(0, remaining)}s`;
-    if (remaining <= 0) finish(true);
-  }, 1000);
+  refreshSum();
+  if (alreadyClaimed) {
+    // Re-opened settlement: show what was paid and lock the cards.
+    cards.forEach((card) => {
+      card.classList.add('is-flipped', 'is-disabled');
+      bank(card);
+    });
+    picked.add(-1);
+    finished = true;
+    if (timer) timer.textContent = '本局奖励已领取';
+    refreshSum();
+  } else {
+    resultCardTimer = window.setInterval(() => {
+      remaining -= 1;
+      if (timer) timer.textContent = `翻牌倒计时 ${Math.max(0, remaining)}s`;
+      if (remaining <= 0) finish(true);
+    }, 1000);
+  }
+  if (claimBtn && !alreadyClaimed) {
+    claimBtn.addEventListener('click', () => {
+      if (claimed) return;
+      const result = claimReward(matchId, tally.coins, tally.stones);
+      if (!result.ok) {
+        showToast(result.reason === 'already-claimed' ? '本局奖励已领取过' : '本地存档不可用，奖励未写入', { alert: true });
+        if (result.reason === 'already-claimed') {
+          claimed = true;
+          refreshClaim();
+        }
+        return;
+      }
+      claimed = true;
+      sound.play('win');
+      const save = paintWallet();
+      if (balanceEl) balanceEl.textContent = `存档余额：金币 ${save.coins} · 玄武石 ${save.stones}`;
+      refreshClaim();
+      showToast(`已入账：金币 +${tally.coins} · 玄武石 +${tally.stones}`, { duration: 2600 });
+    });
+  }
   row.addEventListener('click', (event) => {
     const card = event.target.closest('.result-card');
-    if (!card || finished || card.classList.contains('is-disabled')) return;
+    if (!card || finished || claimed || card.classList.contains('is-disabled')) return;
     if (card.classList.contains('is-flipped') || picked.size >= MAX_PICKS) return;
     if (!reveal(card)) return;
     sound.play(picked.size === 0 && win ? 'win' : 'item');
     picked.add(Number(card.dataset.card));
+    bank(card);
+    refreshSum();
     if (picked.size === MAX_PICKS) finish(false);
   });
 }
@@ -1245,6 +1396,7 @@ function showResult(data) {
   input?.cancelAll('result');
   modalMode = 'result';
   const win = data.winner === 0;
+  const save = paintWallet();
   sound.play(win ? 'win' : 'lose');
   const accuracy = data.stats.playerShots ? Math.round(data.stats.playerHits / data.stats.playerShots * 100) : 0;
   els.modalTitle.textContent = win ? '漂亮的一击，你赢了！' : '芽芽笑到了最后';
@@ -1261,6 +1413,11 @@ function showResult(data) {
     <div class="result-cards" aria-label="战后翻牌">
       <p class="cards-title">${win ? '胜利翻牌 · 点击卡片抽取战利品' : '安慰翻牌 · 点击卡片查看'}<span class="cards-countdown" id="cardsCountdown"></span></p>
       <div class="cards-row" id="cardsRow"></div>
+      <div class="reward-claim">
+        <p class="reward-sum" id="rewardSum"></p>
+        <p class="reward-balance" id="rewardBalance">存档余额：金币 ${save.coins} · 玄武石 ${save.stones}</p>
+        <button class="reward-claim-btn" id="claimReward" type="button" disabled>翻牌后可领取</button>
+      </div>
     </div>
   `;
   setupResultCards(win);
@@ -1291,6 +1448,9 @@ function restartMatch() {
   clearTimeout(flashTimer);
   input?.cancelAll('restart');
   if (!game) return;
+  // New battle, new claim id: the settlement of the previous fight stays paid
+  // once, and this fight starts unpaid.
+  matchId = newMatchId();
   game.reset();
   camera.reset();
   camera.clearPan();
@@ -2427,7 +2587,7 @@ function startMapLoad(id) {
     () => loadImage(urls.thumb),
     () => loadImage(urls.fore),
     () => loadImage(urls.back),
-    () => fetch(`${urls.collision}?v=29`).then((res) => {
+    () => fetch(`${urls.collision}?v=30`).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.arrayBuffer();
     }),
@@ -2565,9 +2725,72 @@ function setupMapPicker() {
   });
 }
 
+/* ---------- 战斗加载过场 ----------
+ * Shown between "确认进入战斗" (map picker / first boot) and the first battle
+ * frame. It renders the chosen map backdrop, both fighters, the map name and a
+ * real progress bar fed by the boot resource promises; it never sits on top of
+ * gameplay because it is removed before the frame loop starts.
+ * SOURCE: GameView.as / MapView.as build the battle stage from MapInfo before
+ * the scene appears — this is the web equivalent of that staged entry. */
+const loadUi = {
+  bar: null, pct: null, track: null, step: null, tip: null, audio: null,
+};
+
+function setLoadProgress(percent, step) {
+  const p = Math.max(0, Math.min(100, Math.round(percent)));
+  if (loadUi.bar) loadUi.bar.style.width = `${p}%`;
+  if (loadUi.pct) loadUi.pct.textContent = `${p}%`;
+  if (loadUi.track) loadUi.track.setAttribute('aria-valuenow', String(p));
+  if (step && loadUi.step) loadUi.step.textContent = step;
+}
+
+function hideLoadingScreen() {
+  const el = document.getElementById('loading');
+  if (!el || el.classList.contains('is-leaving')) return;
+  el.classList.add('is-leaving');
+  window.setTimeout(() => el.classList.add('is-hidden'), 420);
+}
+
+function prepareLoadingScreen() {
+  const el = document.getElementById('loading');
+  if (!el) return false;
+  loadUi.bar = document.getElementById('loadBar');
+  loadUi.pct = document.getElementById('loadPct');
+  loadUi.track = document.getElementById('loadBarTrack');
+  loadUi.step = document.getElementById('loadStep');
+  loadUi.tip = document.getElementById('loadTip');
+  loadUi.audio = document.getElementById('loadAudioBtn');
+  const nameEl = document.getElementById('loadMapName');
+  const idEl = document.getElementById('loadMapId');
+  const backdrop = document.getElementById('loadBackdrop');
+  if (nameEl) nameEl.textContent = currentMap.name;
+  if (idEl) idEl.textContent = String(currentMap.id);
+  if (backdrop) backdrop.src = `assets/map-${currentMap.id}-back.jpg`;
+  if (loadUi.tip) {
+    loadUi.tip.textContent = `${currentMap.name} · ${currentMap.trait} · 可破坏地形`;
+  }
+  setLoadProgress(6, '正在准备战场');
+  // Audio still needs a gesture on a fresh page load. The original has no
+  // loading SoundID, so the button only unlocks the existing 1001 BGM.
+  if (loadUi.audio) {
+    loadUi.audio.hidden = sound.enabled;
+    loadUi.audio.addEventListener('click', async () => {
+      const ok = await sound.unlock();
+      if (ok) {
+        sound.enterBattleLoading();
+        loadUi.audio.hidden = true;
+        loadUi.audio.blur();
+      }
+    });
+  }
+  return true;
+}
+
 async function boot() {
   try {
     setViewportVariables();
+    prepareLoadingScreen();
+    setLoadProgress(8, '正在读取战场清单');
     if (els.buildVersion) els.buildVersion.textContent = `v${BUILD_VERSION}`;
     const craterArtUrls = {
       50: { shape: 'assets/crater-50.png', brink: 'assets/craterbrink-50.png' },
@@ -2586,27 +2809,37 @@ async function boot() {
     // Reflect the chosen map in the minimap header (was hard-coded "亚特兰蒂斯").
     const minimapTitle = document.querySelector('.minimap-title');
     if (minimapTitle) minimapTitle.textContent = currentMap.name;
+    // Progress is reported per resolved resource so the bar reflects real work
+    // instead of a fake timer.
+    const LOAD_STEPS = 10;
+    let loadDone = 0;
+    const tick = (value) => {
+      loadDone += 1;
+      setLoadProgress(8 + (loadDone / LOAD_STEPS) * 84, `正在装载战场资源 ${loadDone}/${LOAD_STEPS}`);
+      return value;
+    };
     const [back, playerSheet, enemySheet, shell, loadedTerrain, weaponImages, projectileImages, fruitPowImage, carryImage, powImages] = await Promise.all([
-      loadImage(mapBackUrl),
-      loadImage('assets/character-player-sheet.png'),
-      loadImage('assets/character-enemy-sheet.png'),
-      loadImage('assets/shell-bomb.png'),
+      loadImage(mapBackUrl).then(tick),
+      loadImage('assets/character-player-sheet.png').then(tick),
+      loadImage('assets/character-enemy-sheet.png').then(tick),
+      loadImage('assets/shell-bomb.png').then(tick),
       Terrain.load({
         foregroundUrl: mapForeUrl,
         craterArtUrls,
-      }),
-      Promise.all(weaponIds.map(async (id) => [id, await loadImage(`assets/weapon-${id}.png`)])).then(Object.fromEntries),
-      Promise.all(weaponIds.map(async (id) => [id, await loadImage(`assets/projectile-${id}.png`)])).then(Object.fromEntries),
-      loadImage('assets/projectile-fruit-pow.png'),
-      loadImage('assets/projectile-carry.png'),
+      }).then(tick),
+      Promise.all(weaponIds.map(async (id) => [id, await loadImage(`assets/weapon-${id}.png`)])).then(Object.fromEntries).then(tick),
+      Promise.all(weaponIds.map(async (id) => [id, await loadImage(`assets/projectile-${id}.png`)])).then(Object.fromEntries).then(tick),
+      loadImage('assets/projectile-fruit-pow.png').then(tick),
+      loadImage('assets/projectile-carry.png').then(tick),
       // SOURCE: BallList.xml Amount=3 的大招弹（171/151/371）换专属弹体，
       // 与 411 榴莲（fruit-pow）一样让 POW 一眼可辨。
       Promise.all([
         ['fire-pow', loadImage('assets/projectile-fire-pow.png')],
         ['thunder-pow', loadImage('assets/projectile-thunder-pow.png')],
         ['toilet-pow', loadImage('assets/projectile-toilet-pow.png')],
-      ]).then(Object.fromEntries),
+      ]).then(Object.fromEntries).then(tick),
     ]);
+    setLoadProgress(94, '正在部署双方角色');
     // POW ammo visual: original durian item art replaces the tomato on a
     // fruit-basket POWER shot (browser-only, see README).
     projectileImages['fruit-pow'] = fruitPowImage;
@@ -2644,7 +2877,11 @@ async function boot() {
       openWeaponPicker({ force: true });
     }
     syncOrientationNotice();
-    els.loading.classList.add('is-hidden');
+    setLoadProgress(100, '战场就绪');
+    paintWallet();
+    // Lift the ducked loading BGM back to battle level, then fade the screen.
+    sound.exitBattleLoading();
+    window.setTimeout(hideLoadingScreen, 220);
     // 首屏资源（WASM/地图）就绪后再解码音效，第一个手势仍能命中原始采样。
     sound.preload();
     showToast('开局先选武器 · 1–8 选战斗道具 · 右下按住蓄力并松手发射', { duration: 5200 });
@@ -2652,9 +2889,11 @@ async function boot() {
   } catch (error) {
     window.__GUNNY_BOOT_ERROR__ = error?.stack || String(error);
     console.error(error);
-    els.loading.classList.add('is-hidden');
+    hideLoadingScreen();
     els.fatal.hidden = false;
     els.fatalText.textContent = `${error.message || error}。请确认通过 HTTP 服务打开，且 assets 目录完整。`;
+    const retry = document.getElementById('fatalRetry');
+    if (retry) retry.addEventListener('click', () => location.reload());
   }
 }
 

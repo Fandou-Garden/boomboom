@@ -258,10 +258,15 @@ export const VIEW = Object.freeze({
   // NEW world camera. The screen is only a viewport into WORLD.
   defaultMode: 'player',
   modes: ['player', 'both', 'shot'],
-  baseZoomFactor: 2.5,
-  baseZoomMin: 0.5,
+  // Turn framing: cover zoom × factor. The old 2.5 pushed the viewport to the
+  // maxZoom ceiling on every device, so the shooter filled the screen and the
+  // surrounding terrain was invisible. 1.25 lands the visible width near
+  // 1450–1500 world px on both desktop and landscape phones (~78% of the
+  // 1843 px map), which matches the original GameView framing better.
+  baseZoomFactor: 1.25,
+  baseZoomMin: 0.45,
   baseZoomMax: 1.05,
-  minZoomFloor: 0.34,
+  minZoomFloor: 0.3,
   // Wide both-player framing may zoom out below the old cover floor. It is a
   // uniform scale (never a non-proportional squeeze) and only adds sky/world
   // margin, so the original 2000 px map and spawn points remain untouched.

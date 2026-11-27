@@ -171,18 +171,18 @@ iPhone 真机地址栏高度、Home Indicator 和嵌入浏览器顶部栏与仿�
 - 历史：版本 6 首次切换到浏览器内 WASM；版本 7 修正文档与加载文案尺寸；版本 8 合并
   远端角色支撑、待机与流畅度修复；版本 9 修复 iPhone 横屏体验。
 - **3.0.0** 把静态后端从 WASM 换成纯 JS 引擎（`dist/js/engine/` +
-  `dist/standalone-api.js`），Go 服务端保留用于在线路径；静态资源查询版本现为 `?v=29`
+  `dist/standalone-api.js`），Go 服务端保留用于在线路径；静态资源查询版本现为 `?v=30`
   （3.0.0 首发为 v24，v25 随「角色/武器回退原版 1:1 尺寸」升级，v26 随「弹道搜索移入
   Web Worker」升级，v27 随「技能改为出牌制」升级，v28 随「原版技能图标 / 音效来源校正 /
-  移除伪造的合成击中音」升级，v29 随「帮助文案与音频行为对齐」升级；
+  移除伪造的合成击中音」升级，v29 随「帮助文案与音频行为对齐」升级，v30 随「回合镜头拉远 / 翻牌奖励与本地存档 / 战斗加载过场」升级；
   `js/engine/` 内部引用仍为 `?v=25`）。
-- 公网 `index.html` 引用 `styles.css?v=29`、`js/main.js?v=29`、`standalone-api.js?v=29`；
+- 公网 `index.html` 引用 `styles.css?v=30`、`js/main.js?v=30`、`standalone-api.js?v=30`；
   静态包不再包含 `wasm/gunny.wasm`。
 - 静态路径同步 v22 规则：`BallList.xml` 每发弹自带 `Power/Radii/Crater/Amount`，
   POW 打各武器 Special 弹（雷霆/烈火/水果篮/马桶三连发）；出生按原版语义扫描列，
   12 张地图均不嵌入悬空地形；`crater/121/131/411` 原版真图随包发布。
 - 地图位图走预压缩 `data/<id>.fore.map.gz`（`DecompressionStream` 解压，
-  无该 API 时回退原始 `.map`），前景图用无损 WebP，版本串 `?v=29`。
+  无该 API 时回退原始 `.map`），前景图用无损 WebP，版本串 `?v=30`。
 - 公网 844×390 冒烟：后端 `js`、双方 x=240/1640、待机帧 9、120 fps、
   玩家 1 发落地生成 1 个弹坑、console/page error 为 0。
 - 静态资源首次加载约 350 KB 地图位图 + 约 1.5k 行 JS；浏览器随后使用版本化缓存。
@@ -253,3 +253,38 @@ fore.map，无法满足逐像素一致规则；改用资源完整的石柱古城
 相同，属首帧预热，未在本轮处理。全部浏览器回归（static / visual / controls+mobile /
 maps）、`npm test`（61/61）、`npm run test:map`（1156 / 1049 均 0 失配）与
 `go test ./...` 均通过。
+
+## 12. 镜头 / 结算存档 / 加载过场（2026-11-27，v30）
+
+### 12.1 回合镜头
+
+`VIEW.baseZoomFactor` 2.5 → 1.25、`baseZoomMin` 0.5 → 0.45、`minZoomFloor` 0.34 → 0.3。
+1440×800 实测 `zoom = 0.980`、可见宽 1468.8 世界像素（旧版被 `baseZoomMax` 顶到 1.05、
+可见宽约 1371 且人物占比过大）；844×390 实测 `zoom = 0.572`、可见宽 1474.4。
+人物仍在屏幕正中（`player` 模式 `targetX/Y = actor.x/y`），地图外改由
+`renderer._drawBackground()` 拉伸背景图边缘列 + 深色渐隐填充。
+
+### 12.2 结算翻牌与本地存档
+
+浏览器端到端（`?test=1`，先把敌方 HP 设为 1 再 `aimAndFirePlayer()`）：
+
+| 检查 | 结果 |
+| --- | --- |
+| 9 张卡 / 3 列 / 5 s 倒计时 | 通过，胜利可翻 3 张 |
+| 翻开累积 | `已翻开 3/3 · 金币 +321 · 玄武石 +1` |
+| 领取写入 | `localStorage['gunny-wind-arena.profile.v1']` = `{version:1,coins:321,stones:1,claims:[{id:…}]}` |
+| 重复点击 | 按钮已禁用，存档字节完全一致（未二次入账） |
+| 刷新恢复 | 重新加载后顶栏钱包仍为 `321 / 1` |
+| 损坏存档 | 非法 JSON 触发 `normalize()` 重建，不抛错 |
+
+### 12.3 战斗加载过场
+
+加载屏进度由 10 个真实资源 Promise 驱动，实测采样 `0% → 50% → 94% → 100%`；
+844×390 与 1440×800 均完整显示地图背景、地图名、双方信息、进度条与“点击开启音效”
+按钮（音频未解锁时）。装载失败进入 `fatal` 面板并带“重新加载”按钮。
+
+### 12.4 回归
+
+`npm run test:engine` 48 项通过；`npm run test:map` mismatches 0；
+`npm run test:browser:static`、`browser_acceptance`、`browser_controls_audio`、
+`browser_mobile` 全部 PASS（`test:browser:*` 已固定 `GAME_URL=http://127.0.0.1:8077/?test=1`）。

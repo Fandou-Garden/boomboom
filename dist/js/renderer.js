@@ -1,7 +1,7 @@
 /** Canvas renderer. World layers use world coordinates; HUD stays in DOM. */
-import { PHYSICS, COMBAT, WORLD, COLORS } from './config.js?v=29';
-import { clamp, muzzlePoint, weaponGripPoint } from './physics.js?v=29';
-import { projectPoint } from './camera.js?v=29';
+import { PHYSICS, COMBAT, WORLD, COLORS } from './config.js?v=30';
+import { clamp, muzzlePoint, weaponGripPoint } from './physics.js?v=30';
+import { projectPoint } from './camera.js?v=30';
 
 // SOURCE: GameCharacter.as action frame arrays. The 3×13 sheet is a frame atlas,
 // not three independent suit rows: STAND/WALK/SHOWGUN/SHOT/HIT all index into it.
@@ -194,6 +194,20 @@ export class Renderer {
     const back = this.images.back;
     const tileW = back.naturalWidth || back.width;
     const tileH = back.naturalHeight || back.height;
+    // Lower turn zoom can put the map edge on screen. Stretching the outermost
+    // source column outward keeps the water/sky tone continuous instead of
+    // exposing the flat sky gradient, which read as "unfinished" next to the
+    // Atlantis artwork. A soft darkening veil hides the 1 px streak.
+    const edgeH = Math.min(tileH, WORLD.height);
+    const leftGap = Math.max(0, -view.worldLeft);
+    if (leftGap > 0) {
+      ctx.drawImage(back, 0, 0, 1, edgeH, view.worldLeft, 0, leftGap, edgeH);
+      const fade = ctx.createLinearGradient(view.worldLeft, 0, view.worldLeft + leftGap, 0);
+      fade.addColorStop(0, 'rgba(2,18,28,0.04)');
+      fade.addColorStop(1, 'rgba(2,18,28,0.62)');
+      ctx.fillStyle = fade;
+      ctx.fillRect(view.worldLeft, 0, leftGap, edgeH);
+    }
     const worldRight = Math.min(WORLD.width, view.worldLeft + view.viewW + 2);
     const startIndex = Math.max(0, Math.floor(view.worldLeft / tileW));
     const endIndex = Math.min(Math.ceil(WORLD.width / tileW), Math.ceil(worldRight / tileW) + 1);
@@ -207,8 +221,17 @@ export class Renderer {
       } else {
         ctx.translate(x, 0);
       }
-      ctx.drawImage(back, 0, 0, tileW, Math.min(tileH, WORLD.height));
+      ctx.drawImage(back, 0, 0, tileW, edgeH);
       ctx.restore();
+    }
+    const rightGap = Math.max(0, view.worldLeft + view.viewW - WORLD.width);
+    if (rightGap > 0) {
+      ctx.drawImage(back, tileW - 1, 0, 1, edgeH, WORLD.width, 0, rightGap, edgeH);
+      const fade = ctx.createLinearGradient(WORLD.width, 0, WORLD.width + rightGap, 0);
+      fade.addColorStop(0, 'rgba(2,18,28,0.04)');
+      fade.addColorStop(1, 'rgba(2,18,28,0.62)');
+      ctx.fillStyle = fade;
+      ctx.fillRect(WORLD.width, 0, rightGap, edgeH);
     }
     // A little deep-water/ground tone below the original image if a device
     // ever exposes the last few pixels at the bottom.

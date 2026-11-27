@@ -41,8 +41,8 @@
 | 敌方回合开始 | `ChangePlayerAction`（敌方分支） | 038 | `sound-038-turn-enemy.mp3` |
 | 胜利 | `ExpView` 胜利分支 | 063 | `sound-063-win.mp3` |
 | 失败 | `ExpView` 失败分支 | 064 | `sound-064-lose.mp3` |
-| 受击（仅扣血） | 原版无独立 SoundID | — | 合成替代（明确标注） |
-| 炮弹出界 / 落地 | 原版无独立 SoundID | — | 合成替代（明确标注） |
+| 受击（仅扣血） | 原版无独立 SoundID | — | **不播放**，爆炸声即受击反馈 |
+| 炮弹出界 / 落地 | 原版无独立 SoundID | — | 不播放额外音效 |
 
 ## 触发规则
 
@@ -50,8 +50,10 @@
   `025/023/114/110/029`。
 - 每枚炮弹爆炸各播一次；Go `resolveImpactLocked()` 的 `explosion` 事件携带
   弹体上的 `weapon`，前端按武器选 `087/102/100/089`。
-- 命中扣血只额外触发合成的 `hit`；不伪造原版 ID。未扣血的擦地只出爆炸声。
-- 选技能只播 `008`；真正生成炮弹时才播开炮声。
+- 命中扣血不再播放任何额外音效。早前网页版用合成 `hit` 冒充，已删除；未扣血的擦地也只出爆炸声。
+- 选技能 / 选 POW 都只播 `008`（`RightPropBar.as:252`、`PropShortCutView.as:90/97`、`WeaponPropBar.as:61`、`SoulPropBar.as:142`），且在点击瞬间播放，不等引擎回声。
+- POW 真正生效（发射必杀弹 / 道具动画）才播 `039`（`GameLiving.as:1550` `doUseItemAnimation()`）。
+- 凡是有原版 SoundID 的音效，一律只播原版采样；采样尚未解码完成时等待解码，绝不用浏览器合成音假冒。
 
 ## 提取与转码
 
@@ -86,3 +88,14 @@ ffmpeg -i in.mp3 -af "volume=+0.9dB" -codec:a libmp3lame -b:a 128k out.mp3
 | `sound-102-boom-fruit.mp3` | 102 | `e7ae8feb8dced81d1f263a5ae9cc8dba7df8534a556b84f77c5196872d965f30` |
 | `sound-110-fire-appliance.mp3` | 110 | `b479e2f67205e021d61943fcb6b73e5703c2e884b0cab079253be89726f236fb` |
 | `sound-114-fire-fruit.mp3` | 114 | `a445268b44e986b27bbdea034c9a3de0764ba386983572daed6a13f8ccdff705` |
+
+## 进入战斗 / 加载音效（核实结论）
+
+`audio.swf` 的 `SoundManager.as` 只登记 `001–130` 通用音效与 `1001` 地图 BGM，
+**没有**“加载完成/进入战斗”的专用 SoundID；`GameView.as`、`MapView.as` 在构建战场时
+也不调用 `SoundManager.play()`。因此网页版不新增“原版加载音”：
+
+| 场景 | 使用音频 | 处理 |
+| --- | --- | --- |
+| 战斗加载过场 | 原版地图 1001 BGM（`assets/audio/bgm-map1001.mp3`） | 音量压到 45% 播放，进入战斗后 0.5 s 内升回 `bgmVolume`；同一条 loop，不会与战斗 BGM 叠加 |
+| 首次冷启动 | 同上 | 受浏览器手势限制，加载卡片提供“点击开启音效”，点击后才解锁；未点击则静默 |

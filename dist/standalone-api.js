@@ -5,7 +5,7 @@
  * compiled to WASM. The Go HTTP server remains the source of truth for
  * local/online play; this path only runs on static hosting.
  */
-import { GunnyEngine } from './js/engine/index.js?v=29';
+import { GunnyEngine } from './js/engine/index.js?v=30';
 
 const API_COMMAND = '/api/command';
 const MAP_IDS = ['1156', '1001', '1002', '1003', '1008', '1014', '1035', '1038', '1157', '1190', '1192', '1049'];
@@ -42,7 +42,7 @@ function startSearchWorker(mapId, map) {
   if (typeof Worker !== 'function') return;
   let worker;
   try {
-    worker = new Worker(new URL('./js/search-worker.js?v=29', import.meta.url), { type: 'module' });
+    worker = new Worker(new URL('./js/search-worker.js?v=30', import.meta.url), { type: 'module' });
   } catch (error) {
     console.warn('search worker unavailable, keeping in-thread search', error);
     return;
@@ -169,7 +169,7 @@ async function loadBytes(url) {
   const response = await fetch(url, { cache: 'no-store' });
   if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
   const raw = await response.arrayBuffer();
-  // The cache-busting query (?v=29) rides on the same URL, so test the path.
+  // The cache-busting query (?v=30) rides on the same URL, so test the path.
   if (!/\.gz(\?|$)/.test(url)) return new Uint8Array(raw);
   // Static hosts usually transfer without content-encoding, so the map is
   // shipped pre-gzipped (232KB -> ~10KB) and inflated in the browser.
@@ -182,10 +182,10 @@ async function loadBytes(url) {
 
 async function loadMapBytes(mapId) {
   try {
-    return await loadBytes(`data/${mapId}.fore.map.gz?v=29`);
+    return await loadBytes(`data/${mapId}.fore.map.gz?v=30`);
   } catch (error) {
     console.warn('pre-gzipped map unavailable, falling back to raw bitmask', error);
-    return loadBytes(`data/${mapId}.fore.map?v=29`);
+    return loadBytes(`data/${mapId}.fore.map?v=30`);
   }
 }
 
