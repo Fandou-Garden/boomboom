@@ -281,7 +281,9 @@ async function runViewport(browser, width, height) {
   assert.equal(afterCalibration.snapshot.audio.enabled, true);
   const audioEvents = afterCalibration.snapshot.audio.events;
   const audioNames = new Set(audioEvents.map((event) => event.name));
-  for (const name of ['fire', 'explosion', 'hit', 'pow']) {
+  // 6a7d302: the original Flash build has no standalone hit SoundID — the
+  // explosion sample is the hit feedback, so the old synthesized chime is gone.
+  for (const name of ['fire', 'explosion', 'pow']) {
     assert.ok(audioNames.has(name), `real battle must emit ${name} audio`);
     const event = [...audioEvents].reverse().find((item) => item.name === name && item.peak > 0.00001);
     assert.ok(event, `${name} must produce a non-zero audio waveform`);

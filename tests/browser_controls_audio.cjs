@@ -203,8 +203,25 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       await page.keyboard.press('r');
       await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().powSelected === true);
 
-      await page.keyboard.press('2'); // deselect scatter, keep POW armed
-      await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().selectedSkill === null);
+      // Skills are CARDS since the stamina rework: the scatter card played above
+      // can no longer be toggled off (a second press would play another card).
+      // Restart for a clean POW volley — with an attack card stacked, the client
+      // recommendation solves a scatter-shaped volley while the engine's POW
+      // branch fires a straight three-shell salvo, so its force could miss.
+      await page.evaluate(() => window.__GUNNY_TEST__.restart());
+      await page.waitForFunction(() => {
+        const s = window.__GUNNY_TEST__.snapshot();
+        return s.phase === 'player' && s.stats.playerShots === 0
+          && s.selectedSkill === null && s.powSelected === false;
+      }, { timeout: 8000 });
+      await page.evaluate(() => {
+        const api = window.__GUNNY_TEST__;
+        api.setWind(0, 0);
+        api.setAngle(26);
+        api.setEnergy(100);
+      });
+      await page.keyboard.press('r');
+      await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().powSelected === true);
       const plan = await page.evaluate(() => window.__GUNNY_TEST__.recommendation());
       assert.equal(plan.reachable, true, 'POW recommendation must verify');
       await page.evaluate(() => window.__GUNNY_TEST__.audioReset());
@@ -336,16 +353,16 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       assert.equal(launches.length, 1, 'normal shot must play launch once');
       assert.equal(launches[0].sample, '114');
       assert.ok(booms.length >= 1 && booms[0].sample === '102', 'ground contact must play fruit BombSound 102');
-      assert.ok(hits.length >= 1, 'actual HP loss must emit hit');
-      assert.equal(hits[0].sample, null, 'hit is the documented synth replacement (no original ID)');
-      assert.ok(hits[0].peak > 0, 'hit replacement must produce audio');
+      // The original Flash build has no standalone hit SoundID, so HP loss adds
+      // no chime; the explosion sample already played above is the feedback.
+      assert.equal(hits.length, 0, 'HP loss must not synthesize a hit chime');
       assert.equal(logs.length, 0, `C console: ${logs.join(' | ')}`);
       out.normalCannon = {
         shots: s.stats.playerShots,
         hits: s.stats.playerHits,
         launch: launches[0].sample,
         explosion: booms[0].sample,
-        hit: 'synth-replacement',
+        hit: 'none (explosion is feedback)',
       };
       await page.close();
     }
@@ -373,8 +390,8 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       await page.close();
     }
 
-    // E. If all source files fail to load, the synth fallback still plays and
-    // charging/firing still work.
+    // E. If all source files fail to load, nothing is faked and
+    // charging/firing still work (6a7d302: no synth when a SoundID exists).
     {
       const { page, logs } = await open(browser, { blockAudio: true });
       await page.keyboard.press('1');
@@ -392,8 +409,8 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       await sleep(260);
       const launches = await audioEvents(page, 'fire');
       assert.equal(launches.length, 1);
-      assert.equal(launches[0].sample, null, 'missing file must fall back, not pretend to be original');
-      assert.ok(launches[0].peak > 0, 'fallback waveform must be audible');
+      assert.equal(launches[0].sample, null, 'missing file must never pretend to be the original');
+      assert.ok(launches[0].peak < 0.00001, 'no synthesized substitute may be invented');
       assert.equal(logs.length, 0, `E console: ${logs.join(' | ')}`);
       out.loadFailureFallback = { samples: 0, launchSample: launches[0].sample, shots: (await snapshot(page)).stats.playerShots };
       await page.close();

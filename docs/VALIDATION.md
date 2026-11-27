@@ -12,7 +12,7 @@ CHECK PASS
 
 npm test
 Go: gunny/server/game ok
-Node: 54 tests / 54 pass / 0 fail
+Node: 61 tests / 61 pass / 0 fail
 
 npm run test:browser:visual
 BROWSER ACCEPTANCE PASS
@@ -34,18 +34,22 @@ MOBILE ADAPTATION PASS
 
 | 视口 | 初始 zoom | 蓄力截图 | 飞行截图 | 结果 |
 | --- | --- | --- | --- | --- |
-| 844×390 | 0.4494 | `charge-844x390.png` | `flight-844x390.png` | PASS |
-| 667×375 | 0.3541 | `charge-667x375.png` | `flight-667x375.png` | PASS |
+| 844×390 | 1.1449 | `charge-844x390.png` | `flight-844x390.png` | PASS |
+| 667×375 | 0.9191 | `charge-667x375.png` | `flight-667x375.png` | PASS |
 
 两个视口均完整跑过“瞄准 → 蓄力 → 发射 → 飞行 → 落地 → 电脑回合”：
 
-- 初始和落地后，双方角色完整在屏，且不与顶部 HUD、小地图、转盘、力度尺、技能栏、
-  POW/蓝色主键相交。
-- 蓄力截图同时显示双方、左下四向转盘、当前力度百分比、推荐/上一发数字。
+- 瞄准与落地取景以行动方为准（`VIEW.defaultMode='player'`，基础 zoom）：行动方角色
+  完整在屏，且不与顶部 HUD、小地图、转盘、力度尺、技能栏、POW/蓝色主键相交；对手在
+  屏外时显示一条方向正确的边缘提示（`hints`），`both` 取景（残局墓碑）下双方完整入镜
+  且无提示。验收断言按此契约分模式校验，不再要求双方始终同屏。
+- 蓄力截图显示行动方、左下四向转盘、当前力度百分比、推荐/上一发数字。
 - 飞行截图镜头在天空跟弹，双方允许离屏；HUD 容器矩形在蓄力和飞行之间偏差 < 0.51 px。
 - 飞行中主键禁用，额外点击不会增加炮弹数；相机缩放单向过渡，不来回振荡。
-- 落地后相机回到 `both`，双方重新完整入镜，缩放回到接近瞄准值。
-- 667×375 下右侧技能列不会压住对手；最窄视口仍保留 74 px 蓝色主键。
+- 弹坑落定后相机离开 `shot` 跟弹，回到行动方取景（`player` 居中；`over` 时 `both`
+  框住双方墓碑），缩放回到接近瞄准值；玩家上一发记录按世界坐标投影，允许在电脑回合
+  离屏。
+- 667×375 下右侧技能列不会压住行动方；最窄视口仍保留 74 px 蓝色主键。
 
 ## 3. 操作与反馈
 
@@ -167,16 +171,17 @@ iPhone 真机地址栏高度、Home Indicator 和嵌入浏览器顶部栏与仿�
 - 历史：版本 6 首次切换到浏览器内 WASM；版本 7 修正文档与加载文案尺寸；版本 8 合并
   远端角色支撑、待机与流畅度修复；版本 9 修复 iPhone 横屏体验。
 - **3.0.0** 把静态后端从 WASM 换成纯 JS 引擎（`dist/js/engine/` +
-  `dist/standalone-api.js`），Go 服务端保留用于在线路径；静态资源查询版本现为 `?v=26`
+  `dist/standalone-api.js`），Go 服务端保留用于在线路径；静态资源查询版本现为 `?v=28`
   （3.0.0 首发为 v24，v25 随「角色/武器回退原版 1:1 尺寸」升级，v26 随「弹道搜索移入
-  Web Worker」升级；`js/engine/` 内部引用为 `?v=25`）。
-- 公网 `index.html` 引用 `styles.css?v=26`、`js/main.js?v=26`、`standalone-api.js?v=26`；
+  Web Worker」升级，v27 随「技能改为出牌制」升级，v28 随「原版技能图标 / 音效来源校正 /
+  移除伪造的合成击中音」升级；`js/engine/` 内部引用仍为 `?v=25`）。
+- 公网 `index.html` 引用 `styles.css?v=28`、`js/main.js?v=28`、`standalone-api.js?v=28`；
   静态包不再包含 `wasm/gunny.wasm`。
 - 静态路径同步 v22 规则：`BallList.xml` 每发弹自带 `Power/Radii/Crater/Amount`，
   POW 打各武器 Special 弹（雷霆/烈火/水果篮/马桶三连发）；出生按原版语义扫描列，
   12 张地图均不嵌入悬空地形；`crater/121/131/411` 原版真图随包发布。
 - 地图位图走预压缩 `data/<id>.fore.map.gz`（`DecompressionStream` 解压，
-  无该 API 时回退原始 `.map`），前景图用无损 WebP，版本串 `?v=26`。
+  无该 API 时回退原始 `.map`），前景图用无损 WebP，版本串 `?v=28`。
 - 公网 844×390 冒烟：后端 `js`、双方 x=240/1640、待机帧 9、120 fps、
   玩家 1 发落地生成 1 个弹坑、console/page error 为 0。
 - 静态资源首次加载约 350 KB 地图位图 + 约 1.5k 行 JS；浏览器随后使用版本化缓存。
@@ -197,7 +202,7 @@ iPhone 真机地址栏高度、Home Indicator 和嵌入浏览器顶部栏与仿�
 | `?map=1049` 启动 | 后端 `js`、1843×1020 terrain、玩家开炮 1 发落地 |
 | 页面错误 | 0 |
 
-`npm test` 升至 **58/58**：新增玛雅废墟 1049 的 9000 tick 真实对局嵌入模拟（Go 金标准与
+`npm test` 当时升至 **58/58**（当前 61/61）：新增玛雅废墟 1049 的 9000 tick 真实对局嵌入模拟（Go 金标准与
 JS 移植各一套），逐 tick 断言角色不嵌入/不悬空；另有 3 个异步 AI 搜索用例（Worker 计划与
 同步计划一致、重开后丢弃过期结果、超时回退可打）。`npm run check` PASS。
 
@@ -227,15 +232,23 @@ fore.map，无法满足逐像素一致规则；改用资源完整的石柱古城
 改动前路径）。测量方式：本机 headless Chromium（844×390、DPR 1）自起静态服务，
 `Emulation.setCPUThrottlingRate` 6× 模拟低端机；数值不是真机实测。
 
+同一构建在 `6a7d302`（v28）上重测的 A/B（`tests/screenshots/perf-6x.json` /
+`perf-6x-sync.json`）：
+
 | 场景 | 指标 | 同步（改动前） | Worker（改动后） |
 | --- | --- | --- | --- |
-| 推荐计算（UI 路径） | 主线程阻塞 | 12–13 ms@1× / 74–80 ms@6× | 0 ms（往返 17–21 ms@6×） |
-| 电脑回合 | long task | 109 ms@6× | 无 |
-| 电脑回合 | 最慢帧 | 106.8 ms@6× | 33–40 ms@6× |
+| 推荐计算（UI 路径） | 主线程阻塞 | 75.3–79.9 ms@6× | 0–0.1 ms（往返 17.4–18.2 ms） |
+| 电脑回合 | long task | 1 次 138 ms@6×（t≈4.86 s） | 无 |
+| 电脑回合 | 最慢帧 | 133.5 ms@6× | 24.9 ms@6× |
 | 电脑回合 | P95 | 10.1 ms@6× | 10.1 ms@6× |
-| 连按角度（2 s） | P95 / 最慢帧 | 10.2 / 49.8 ms@6× | 10.2 / 51.6 ms@6× |
-| 散射弹坑 | P95 / long task | 10.1 ms / 无 | 10.1 ms / 无 |
+| 连按角度（2 s） | P95 / 最慢帧 | 10.0 / 50.6 ms@6× | 10.2 / 49.2 ms@6× |
+| 散射弹坑 | P95 / long task | 10.0 ms / 无 | 10.2 ms / 无 |
 
-角度拖拽开场约 340 ms 处有一次 ~56 ms@6×（≈9 ms@1×）的一次性长任务，改动前后
+同场景的主线程同步求解耗时（`engine.aiSearchMs`）为 106–114 ms@6×（同步模式）与
+139–146 ms@6×（Worker 模式测量的是线程内直接调用，不代表 UI 阻塞）。Worker 与主线程
+弹坑掩码 FNV-1a 哈希相同（scatter 后 2 个弹坑，`match: true`）。
+
+角度拖拽开场约 344–350 ms 处有一次 54–59 ms@6×（≈9 ms@1×）的一次性长任务，改动前后
 相同，属首帧预热，未在本轮处理。全部浏览器回归（static / visual / controls+mobile /
-maps）、`npm test`、`npm run test:map` 与 `go test ./...` 均通过。
+maps）、`npm test`（61/61）、`npm run test:map`（1156 / 1049 均 0 失配）与
+`go test ./...` 均通过。
