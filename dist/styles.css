@@ -713,6 +713,20 @@ svg { display: block; }
   box-shadow: 0 0 13px rgba(105, 211, 255, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 .skill-button:disabled { opacity: 0.34; cursor: default; filter: grayscale(0.45); }
+/* 已经出过至少一张的牌：即便本回合次数用光也要保持高亮，右上角点一颗金点。 */
+.skill-button.is-played { border-color: rgba(255, 211, 106, 0.7); opacity: 1; filter: none; }
+.skill-button.is-played:disabled { opacity: 0.86; filter: none; }
+.skill-button.is-played::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffd36a;
+  box-shadow: 0 0 6px rgba(255, 211, 106, 0.9);
+}
 .skill-icon {
   width: 23px;
   height: 23px;

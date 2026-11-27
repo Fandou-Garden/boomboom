@@ -35,6 +35,8 @@ export function buildSnapshot(m) {
     stats: { ...m.stats },
     healsRemaining: m.healsRemaining,
     skillUses: { ...m.skillUses },
+    skillPlayed: { ...m.skillPlayed },
+    attackStacks: m.attackStacks || 0,
     selectedSkill: m.selectedSkill,
     selectedBuffs: [...m.selectedBuffs],
     powSelected: m.powSelected,

@@ -12,7 +12,8 @@ import {
   BLAST_RADIUS, CRITICAL_LUCKY, CRITICAL_REDUCE, ENERGY_MAX, ENERGY_PER_HIT,
   ENERGY_PER_VOLLEY, ENERGY_PER_HEAL, FORCE_MAX, GROUND_BOTTOM, HEAL_AMOUNT,
   HEAL_DELAY, HEALS_PER_ROUND, MAX_FLIGHT_SECONDS, PHYSICS_DT, RESOLVE_DELAY,
-  SKILL_DEFS, SKILL_ORDER, WORLD_WIDTH, ballFor, clamp,
+  SKILL_DEFS, SKILL_ORDER, SKILL_USES_PER_ROUND, STAMINA_MAX, STAMINA_TURN_RESTORE,
+  WORLD_WIDTH, ballFor, clamp,
 } from './constants.js?v=25';
 import { blastDamage, launch, muzzlePoint, sourceCriticalDamage, stepProjectile } from './physics.js?v=25';
 import { makeImpact } from './json.js?v=25';
@@ -57,9 +58,17 @@ export function fireLocked(m, index, angle, force) {
     sequential = true;
   } else if (index === 0 && m.selectedSkill !== '') {
     const def = SKILL_DEFS[m.selectedSkill];
-    if (def && def.kind === 'attack' && m.skillUses[m.selectedSkill] > 0) {
-      offsets = def.offsets;
-      scales = def.forceScales;
+    if (def && def.kind === 'attack') {
+      // Cards already spent at selection time, so no uses check here: the last
+      // card must still fire after its use counter reaches zero. Two attack
+      // cards stack, so the volley is repeated once per card played.
+      const stacks = Math.max(1, m.attackStacks || 1);
+      offsets = [];
+      scales = [];
+      for (let s = 0; s < stacks; s += 1) {
+        offsets.push(...def.offsets);
+        scales.push(...def.forceScales);
+      }
       sequential = !!def.sequential;
       attackPenalty = def.damageScale;
       firedSkill = def.id;
@@ -69,7 +78,7 @@ export function fireLocked(m, index, angle, force) {
   if (index === 0 && !pow) {
     for (const id of m.selectedBuffs) {
       const def = SKILL_DEFS[id];
-      if (def && def.kind === 'boost' && m.skillUses[id] > 0) damageBonus += def.damageBonus;
+      if (def && def.kind === 'boost') damageBonus += def.damageBonus;
     }
   }
   const damageScale = (1 + damageBonus) * attackPenalty;
@@ -135,14 +144,11 @@ export function fireLocked(m, index, angle, force) {
       m.powSelected = false;
     } else {
       m.energy = Math.min(ENERGY_MAX, m.energy + ENERGY_PER_VOLLEY);
-      if (m.selectedSkill !== '') {
-        if (m.skillUses[m.selectedSkill] > 0) m.skillUses[m.selectedSkill] -= 1;
-        m.selectedSkill = '';
-      }
-      for (const id of m.selectedBuffs) {
-        if (m.skillUses[id] > 0) m.skillUses[id] -= 1;
-      }
+      // Skill cards were already paid for (uses + stamina) when the player
+      // pressed the slot; firing only clears the staging area.
+      m.selectedSkill = '';
       m.selectedBuffs = [];
+      m.attackStacks = 0;
     }
   } else {
     m.stats.enemyShots += activeShots.length;
@@ -413,13 +419,15 @@ export function beginTurnLocked(m, index, rollWind) {
     m.phase = 'player';
     m.timer = 0;
     m.healsRemaining = HEALS_PER_ROUND;
-    for (const id of SKILL_ORDER) m.skillUses[id] = 1;
+    for (const id of SKILL_ORDER) m.skillUses[id] = SKILL_USES_PER_ROUND;
+    m.skillPlayed = {};
+    m.attackStacks = 0;
     m.selectedSkill = '';
     m.selectedBuffs = [];
     m.powSelected = false;
     m.carryArmed = false;
     m.canCarry = true;
-    m.stamina = 100;
+    m.stamina = Math.min(STAMINA_MAX, (m.stamina || 0) + STAMINA_TURN_RESTORE);
     const pw = m.playerWeapon();
     m.angle = clamp(m.angle, pw.angleMin, pw.angleMax);
     m.actors[0].aimAngle = m.angle;

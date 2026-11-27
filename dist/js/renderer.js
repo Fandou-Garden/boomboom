@@ -1,7 +1,7 @@
 /** Canvas renderer. World layers use world coordinates; HUD stays in DOM. */
-import { PHYSICS, COMBAT, WORLD, COLORS } from './config.js?v=26';
-import { clamp, muzzlePoint, weaponGripPoint } from './physics.js?v=26';
-import { projectPoint } from './camera.js?v=26';
+import { PHYSICS, COMBAT, WORLD, COLORS } from './config.js?v=27';
+import { clamp, muzzlePoint, weaponGripPoint } from './physics.js?v=27';
+import { projectPoint } from './camera.js?v=27';
 
 // SOURCE: GameCharacter.as action frame arrays. The 3×13 sheet is a frame atlas,
 // not three independent suit rows: STAND/WALK/SHOWGUN/SHOT/HIT all index into it.
@@ -23,6 +23,22 @@ const ACTOR_FRAMES = {
 };
 const FIRE_ANIM_SECONDS = 0.28;
 const HURT_ANIM_SECONDS = 0.5;
+
+// One shared timeline for the whole death presentation. 倒地 -> 墓碑落下成形 ->
+// 灵魂升起 -> 停留一拍 -> 结算。main.js advances each actor's `tombAge` and only
+// opens the result screen once every dead actor has passed `total`, so
+// simultaneous deaths wait for both tombstones and settlement can never cover
+// a half-built grave. Keep every phase length here — nowhere else.
+const DEATH_STONE_SECONDS = 0.45 + 0.38 + 0.47;
+export const DEATH_SEQUENCE = Object.freeze({
+  collapse: 0.45,
+  drop: 0.38,
+  form: 0.47,
+  soulDelay: DEATH_STONE_SECONDS,
+  soulRise: 1.05,
+  hold: 0.55,
+  total: DEATH_STONE_SECONDS + 1.05 + 0.55,
+});
 
 function roundedRect(ctx, x, y, w, h, r) {
   const radius = Math.min(r, w / 2, h / 2);
@@ -290,18 +306,84 @@ export class Renderer {
 
   // SOURCE: GamePlayer death handler creates a TombView at the death spot and
   // lifts the player to y-70 in the SOUL/SOUL_MOVE state; GhostMoveAction then
-  // drifts the soul upward with a gentle sway. TombView draws its bitmap at
-  // (-20,-50). We reproduce the same pairing with a vector gravestone plus a
-  // translucent rising soul so the death reads before the result screen.
+  // drifts the soul upward. Here the whole presentation is a single timeline
+  // driven by `actor.tombAge` (stamped by main.js from DEATH_SEQUENCE):
+  //   倒地 -> 墓碑落下并刻好 -> 灵魂升起 -> 停留一拍.
+  // Nothing loops and nothing depends on wall-clock time, so the animation is
+  // deterministic and the settlement gate can measure exactly when it ends.
   _drawTombAndSoul(ctx, game, actor, x, y) {
-    const t = game.visualTime ?? game.time ?? 0;
+    const D = DEATH_SEQUENCE;
+    const age = Math.max(0, Number.isFinite(actor.tombAge) ? actor.tombAge : 0);
+    const stoneStart = D.collapse;
+    const landed = stoneStart + D.drop;
+    const direction = Math.sign(actor.facing) || 1;
+
+    // 1) 倒地: the body topples around its feet and settles before the stone.
+    if (age < stoneStart) {
+      const p = clamp(age / D.collapse, 0, 1);
+      const ease = p * p * (3 - 2 * p);
+      const scale = COMBAT.characterScale;
+      const frame = ACTOR_FRAMES.hit[ACTOR_FRAMES.hit.length - 1];
+      const sheet = actor.index === 0 ? this.images.playerSheet : this.images.enemySheet;
+      ellipseShadow(ctx, x, y, 82, 0.24 - ease * 0.07);
+      ctx.save();
+      ctx.globalAlpha = 1 - ease * 0.4;
+      ctx.translate(x + direction * ease * 12, y - ease * 5);
+      ctx.rotate(direction * ease * 1.3);
+      ctx.scale(direction * scale, scale);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(
+        sheet,
+        (frame % 13) * COMBAT.characterFrameWidth,
+        Math.floor(frame / 13) * COMBAT.characterFrameHeight,
+        COMBAT.characterFrameWidth, COMBAT.characterFrameHeight,
+        -COMBAT.characterFrameWidth / 2, -COMBAT.characterAnchorY,
+        COMBAT.characterFrameWidth, COMBAT.characterFrameHeight,
+      );
+      ctx.restore();
+      return;
+    }
+
+    const dropP = clamp((age - stoneStart) / D.drop, 0, 1);
+    const dropEase = 1 - Math.pow(1 - dropP, 3);
+    const sinceLand = age - landed;
+    // A single damped hop when the stone hits the ground; purely decorative.
+    const bounce = sinceLand > 0 && sinceLand < 0.24
+      ? Math.sin((sinceLand / 0.24) * Math.PI) * 9 * (1 - sinceLand / 0.24)
+      : 0;
+    const formP = clamp(sinceLand / D.form, 0, 1);
+    const moundP = clamp(age / landed, 0, 1);
+
     ctx.save();
-    // Gravestone: a rounded stone slab with a carved cross and a soil mound.
     ctx.translate(x, y);
+
+    // 2) 墓碑: soil mound rises while the stone falls from above.
     ctx.fillStyle = 'rgba(6,20,28,0.32)';
     ctx.beginPath();
-    ctx.ellipse(0, 2, 30, 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 2, 32 + 4 * moundP, 8, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.fillStyle = '#5b4632';
+    ctx.beginPath();
+    ctx.ellipse(0, 2, 26 + 6 * moundP, 6 + 4 * moundP, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dust ring kicked up by the landing.
+    if (sinceLand >= 0 && sinceLand < 0.5) {
+      const dp = sinceLand / 0.5;
+      ctx.save();
+      ctx.globalAlpha = (1 - dp) * 0.5;
+      ctx.strokeStyle = 'rgba(214,232,214,0.9)';
+      ctx.lineWidth = 1 + 3 * (1 - dp);
+      ctx.beginPath();
+      ctx.ellipse(0, 1, 22 + dp * 48, 6 + dp * 12, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.translate(0, -(1 - dropEase) * 84 + bounce);
+    ctx.globalAlpha = clamp(dropP * 4, 0, 1);
+    // stone slab
     ctx.fillStyle = '#7d8a8f';
     ctx.strokeStyle = '#3c4a50';
     ctx.lineWidth = 2;
@@ -313,32 +395,59 @@ export class Renderer {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    // bevel highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.16)';
-    ctx.beginPath();
-    ctx.moveTo(-14, -2);
-    ctx.lineTo(-14, -30);
-    ctx.arc(-2, -30, 12, Math.PI, 0);
-    ctx.lineTo(10, -6);
-    ctx.closePath();
-    ctx.fill();
-    // carved cross
-    ctx.strokeStyle = '#e9f2f4';
-    ctx.lineWidth = 3.4;
-    ctx.beginPath();
-    ctx.moveTo(0, -40); ctx.lineTo(0, -18);
-    ctx.moveTo(-8, -32); ctx.lineTo(8, -32);
-    ctx.stroke();
+    // bevel highlight reveals as the stone settles
+    if (formP > 0) {
+      ctx.save();
+      ctx.globalAlpha *= formP;
+      ctx.fillStyle = 'rgba(255,255,255,0.16)';
+      ctx.beginPath();
+      ctx.moveTo(-14, -2);
+      ctx.lineTo(-14, -30);
+      ctx.arc(-2, -30, 12, Math.PI, 0);
+      ctx.lineTo(10, -6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      // carved cross, engraved from the centre outwards
+      const cross = 0.25 + formP * 0.75;
+      ctx.strokeStyle = '#e9f2f4';
+      ctx.lineWidth = 3.4;
+      ctx.beginPath();
+      ctx.moveTo(0, -39); ctx.lineTo(0, -39 + 21 * cross);
+      ctx.moveTo(-8 * cross, -32); ctx.lineTo(8 * cross, -32);
+      ctx.stroke();
+    }
     ctx.restore();
 
-    // Soul: the character's faint, bluish silhouette rising and fading, with
-    // a soft halo. GHOST_MOVE_SPEED=8 in the source; here it is a slow drift
-    // that keeps looping until the result screen takes over.
-    const rise = 70 + Math.sin(t * 0.9 + actor.index) * 4;
-    const sway = Math.sin(t * 1.6 + actor.index * 2) * 6;
-    const alpha = 0.34 + Math.sin(t * 2.2 + actor.index) * 0.08;
+    // Engraving glint right before the soul leaves the body.
+    if (age >= D.soulDelay - 0.3 && age < D.soulDelay + 0.15) {
+      const gp = clamp((age - (D.soulDelay - 0.3)) / 0.45, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = Math.sin(gp * Math.PI) * 0.8;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(220,250,255,0.95)';
+      ctx.lineWidth = 1.6;
+      const s = 3 + gp * 7;
+      ctx.beginPath();
+      ctx.moveTo(-s, -32); ctx.lineTo(s, -32);
+      ctx.moveTo(0, -32 - s); ctx.lineTo(0, -32 + s);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // 3) 灵魂: rises once after the stone is complete, then fades. The hold
+    // phase (last `hold` seconds) is the quiet beat before settlement.
+    if (age < D.soulDelay) return;
+    const pS = clamp((age - D.soulDelay) / D.soulRise, 0, 1);
+    const riseEase = 1 - Math.pow(1 - pS, 2);
+    const rise = 26 + riseEase * 108;
+    const sway = Math.sin(pS * Math.PI * 2 + actor.index) * 5;
+    const fadeOut = clamp((pS - 0.7) / 0.3, 0, 1);
+    const alpha = Math.min(1, pS / 0.15) * (1 - fadeOut);
+    if (alpha <= 0.002) return;
     ctx.save();
-    ctx.globalAlpha = Math.max(0.18, alpha);
+    ctx.globalAlpha = Math.max(0, alpha) * 0.55;
     ctx.globalCompositeOperation = 'lighter';
     ctx.translate(x + sway, y - rise);
     // halo

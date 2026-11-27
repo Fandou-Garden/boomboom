@@ -1,13 +1,13 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=26';
-import { loadImage, Terrain } from './terrain.js?v=26';
-import { RemoteMatch } from './net-client.js?v=26';
-import { Renderer } from './renderer.js?v=26';
-import { Camera, projectPoint } from './camera.js?v=26';
-import { InputController } from './input.js?v=26';
-import { solvePerfect } from './ai.js?v=26';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=26';
-import { MAPS, getMap, resolveMapId } from './maps.js?v=26';
-import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=26';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=27';
+import { loadImage, Terrain } from './terrain.js?v=27';
+import { RemoteMatch } from './net-client.js?v=27';
+import { Renderer, DEATH_SEQUENCE } from './renderer.js?v=27';
+import { Camera, projectPoint } from './camera.js?v=27';
+import { InputController } from './input.js?v=27';
+import { solvePerfect } from './ai.js?v=27';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=27';
+import { MAPS, getMap, resolveMapId } from './maps.js?v=27';
+import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=27';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -89,8 +89,13 @@ let modalMode = 'help';
 let toastTimer = 0;
 let displayTipTimer = 0;
 let flashTimer = 0;
-let resultTimer = 0;
 let resultCardTimer = 0;
+// RemoteMatch replaces every actor object on each snapshot, so the death
+// animation clock cannot live on the actor. Keep one age per actor index here
+// and stamp it back onto the current object every frame (actor.tombAge) for
+// the renderer; the result screen is gated on DEATH_SEQUENCE.total.
+const deathClocks = new Map();
+let pendingResult = null;
 let lastTurnKey = '';
 let portraitDismissed = false;
 let booted = false;
@@ -544,7 +549,49 @@ function effectiveCameraMode() {
   // framing is gone because it never truly centred the shooter.
   if (!game) return 'player';
   if (game.phase === 'flight' && game.shot) return 'shot';
+  // After the final impact nobody is "active" any more: frame both graves so
+  // the death presentation stays on screen until the result leaves the gate.
+  if (game.phase === 'over') return 'both';
   return 'player';
+}
+
+// Advance each dead actor's presentation clock. Runs every frame (even while a
+// menu is open) so the timeline never deadlocks; the draw itself is throttled
+// by the paused-scene path. dt is the same capped delta the renderer uses.
+function trackDeathClocks(dt) {
+  if (!game || !Number.isFinite(dt) || dt <= 0) return;
+  game.actors.forEach((actor, index) => {
+    if (!actor) return;
+    if (actor.alive === false) {
+      const age = (deathClocks.get(index) ?? 0) + dt;
+      deathClocks.set(index, age);
+      actor.tombAge = age;
+    } else if (deathClocks.has(index) || actor.tombAge) {
+      deathClocks.delete(index);
+      actor.tombAge = 0;
+    }
+  });
+}
+
+// Every dead actor must have finished the full death sequence (tombstone
+// formed, soul risen, hold elapsed). With simultaneous deaths this naturally
+// waits for the later clock, so no grave is ever covered mid-animation.
+function tombstonesSettled() {
+  if (!game) return false;
+  let dead = 0;
+  game.actors.forEach((actor, index) => {
+    if (!actor || actor.alive !== false) return;
+    dead += 1;
+    if ((deathClocks.get(index) ?? 0) < DEATH_SEQUENCE.total) return false;
+  });
+  return dead > 0;
+}
+
+function maybeShowPendingResult() {
+  if (!pendingResult || !tombstonesSettled()) return;
+  const data = pendingResult;
+  pendingResult = null;
+  showResult(data);
 }
 
 function frame(now) {
@@ -552,6 +599,10 @@ function frame(now) {
   const dt = Math.min(0.1, Math.max(0, (now - lastFrame) / 1000));
   lastFrame = now;
   paused = !els.modal.hidden || !els.rotateNotice.hidden || !els.weaponPicker.hidden;
+  // Advance the death clocks before the paused-scene early return so a menu
+  // opened mid-animation cannot freeze the settlement gate forever.
+  trackDeathClocks(dt);
+  maybeShowPendingResult();
 
   // Modals use backdrop-filter over the canvas. Redrawing the battlefield at
   // 60/120 Hz behind a static blur burns the main thread and makes the overlay
@@ -643,12 +694,19 @@ function updateSkillButtons(phase) {
     const id = button.dataset.skill;
     if (!id) continue;
     const uses = Math.max(0, game.skillUses?.[id] ?? 0);
-    const selected = game.selectedSkill === id || buffs.includes(id);
+    const staged = game.selectedSkill === id || buffs.includes(id);
+    // Highlight every card that has already been played at least once this
+    // turn, on top of the ones staged for the next shot.
+    const played = Math.max(0, game.skillPlayed?.[id] ?? 0);
+    const highlighted = staged || played > 0;
     const disabled = phase !== 'player' || game.charging || uses <= 0;
     // Keep every selected attack/boost visible, including multi-select boosts.
     button.disabled = disabled;
-    button.classList.toggle('is-selected', selected);
-    button.setAttribute('aria-pressed', String(selected));
+    button.classList.toggle('is-selected', highlighted);
+    button.classList.toggle('is-played', played > 0);
+    button.setAttribute('aria-pressed', String(highlighted));
+    const label = uses > 0 ? `剩 ${uses} 张` : '本回合已出完';
+    button.title = `${skillName(id) || id} · ${label}`;
   }
 }
 
@@ -852,9 +910,14 @@ function syncUI() {
     }
   }
 
-  if (uiCache.stamina !== '∞') {
-    uiCache.stamina = '∞';
-    setText(els.statStamina, '∞');
+  const staminaNow = Number.isFinite(game.stamina) ? Math.round(game.stamina) : null;
+  if (staminaNow != null && uiCache.stamina !== staminaNow) {
+    uiCache.stamina = staminaNow;
+    setText(els.statStamina, staminaNow);
+    if (els.statStamina) {
+      const pct = Math.max(0, Math.min(100, game.stamina / BATTLE.staminaMax * 100));
+      els.statStamina.style.setProperty('--stamina-pct', `${pct}%`);
+    }
   }
   if (uiCache.energy !== Math.round(game.energy)) {
     uiCache.energy = Math.round(game.energy);
@@ -1026,10 +1089,12 @@ function handleEvent(type, data = {}) {
   } else if (type === 'volley-resolve') {
     if (data.shots > 1) showToast(`${data.shots} 发已全部结算，即将切换回合`, { duration: 1700 });
   } else if (type === 'gameover') {
-    // SOURCE: GameOverAction -> ExpView.showCard(). Delay the result screen so
-    // the tombstone + rising soul stay visible for a beat before the cards.
-    clearTimeout(resultTimer);
-    resultTimer = window.setTimeout(() => showResult(data), 1500);
+    // SOURCE: GameOverAction -> ExpView.showCard(). Do not open the settlement
+    // here: hold it until every tombstone has run the full DEATH_SEQUENCE
+    // (倒地 -> 落下成形 -> 灵魂升起 -> 停留一拍). maybeShowPendingResult() runs
+    // from the frame loop, so simultaneous deaths wait for both graves.
+    pendingResult = data;
+    maybeShowPendingResult();
   } else if (type === 'translate') {
     // SOURCE: ActionType.TRANSLATE -> Living.transmit(). The carry ball moved
     // its owner to the landing point; flash a teleport ring at the new spot.
@@ -1188,7 +1253,10 @@ function closeModal() {
 }
 
 function restartMatch() {
-  clearTimeout(resultTimer);
+  // Drop any death presentation state so the next match starts at age 0 and a
+  // stale settlement can never appear mid-game.
+  deathClocks.clear();
+  pendingResult = null;
   window.clearInterval(resultCardTimer);
   resultCardTimer = 0;
   clearTimeout(flashTimer);
@@ -2323,7 +2391,7 @@ function startMapLoad(id) {
     () => loadImage(urls.thumb),
     () => loadImage(urls.fore),
     () => loadImage(urls.back),
-    () => fetch(`${urls.collision}?v=26`).then((res) => {
+    () => fetch(`${urls.collision}?v=27`).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.arrayBuffer();
     }),

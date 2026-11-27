@@ -24,7 +24,7 @@ import { GoRand } from '../../dist/js/engine/rng.js';
 import {
   ANGLE_MAX, ANGLE_MIN, BALL_DEFS, BEDROCK_Y, CRITICAL_LUCKY, CRITICAL_REDUCE,
   ENERGY_MAX, FIXED_WIND, FORCE_MAX, MAX_FLIGHT_SECONDS, MOVE_STEP_Y, PHYSICS_DT,
-  SKILL_DEFS, SPAWN_PROBE_Y, START_ANGLE, WEAPON_DEFS, WEAPON_ORDER, ballFor,
+  SKILL_DEFS, SKILL_USES_PER_ROUND, SPAWN_PROBE_Y, START_ANGLE, WEAPON_DEFS, WEAPON_ORDER, ballFor,
 } from '../../dist/js/engine/constants.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -170,12 +170,52 @@ test('sequential attack launches the next shell on finishFlight', () => {
 
 test('damage buffs stack and spend', () => {
   const m = newMatch();
-  m.selectedBuffs = ['boost50', 'boost20'];
+  m.phase = 'player';
+  // Selecting a card spends it immediately; firing only consumes the staging.
+  m.command({ type: 'skill', skill: 'boost50' });
+  m.command({ type: 'skill', skill: 'boost20' });
+  assert.deepEqual(m.selectedBuffs, ['boost50', 'boost20']);
+  assert.equal(m.skillUses.boost50, SKILL_USES_PER_ROUND - 1);
+  assert.equal(m.skillUses.boost20, SKILL_USES_PER_ROUND - 1);
+  assert.equal(m.skillPlayed.boost50, 1);
   assert.ok(fireLocked(m, 0, 45, FORCE_MAX), 'fire rejected');
   for (const shot of m.shots) assert.ok(Math.abs(shot.damageScale - 1.7) < 1e-9);
-  assert.equal(m.skillUses.boost50, 0);
-  assert.equal(m.skillUses.boost20, 0);
   assert.equal(m.selectedBuffs.length, 0);
+});
+
+test('pressing a skill twice plays two cards instead of cancelling', () => {
+  const m = newMatch();
+  m.phase = 'player';
+  const stamina0 = m.stamina;
+  m.command({ type: 'skill', skill: 'boost50' });
+  m.command({ type: 'skill', skill: 'boost50' });
+  assert.deepEqual(m.selectedBuffs, ['boost50', 'boost50']);
+  assert.equal(m.skillUses.boost50, SKILL_USES_PER_ROUND - 2);
+  assert.equal(m.skillPlayed.boost50, 2);
+  assert.equal(m.stamina, stamina0 - 2 * SKILL_DEFS.boost50.staminaCost);
+  fireLocked(m, 0, 45, FORCE_MAX);
+  for (const shot of m.shots) assert.ok(Math.abs(shot.damageScale - 2.0) < 1e-9);
+  assert.equal(m.selectedBuffs.length, 0);
+});
+
+test('two attack cards fire two volleys', () => {
+  const m = newMatch();
+  m.phase = 'player';
+  m.command({ type: 'skill', skill: 'extra1' });
+  m.command({ type: 'skill', skill: 'extra1' });
+  assert.equal(m.attackStacks, 2);
+  assert.ok(fireLocked(m, 0, 45, FORCE_MAX), 'fire rejected');
+  // extra1 = 2 shells per card, played twice = 4 shells.
+  assert.equal(m.shots.length + m.queuedShots.length, 4);
+});
+
+test('skills are refused without enough stamina', () => {
+  const m = newMatch();
+  m.phase = 'player';
+  m.stamina = 100;
+  m.command({ type: 'skill', skill: 'extra2' });
+  assert.equal(m.selectedSkill, '');
+  assert.equal(m.skillUses.extra2, SKILL_USES_PER_ROUND);
 });
 
 test('weapon locks after the first shot', () => {

@@ -56,10 +56,15 @@ export const ENERGY_MAX = 100.0;
 export const ENERGY_PER_VOLLEY = 12.0;
 export const ENERGY_PER_HIT = 20.0;
 export const ENERGY_PER_HEAL = 8.0;
-export const STAMINA_MAX = 100.0;
+// Stamina is a real resource: skills cost stamina, and each new turn restores
+// a slice of it. It never regenerates while idling (that would make the cost
+// meaningless within a single turn).
+export const STAMINA_MAX = 2000.0;
 export const STAMINA_MOVE_COST = 0.0;
 export const STAMINA_IDLE_REGEN = 0.0;
-export const STAMINA_TURN_RESTORE = 0.0;
+export const STAMINA_TURN_RESTORE = 500.0;
+// Every skill slot holds this many cards per turn; each press spends one.
+export const SKILL_USES_PER_ROUND = 3;
 // POW no longer uses a global multiplier/radius/crater: SOURCE BallList.xml
 // gives every ball its own Power/Radii/Crater/Amount, and POW fires the
 // weapon's Special ball (see BALL_DEFS).
@@ -248,22 +253,25 @@ export const SKILL_DEFS = {
     id: 'extra2', label: '攻击 +2', kind: 'attack', badge: '+2',
     offsets: [0, 0, 0], forceScales: [1.0, 1.0, 1.0],
     sequential: true, damageScale: 0.6, damageBonus: 0, craterArt: '401', source: true,
+    staminaCost: 500,
   },
   scatter: {
     id: 'scatter', label: '三向散射', kind: 'attack', badge: '×3',
     offsets: [0, -5, 5], forceScales: [1.0, 0.9, 1.1],
     sequential: false, damageScale: 0.5, damageBonus: 0, craterArt: '401', source: true,
+    staminaCost: 450,
   },
   extra1: {
     id: 'extra1', label: '攻击 +1', kind: 'attack', badge: '+1',
     offsets: [0, 0], forceScales: [1.0, 1.0],
     sequential: true, damageScale: 0.9, damageBonus: 0, craterArt: '401', source: true,
+    staminaCost: 400,
   },
-  boost50: { id: 'boost50', label: '伤害增幅 50%', kind: 'boost', badge: '50', damageScale: 1.0, damageBonus: 0.50, craterArt: '', source: false },
-  boost40: { id: 'boost40', label: '伤害增幅 40%', kind: 'boost', badge: '40', damageScale: 1.0, damageBonus: 0.40, craterArt: '', source: false },
-  boost30: { id: 'boost30', label: '伤害增幅 30%', kind: 'boost', badge: '30', damageScale: 1.0, damageBonus: 0.30, craterArt: '', source: false },
-  boost20: { id: 'boost20', label: '伤害增幅 20%', kind: 'boost', badge: '20', damageScale: 1.0, damageBonus: 0.20, craterArt: '', source: false },
-  boost10: { id: 'boost10', label: '伤害增幅 10%', kind: 'boost', badge: '10', damageScale: 1.0, damageBonus: 0.10, craterArt: '', source: false },
+  boost50: { id: 'boost50', label: '伤害增幅 50%', kind: 'boost', badge: '50', damageScale: 1.0, damageBonus: 0.50, craterArt: '', source: false, staminaCost: 400 },
+  boost40: { id: 'boost40', label: '伤害增幅 40%', kind: 'boost', badge: '40', damageScale: 1.0, damageBonus: 0.40, craterArt: '', source: false, staminaCost: 350 },
+  boost30: { id: 'boost30', label: '伤害增幅 30%', kind: 'boost', badge: '30', damageScale: 1.0, damageBonus: 0.30, craterArt: '', source: false, staminaCost: 300 },
+  boost20: { id: 'boost20', label: '伤害增幅 20%', kind: 'boost', badge: '20', damageScale: 1.0, damageBonus: 0.20, craterArt: '', source: false, staminaCost: 250 },
+  boost10: { id: 'boost10', label: '伤害增幅 10%', kind: 'boost', badge: '10', damageScale: 1.0, damageBonus: 0.10, craterArt: '', source: false, staminaCost: 200 },
 };
 
 export function clamp(v, lo, hi) {

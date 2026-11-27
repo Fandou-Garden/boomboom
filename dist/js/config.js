@@ -99,33 +99,34 @@ export const BATTLE = Object.freeze({
   energyPerVolley: 12,
   energyPerHit: 20,
   energyPerHeal: 8,
-  // NEW: 体力无限。渲染层显示 ∞；服务端也不再扣体力或阻止移动。
-  staminaMax: 100,
+  // 体力是有限资源：上限 2000，技能按张消耗，每回合恢复 500。站定不再自动回满。
+  staminaMax: 2000,
   staminaMoveCost: 0,
   staminaIdleRegen: 0,
-  staminaTurnRestore: 0,
+  staminaTurnRestore: 500,
   powDamageMultiplier: 1.8,
   powBlastRadius: 82,
   powCraterRadius: 78,
   // One tactical use of each battle item per player turn. Slots 1–3 are attack
   // patterns; slots 4–8 are additive damage amplifiers.
+  // 技能是「牌」：每个槽每回合 3 张，按一次出一张，可重复出同一张，不取消。
   skillUsesPerRound: {
-    extra2: 1, scatter: 1, extra1: 1,
-    boost50: 1, boost40: 1, boost30: 1, boost20: 1, boost10: 1,
+    extra2: 3, scatter: 3, extra1: 3,
+    boost50: 3, boost40: 3, boost30: 3, boost20: 3, boost10: 3,
   },
   // SOURCE TemplateAlllist 10001/10003/10002 and the matching game-logic
   // spells. +2 and +1 are counted shots (DamageScale 0.6/0.9); the 10003
   // item is a three-ray fan (DamageScale 0.5) with Living.ShootImp's
   // 0°/-5°/+5° force scales.
   skillDefs: {
-    extra2: { label: '攻击 +2', kind: 'attack', badge: '+2', offsets: [0, 0, 0], forceScales: [1, 1, 1], damageScale: 0.6 },
-    scatter: { label: '三向散射', kind: 'attack', badge: '×3', offsets: [0, -5, 5], forceScales: [1, 0.9, 1.1], damageScale: 0.5 },
-    extra1: { label: '攻击 +1', kind: 'attack', badge: '+1', offsets: [0, 0], forceScales: [1, 1], damageScale: 0.9 },
-    boost50: { label: '伤害增幅 50%', kind: 'boost', badge: '50', damageBonus: 0.5 },
-    boost40: { label: '伤害增幅 40%', kind: 'boost', badge: '40', damageBonus: 0.4 },
-    boost30: { label: '伤害增幅 30%', kind: 'boost', badge: '30', damageBonus: 0.3 },
-    boost20: { label: '伤害增幅 20%', kind: 'boost', badge: '20', damageBonus: 0.2 },
-    boost10: { label: '伤害增幅 10%', kind: 'boost', badge: '10', damageBonus: 0.1 },
+    extra2: { label: '攻击 +2', kind: 'attack', badge: '+2', offsets: [0, 0, 0], forceScales: [1, 1, 1], damageScale: 0.6, staminaCost: 500 },
+    scatter: { label: '三向散射', kind: 'attack', badge: '×3', offsets: [0, -5, 5], forceScales: [1, 0.9, 1.1], damageScale: 0.5, staminaCost: 450 },
+    extra1: { label: '攻击 +1', kind: 'attack', badge: '+1', offsets: [0, 0], forceScales: [1, 1], damageScale: 0.9, staminaCost: 400 },
+    boost50: { label: '伤害增幅 50%', kind: 'boost', badge: '50', damageBonus: 0.5, staminaCost: 400 },
+    boost40: { label: '伤害增幅 40%', kind: 'boost', badge: '40', damageBonus: 0.4, staminaCost: 350 },
+    boost30: { label: '伤害增幅 30%', kind: 'boost', badge: '30', damageBonus: 0.3, staminaCost: 300 },
+    boost20: { label: '伤害增幅 20%', kind: 'boost', badge: '20', damageBonus: 0.2, staminaCost: 250 },
+    boost10: { label: '伤害增幅 10%', kind: 'boost', badge: '10', damageBonus: 0.1, staminaCost: 200 },
   },
   countdownSeconds: 30,
   countdownDefault: false,

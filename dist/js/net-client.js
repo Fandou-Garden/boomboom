@@ -5,9 +5,9 @@
  * snapshot and sends intent commands over HTTP; server events arrive through
  * SSE. Local physics remains only for the non-firing aim recommendation.
  */
-import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=26';
-import { solveForceForAngle } from './ai.js?v=26';
-import { muzzlePoint } from './physics.js?v=26';
+import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=27';
+import { solveForceForAngle } from './ai.js?v=27';
+import { muzzlePoint } from './physics.js?v=27';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const FIRE_ANIM_SECONDS = 0.28;
@@ -65,7 +65,7 @@ export class RemoteMatch {
     this.carryArmed = false;
     this.canCarry = true;
     this.energy = 0;
-    this.stamina = Infinity;
+    this.stamina = BATTLE.staminaMax;
     this.healsRemaining = BATTLE.healsPerRound;
     this.countdown = BATTLE.countdownSeconds;
     this.showCountdown = false;
@@ -204,6 +204,8 @@ export class RemoteMatch {
     this.selectedSkill = s.selectedSkill || null;
     this.selectedBuffs = Array.isArray(s.selectedBuffs) ? s.selectedBuffs : [];
     this.skillUses = s.skillUses || {};
+    this.skillPlayed = s.skillPlayed || {};
+    this.attackStacks = s.attackStacks || 0;
     // Keep a just-selected weapon stable against in-flight stale snapshots.
     if (this._pendingWeapon && nowMs < this._pendingWeaponUntil && s.weapon !== this._pendingWeapon) {
       // ignore the stale weapon from this snapshot
@@ -227,7 +229,8 @@ export class RemoteMatch {
       this._energyOverride = null;
       this.energy = s.energy || 0;
     }
-    this.stamina = Infinity;
+    // Stamina is a real resource now (skills spend it); mirror the engine value.
+    this.stamina = Number.isFinite(s.stamina) ? s.stamina : BATTLE.staminaMax;
     this.healsRemaining = s.healsRemaining ?? 0;
     this.countdown = s.countdown ?? 0;
     this.showCountdown = !!s.showCountdown;
@@ -605,16 +608,26 @@ export class RemoteMatch {
     return true;
   }
 
+  // A skill is a CARD: every call plays one card and spends one use plus its
+  // stamina cost. Calling the same slot again plays another card instead of
+  // cancelling (the old toggle behaviour).
   toggleSkill(id) {
     if (this.phase !== 'player' || this.charging) return false;
-    if ((this.skillUses?.[id] ?? 0) <= 0) return false;
+    const uses = this.skillUses?.[id] ?? 0;
+    if (uses <= 0) return false;
     const def = BATTLE.skillDefs[id];
+    const cost = def?.staminaCost || 0;
+    if (Number.isFinite(this.stamina) && this.stamina < cost) return false;
+    // Optimistic local update; the authoritative snapshot echoes the same maths.
+    this.skillUses[id] = uses - 1;
+    if (Number.isFinite(this.stamina)) this.stamina = Math.max(0, this.stamina - cost);
+    this.skillPlayed = { ...(this.skillPlayed || {}) };
+    this.skillPlayed[id] = (this.skillPlayed[id] || 0) + 1;
     if (def?.kind === 'boost') {
-      const at = this.selectedBuffs.indexOf(id);
-      if (at >= 0) this.selectedBuffs.splice(at, 1);
-      else this.selectedBuffs.push(id);
+      this.selectedBuffs = [...this.selectedBuffs, id];
     } else {
-      this.selectedSkill = this.selectedSkill === id ? null : id;
+      this.selectedSkill = id;
+      this.attackStacks = (this.attackStacks || 0) + 1;
     }
     this._post({ type: 'skill', skill: id });
     return true;

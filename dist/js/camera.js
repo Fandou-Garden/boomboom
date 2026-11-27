@@ -11,8 +11,8 @@
  *
  * UI remains in the DOM outside this transform.
  */
-import { WORLD, VIEW } from './config.js?v=26';
-import { clamp } from './physics.js?v=26';
+import { WORLD, VIEW } from './config.js?v=27';
+import { clamp } from './physics.js?v=27';
 
 export function coverZoom(width, height) {
   return Math.max(1 / WORLD.width, width / WORLD.width, height / WORLD.height);
@@ -205,8 +205,10 @@ export class Camera {
       allowSky = true;
       allowWide = true;
     } else if (mode === 'both' && actors?.length) {
-      const alive = actors.filter((actor) => actor && actor.alive !== false);
-      const list = alive.length ? alive : actors;
+      // Game-over framing: include dead actors so their tombstones stay in
+      // view. Filtering to the living zoomed past the grave the result screen
+      // is supposed to sit behind.
+      const list = actors.filter(Boolean);
       let minX = Infinity;
       let maxX = -Infinity;
       let minY = Infinity;

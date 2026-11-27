@@ -13,7 +13,7 @@ import {
   FORCE_MAX, GRADE, GROUND_BOTTOM, HEAL_AMOUNT, HEALS_PER_ROUND, MIN_CHARGE_SECONDS,
   MIN_FIRE_FORCE, MOVE_SPEED, MOVE_STEP_X, MOVE_STEP_Y, PIXELS_PER_METRE, PLAYER_MAX_HP,
   RESOLVE_DELAY, SHOOT_MINUS, SKILL_DEFS, SKILL_ORDER, SPAWN_PROBE_Y, SPAWN_X,
-  STAMINA_MAX, WORLD_HEIGHT, WORLD_WIDTH, clamp, weaponFor, WEAPON_DEFS, LUCKY,
+  STAMINA_MAX, SKILL_USES_PER_ROUND, WORLD_HEIGHT, WORLD_WIDTH, clamp, weaponFor, WEAPON_DEFS, LUCKY,
 } from './constants.js?v=25';
 import { nextWind } from './physics.js?v=25';
 import { GoRand } from './rng.js?v=25';
@@ -97,7 +97,12 @@ export class Match {
     this.energy = 0;
     this.stamina = STAMINA_MAX;
     this.skillUses = {};
-    for (const id of SKILL_ORDER) this.skillUses[id] = 1;
+    for (const id of SKILL_ORDER) this.skillUses[id] = SKILL_USES_PER_ROUND;
+    // How many cards of each skill have already been played this turn. Drives
+    // the "already played" highlight on the skill bar.
+    this.skillPlayed = {};
+    // Attack cards stack: playing two "attack +1" cards fires two volleys.
+    this.attackStacks = 0;
     this.healsRemaining = HEALS_PER_ROUND;
     this.shots = [];
     this.shot = null;
@@ -301,21 +306,30 @@ export class Match {
         return '';
       }
       case 'skill': {
+        // A skill is a CARD, not a toggle: every press plays one card. Pressing
+        // the same slot again does not cancel it — it plays another card of the
+        // same kind, spending one more use and another slice of stamina.
         if (this.phase !== 'player' || this.charging) return '';
         const def = SKILL_DEFS[c.skill];
-        if (!def || this.skillUses[c.skill] <= 0) return '';
+        if (!def || (this.skillUses[c.skill] ?? 0) <= 0) return '';
+        const cost = def.staminaCost || 0;
+        if (this.stamina < cost) {
+          this.emit('toast', { text: `体力不足：${def.label} 需要 ${cost}`, alert: true });
+          return '';
+        }
+        this.skillUses[c.skill] -= 1;
+        this.stamina = Math.max(0, this.stamina - cost);
+        this.skillPlayed[c.skill] = (this.skillPlayed[c.skill] || 0) + 1;
         if (def.kind === 'boost') {
-          const at = this.selectedBuffs.indexOf(c.skill);
-          if (at >= 0) this.selectedBuffs.splice(at, 1);
-          else this.selectedBuffs.push(c.skill);
-        } else if (this.selectedSkill === c.skill) {
-          this.selectedSkill = '';
+          this.selectedBuffs.push(c.skill);
         } else {
           this.selectedSkill = c.skill;
+          this.attackStacks += 1;
         }
         this.emit('skill-select', {
           skill: this.selectedSkill,
           buffs: this.selectedBuffs.length ? [...this.selectedBuffs] : null,
+          stamina: Math.round(this.stamina),
         });
         return '';
       }
@@ -443,7 +457,8 @@ export class Match {
       case 'player': {
         if (this.moveDir !== 0 && !this.charging) this.movePlayerLocked(step);
         else this.actors[0].walkDirection = 0;
-        if (!this.charging && this.actors[0].walkDirection === 0) this.stamina = STAMINA_MAX;
+        // Stamina no longer tops itself up while standing still: it is restored
+        // once per turn (STAMINA_TURN_RESTORE) so skill cards have a real price.
         if (this.showCountdown) this.countdown = Math.max(0, this.countdown - step);
         break;
       }
@@ -523,7 +538,7 @@ export class Match {
       a.walkDirection = 0;
       return;
     }
-    if (this.moveActorLocked(0, this.moveDir, MOVE_SPEED * dt)) this.stamina = STAMINA_MAX;
+    if (this.moveActorLocked(0, this.moveDir, MOVE_SPEED * dt)) this.stamina = Math.max(0, this.stamina);
   }
 
   moveActorLocked(index, direction, distance) {
