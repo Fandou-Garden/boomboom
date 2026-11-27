@@ -115,7 +115,7 @@
 
 ## 当前任务
 
-最终回归、提交开发分支并尝试推送；随后交付分支、SHA、启动命令、数据库位置、测试结果与剩余问题。
+已完成。最终回归通过、本地提交完成；推送被凭证失效阻塞，等待用户提供有效凭证。
 
 ## 验证结果（2026-11-28 全部实测，不把估算写成实测）
 
@@ -179,9 +179,16 @@
      仅写操作认证失败。
    - 判定：现有 GitHub 凭证已失效或被撤销，属准则第 8 条的「权限失败」真实阻塞。
    - 处理：不打印/记录/提交任何 Token，不猜测或替换凭证，不做强制推送；
-     按准则第 9 条保存现场并继续开发，本地持续提交，最终再尝试一次推送。
+     按准则第 9 条保存现场并继续开发，本地持续提交。
+   - 最终复核（代码全部完成后）：又尝试 2 次推送，仍返回同样的认证错误。
+     期间发现并排除了一个 02:22 留下的陈旧 `~/.git-credentials.lock`
+     （已改名保留为 `~/.git-credentials.lock.stale-20261128`，未删除数据）；
+     `git credential fill` 能正常读出用户名与 40 字符 PAT，说明**不是锁或读不到凭证**，
+     而是该 PAT 已被 GitHub 判定无效（`gh auth status` 亦独立报告 token invalid）。
+   - 判定：这是准则第 8 条的「权限失败」真实阻塞，已按第 9 条保存现场并完成全部独立开发任务，
+     不再反复重试。
    - 需要用户执行：提供有效 PAT / 重新登录 `gh` / 配置可用的认证方式后执行
-     `git push -u origin feat/node-server-mode`。
+     `git push -u origin feat/node-server-mode`。本地分支与全部提交已就绪。
 2. **既有测试 1 项失败（非本轮引入）**：`tests/physics.test.mjs` 的
    「shot mode follows the shell and permits sky overscan」边界断言
    `view.worldLeft + view.viewW <= WORLD.width + 1e-6`。
