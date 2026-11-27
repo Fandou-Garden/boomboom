@@ -102,24 +102,25 @@ MOBILE ADAPTATION PASS
 刷新支撑点，回归测试 `TestCraterReseatsActorAndWalkStaysOnSurface` 已覆盖角色不陷入弹坑、
 行走时脚底贴合地形。
 
-## 6. 静态站点（WASM）
+## 6. 静态站点（纯 JS 引擎）
 
 `npm run test:browser:static` 在 Node 里起一个不带 `/api` 的静态 HTTP 服务，只提供
 `dist/`，然后走真实浏览器：
 
 | 项目 | 结果 |
 | --- | --- |
-| 后端探测 | `__GUNNY_BACKEND__='wasm'` |
-| 引擎 | `GunnyWasm` 初始化成功，地图 2000×1425 |
-| 待机帧 | `STAND frame 0`，`weaponVisible=false` |
-| 帧率 | 121 fps（844×390，headless Chromium） |
+| 后端探测 | `__GUNNY_BACKEND__='js'` |
+| 引擎 | `GunnyEngine`（`dist/js/engine/`）初始化成功，地图 1843×1020 |
+| 待机帧 | `STAND frame 9`，`weaponVisible=false` |
+| 帧率 | 120 fps（844×390，headless Chromium） |
 | 玩家开炮 | 1 发，落地生成 1 个弹坑，`removed>0` |
-| 电脑回合 | `enemyShots=1`，再生成 1 个弹坑（共 2 个） |
+| 电脑回合 | `enemyShots=1`；本次 AI 直接命中玩家（弹坑数不变，伤害生效） |
 | 重开 | `playerShots=0`，弹坑归零 |
 | 页面错误 | 0（只忽略探测 `/api/state` 的 404） |
 
-WASM 包 3.6 MB，地图 349 KB；`dist/wasm/gunny.wasm`、`dist/wasm/wasm_exec.js`、
-`dist/data/1001.fore.map` 和 `dist/offline-api.js` 必须一起部署。
+静态包只含 `dist/` 的 HTML/CSS/JS/素材与 `data/*.fore.map`（默认 1156，349 KB），
+没有 WASM 或 Go 运行时；`npm run build:static` 会排除 `wasm/` 与 `offline-api.js`。
+`tests/engine/parity.test.mjs` 另用 Go 金标准逐字段校验同一套规则。
 
 ## 7. 手机横竖屏适配
 
@@ -142,7 +143,7 @@ iPhone 真机地址栏高度、Home Indicator 和嵌入浏览器顶部栏与仿�
 
 ## 8. 保留项
 
-- 世界为 **2000×1425**，玩家 x=300、电脑 x=1700，初始水平距离 1400 px（70.0 m）。
+- 世界为 **1843×1020**，玩家 x=240、电脑 x=1640，初始水平距离 1400 px（70.0 m）。
 - 角色图集换成原版完整套装 `m/suits/suits571` 与 `f/suits/suits45`；地形、炮弹、弹坑
   素材未换，没有移动出生点来强行同屏。
 - 单机回合、风力、连续碰撞、分块 Alpha Mask 地形破坏和确定性弹坑规则未改。
@@ -153,7 +154,7 @@ iPhone 真机地址栏高度、Home Indicator 和嵌入浏览器顶部栏与仿�
 - 真实 iPhone Safari 的元素全屏限制只能按降级逻辑模拟；无法在沙箱验证真实
   Home Indicator、地址栏动画和触摸延迟。
 - 设备性能只在 headless Chromium 中观察；低端 Android 的 Canvas/内存表现需真机复测。
-- 本版仍只有 map/1001，没有地图选择/切换 UI。
+- 地图切换走整页重载（`?map=<id>`），没有无刷新热换图。
 - 角色贴图来自原版完整套装图集，待机/移动/举枪/开炮/受击帧序已按
   `GameCharacter.as` 对齐，但不是完整 SWF 时间线（攀爬、跳跃等动作未使用）。
 
@@ -161,12 +162,11 @@ iPhone 真机地址栏高度、Home Indicator 和嵌入浏览器顶部栏与仿�
 
 - 稳定地址：`https://slnp165x30zq.reakh.fun/`，`site_id=slnp165x30zq`。
 - 历史：版本 6 首次切换到浏览器内 WASM；版本 7 修正文档与加载文案尺寸；版本 8 合并
-  远端角色支撑、待机与流畅度修复。
-- 本轮发布为 **版本 9**，静态资源查询版本 `?v=16`，状态 `PUBLISHED`。
-- 版本 9 修复 iPhone 横屏体验：全屏键改为顶部非阻断说明，不再弹红色错误；竖屏“先看看
-  战场”改为真正的只读预览；`visualViewport` 偏移和 `100dvh` 回退避免短横屏 HUD 越界。
-- 公网 `index.html` 已确认引用 `styles.css?v=16` 与 `js/main.js?v=16`；
-  `wasm/gunny.wasm?v=16` 返回 HTTP 200。
-- 公网 844×390 冒烟：后端 `wasm`、双方 x=300/1700、待机帧 0/8、120 fps、
+  远端角色支撑、待机与流畅度修复；版本 9 修复 iPhone 横屏体验。
+- **3.0.0** 把静态后端从 WASM 换成纯 JS 引擎（`dist/js/engine/` +
+  `dist/standalone-api.js`），Go 服务端保留用于在线路径；静态资源查询版本 `?v=22`。
+- 公网 `index.html` 引用 `styles.css?v=22`、`js/main.js?v=22`、`standalone-api.js?v=22`；
+  静态包不再包含 `wasm/gunny.wasm`。
+- 公网 844×390 冒烟：后端 `js`、双方 x=240/1640、待机帧 9、120 fps、
   玩家 1 发落地生成 1 个弹坑、console/page error 为 0。
-- 公网资源首次加载约 3.6 MB WASM + 349 KB 地图；浏览器随后使用版本化缓存。
+- 静态资源首次加载约 350 KB 地图位图 + 约 1.5k 行 JS；浏览器随后使用版本化缓存。

@@ -9,9 +9,12 @@
 | POST | `/api/command` | `{"type":"move","dir":-1}` 等玩家意图 |
 | POST | `/api/command` | `debug` 仅在 `GUNNY_DEBUG=1` 时接受 |
 
-命令类型：`start`、`move`（按下/松开）、`aim`、`chargeStart`、`chargeRelease`、
-`fire`、`heal`、`selectSkill`、`debug`。服务端会校验回合与阶段，非法命令返回
-`{"ok":false,"reason":"..."}`，不会改变状态。
+命令类型（与 `dist/js/engine/match.js` 完全一致）：`restart`、`select_weapon`、
+`move`、`aim_delta`、`aim_absolute`、`charge_start`、`charge_release`、
+`charge_cancel`、`skill`、`carry`、`pow`、`heal`、`fire`，以及仅调试模式可用的
+`debug_set_position`、`debug_set_wind`、`debug_set_hp`、`debug_set_energy`、
+`debug_set_stamina`、`debug_set_countdown`、`debug_carve`。服务端会校验回合与阶段，
+非法命令返回错误字符串（HTTP 4xx + 原因），不会改变状态。
 
 ## 2. 已按原版还原的部分
 
@@ -32,7 +35,7 @@
 | --- | --- | --- |
 | 玩家 `BaseDamage/BaseGuard/Defence/Attack/HP` | 360/80/40/100/2000 | 原版玩家行在 SQL 备份中不可读；公式结构来自 `SimpleBomb.cs`，数值为 TEMP |
 | 电脑 HP | 2000 | 与玩家同值，便于练习；原版 PVP 血量未取到 |
-| 出生点 | `x=300 / 1700` | `MapServerList.xml` 的 map/1001 `PosX/PosX1` 缺失，按对称 PORT 值 |
+| 出生点 | `x=240 / 1640` | 原版 `PosX/PosX1` 不可用，按地图地表探测得到对称 PORT 值 |
 | AI 决策 | Go 粗搜+细搜 | 原版 `SimpleBrain.cs` 为空壳、`AMissionControl` 抽象，无法直接移植 |
 | 1–8 道具、增幅、无限体力、治疗 | 见 `config.go` / `match.go` | **NEW** 网页规则，不是原版技能 |
 | 伤害数字/粒子/相机 | 前端 | **NEW** 表现层 |
@@ -57,40 +60,50 @@ cd server && go run .
 
 环境变量：`GUNNY_ADDR`（默认 `:8000`）、`GUNNY_DEBUG=1`、`GO_BIN`（`run.sh` 用）。
 
-## 6. 静态 WASM 模式
+## 6. 静态纯 JS 模式
 
 公网站点没有 Go 进程，`dist/index.html` 探测 `/api/state` 失败后加载
-`dist/wasm/gunny.wasm`。`server/wasm/main.go` 只做一层 JS 绑定：
+`dist/standalone-api.js`，由 `dist/js/engine/` 的纯 JS 引擎在浏览器内结算。
+引擎门面与旧的 WASM 绑定逐方法对应（`server/wasm/main.go` 是这层契约的原型）：
 
-| JS | Go |
+| JS（`GunnyEngine`） | Go |
 | --- | --- |
-| `GunnyWasm.init(map, c50, c401, c4, debug)` | `game.LoadTerrainFromBytes` + `game.NewMatch` |
-| `GunnyWasm.command(json)` | `Match.Command` |
-| `GunnyWasm.update(dt)` | `Match.Update` |
-| `GunnyWasm.snapshot()` | `Match.Snapshot` |
-| `GunnyWasm.events()` | `Match.EventsSince` |
+| `init(mapBytes, c50, c401, c4, debug)` | `game.LoadTerrainFromBytes` + `game.NewMatch` |
+| `command(json) -> '' \| errtext` | `Match.Command` |
+| `update(dt) -> null` | `Match.Update` |
+| `snapshot() -> jsonString` | `Match.Snapshot` |
+| `events() -> jsonArrayString` | `Match.EventsSince` |
 
-`dist/offline-api.js` 用 `LocalEventSource` 每 40 ms 调用 `update`，把事件包成
+`standalone-api.js` 用 `LocalEventSource` 每 40 ms 调用 `update`，把事件包成
 `{seq,type,data}` 的 `game` 事件、把快照包成 `{seq,type:"state",data}`，与 SSE 格式
 完全一致，因此 `RemoteMatch` 不需要分支。`/api/command` 被同文件拦截并转给
-`GunnyWasm.command`；`fetch` 失败时仍按原逻辑提示。
+`GunnyEngine.command`。
+
+静态引擎使用同一个 Go `math/rand` 算法的 JS 移植（`rng.js`）、同一张
+`data/<id>.fore.map`、同一组 crater 位图常量；`tests/engine/parity.test.mjs`
+用从 Go 引擎导出的金标准逐字段校验（seq/血量/伤害/暴击/弹坑/能量/事件/AI 参数）。
+唯一已知偏差是 Go `math.Sin` 与 V8 `Math.sin` 的 1 ulp 差异，只影响未截断的炮口
+原始浮点坐标。
 
 构建：
 
 ```bash
-npm run build:wasm   # server/wasm -> dist/wasm/gunny.wasm + wasm_exec.js
-npm run build:static # 再打包 gunny-static.zip
+npm run build:static # 打包 gunny-static.zip（纯 JS，不含 wasm/）
+npm run build:wasm   # 可选：仍可把 server/wasm 编译成 dist/wasm/ 旧兜底
 ```
 
-WASM 使用 `game.SetDebug(URLSearchParams.has("test"))`，只有 `?test=1` 才开放
-`debug_fire` 等测试命令；普通公网页面没有测试钩子。
+`server/` 与 `server/wasm/` 保留在仓库中；静态包默认不再包含 `dist/wasm/` 与
+`dist/offline-api.js`。测试命令在纯 JS 路径下由 `?test=1`（`new Match({debug:true})`）
+控制，普通公网页面没有测试钩子。
 
 ## 7. 测试
 
 ```bash
 cd server && go test ./...
+npm run test:engine        # dist/js/engine：功能 21 项 + Go 金标准 6 项
 npm run test:browser:static
 ```
 
 覆盖：fore.map 头/尺寸、弹坑像素数、风范围、ShootImp 偏移、伤害衰减、
-开局落点、齐射结算、AI 按当前武器的角度范围可达。
+开局落点、齐射结算、AI 按当前武器的角度范围可达；Go 与 JS 的同一命令序列
+逐字段一致。

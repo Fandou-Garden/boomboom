@@ -1,7 +1,11 @@
 # 纯 JS 全量重构规划（Pure-JS Rewrite Roadmap）
 
-> **状态：仅规划，未实施。** 本文只回答「如果要把整个项目重构成纯 JS，应该怎么写」，
-> 不改变任何运行时代码，也不需要重新部署站点。
+> **状态：已落地为 3.0.0（2026-11）。** 静态站点现在由 `dist/js/engine/` 的纯 JS
+> 权威引擎经 `dist/standalone-api.js` 驱动；**`server/`（含 `server/wasm/`）按需求保留**，
+> 作为在线 `/api` 路径的权威实现，P5 的「删除 `server/`」一项不再执行。
+> 本文保留为重构决策与验收记录；`tests/engine/parity.test.mjs` 是从 Go 引擎导出的金标准。
+>
+> 原始规划写于纯规划阶段，下文涉及时态的句子以本状态块为准。
 >
 > 对应基线：功能提交 `0b61643`（`feat: 补齐原版地图/飞行/死亡结算/暴击并发布静态站点源码`），
 > 文档提交 `ea40ca4`；当前远程 `main` HEAD = `ea40ca4`，分支仅 `main`。
@@ -20,7 +24,7 @@
 1. 把这几块**提升为权威**，补齐与 Go 引擎的数值一致性；
 2. 新写一个 JS 版 `Match`（状态机 + 命令 + 回合 + 快照 + 事件），对应 `match.go` + `actions.go`；
 3. 用一个 **JS 引擎门面**替换 `window.GunnyWasm`，改造 `offline-api.js`；
-4. 删掉 Go/WASM 工具链。
+4. 静态包不再需要 Go/WASM 工具链（`server/` 保留用于在线路径，按 3.0 交付调整）。
 
 因为前端只认「`EventSource` + `fetch('/api/command')`」这层契约，
 `net-client.js` / `renderer.js` / `main.js` 几乎可以零改动。
@@ -335,15 +339,16 @@ JS 里 `Math.trunc` 对负数同样是「向零截断」，与 Go `int()`/`math.
 `Match.Update(dt)` 内部按 `dt` 累加（`FlightAccumulator` 等）逐行照搬，不要改成
 `requestAnimationFrame` 或固定 1/60——那会改变齐射节奏。
 
-### 7.4 地形位图解析（大端）
+### 7.4 地形位图解析（小端）
 
-`dist/data/<id>.fore.map` 格式：
+`dist/data/<id>.fore.map` 格式（与 `server/game/terrain.go` 的
+`binary.LittleEndian.Uint32` 一致）：
 
 ```text
-[int32 big-endian width][int32 big-endian height][MSB-first 行位图字节...]
+[int32 little-endian width][int32 little-endian height][MSB-first 行位图字节...]
 ```
 
-JS 用 `DataView.getUint32(0, false)` / `getUint32(4, false)` 读宽高，再按
+JS 用 `DataView.getUint32(0, true)` / `getUint32(4, true)` 读宽高，再按
 `(y*rowBytes + (x>>3))` 取 bit `(0x80 >> (x & 7))`。**不能用小端**。
 11 张地图统一 1843×1020，`SpawnX=[240,1640]`、`BedrockY=1015` 硬编码在引擎里，
 换地图只换位图，不改世界尺寸。
@@ -392,7 +397,7 @@ for mapId in [1156, 1002, 1192]:
 | **P2 状态机** | 搬 `match.go` + `actions.js` | `engine/match.js`、`actors.js`、`actions.js`、`snapshot.js` | 单机跑通：选武器 → 蓄力 → 单发命中 → 齐射 → 飞行弹传送 → 治疗 → 回合切换 → 电脑出招 → 胜负；`Snapshot` 字段与 golden 对齐率 ≥ 99% |
 | **P3 接线** | JS 引擎替换 WASM | `engine/index.js`、`standalone-api.js`、`index.html` 新入口（带新旧开关） | 浏览器四件套全绿；`?engine=js` 与 `?engine=wasm` 双跑，同命令序列 snapshot 一致 |
 | **P4 全量回归** | 清掉偏差 | parity 报告、修复清单 | 浏览器 acceptance/controls/mobile/static 4/4；物理 13/13；地图 0 偏差；暴击双飘字 / 9 张翻牌 / 墓碑灵魂 / 11 张地图端到端全通过 |
-| **P5 清理** | 删 Go/WASM，收口文档 | 删除 `server/`、`dist/wasm/`、`scripts/build-wasm.sh`、`offline-api.js`；改 `package.json`、`build-static.sh`、`README-ZH.md`、`CODE_LAYOUT.md`、重生成 `SOURCE_MANIFEST.sha256`；`BUILD_VERSION` 3.0.0、缓存串 `?v=22` | `npm run check` 无 Go 依赖；`dist/` 纯静态可部署；线上站点行为不变 |
+| **P5 清理** | 静态源切纯 JS，收口文档（**已按保留 `server/` 调整**） | 删除 `dist/wasm/`、`dist/offline-api.js`；`server/`、`server/wasm/`、`scripts/build-wasm.sh` **保留**；改 `package.json`、`build-static.sh`、`README-ZH.md`、`CODE_LAYOUT.md`、重生成 `SOURCE_MANIFEST.sha256`；`BUILD_VERSION` 3.0.0、缓存串 `?v=22` | 静态包无 WASM/Go 依赖即可部署；`npm test` 含 JS 引擎金标准；线上 Go 路径不变 |
 
 > P0–P4 期间旧引擎保持可用，`index.html` 用 `?engine=wasm` 兜底，任何阶段出问题都能回退。
 
@@ -450,6 +455,10 @@ package.json 中的 start / start:debug / build:wasm / check 里的 gofmt+go vet
 README-ZH.md 中 ddt / Go 服务相关章节（改为纯静态说明）
 docs/CODE_LAYOUT.md、docs/GO_SERVER.md（内容并入新文档或标记废弃）
 ```
+
+> **3.0 实际执行**：只删了 `dist/wasm/` 与 `dist/offline-api.js`。`server/`（含
+> `server/wasm/`、`go.mod`、`run.sh`、`check.sh`、`test.sh`）、`scripts/build-wasm.sh`
+> 和 `package.json` 的 `start`/`check` 全部保留；`build:wasm` 保留为可选的旧兜底构建。
 
 ### 10.2 新增
 
@@ -522,7 +531,8 @@ reference/、docs/SOURCE_MAPPING.md、docs/AUDIO_MAPPING.md、docs/VALIDATION.md
 - [ ] 飞行弹（零伤害零弹坑 + 传送）、暴击双飘字、墓碑灵魂、9 张 3 列 5 秒翻牌、
       轰天等炮弹按原画比例缩放，全部行为与 `0b61643` 一致。
 - [ ] 浏览器四件套 + 物理 13 项 + 地图 parity + engine 单测 + golden parity 全绿。
-- [ ] `server/`、`scripts/build-wasm.sh`、`dist/wasm/` 已删除；`npm run check` 不再需要 Go。
+- [x] 静态包不再包含 `dist/wasm/` 与 `dist/offline-api.js`；`server/`、`server/wasm/`、
+      `scripts/build-wasm.sh` 按 3.0 决策保留；`npm run check` 仍覆盖 Go 在线路径。
 - [ ] `package.json`、`README-ZH.md`、`docs/CODE_LAYOUT.md`、`SOURCE_MANIFEST.sha256`、
       缓存版本 `?v=22` / `BUILD_VERSION 3.0.0` 全部同步。
 - [ ] 远程只剩 `main`，提交并推送；静态站点重新发布并验证。

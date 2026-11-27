@@ -5,9 +5,9 @@
  * snapshot and sends intent commands over HTTP; server events arrive through
  * SSE. Local physics remains only for the non-firing aim recommendation.
  */
-import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=21';
-import { solveForceForAngle } from './ai.js?v=21';
-import { muzzlePoint } from './physics.js?v=21';
+import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=22';
+import { solveForceForAngle } from './ai.js?v=22';
+import { muzzlePoint } from './physics.js?v=22';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const FIRE_ANIM_SECONDS = 0.28;
@@ -104,7 +104,7 @@ export class RemoteMatch {
     });
     this._readyTimer = window.setTimeout(() => {
       if (this.phase === 'loading') {
-        this._readyReject?.(new Error('连接战斗引擎超时：本地请确认 npm start；静态站请检查 wasm 资源'));
+        this._readyReject?.(new Error('连接战斗引擎超时：本地请确认 npm start；静态站请检查 standalone-api.js 与 data/*.fore.map 是否可访问'));
       }
     }, 30000);
 

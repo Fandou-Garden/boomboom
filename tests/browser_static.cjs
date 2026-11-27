@@ -1,6 +1,7 @@
 /**
  * Static-host acceptance: serve dist/ without the Go API and verify that the
- * browser falls back to the WASM match, plays a full turn and can restart.
+ * browser falls back to the pure-JS engine (dist/standalone-api.js), plays a
+ * full turn and can restart.
  * Requires Chrome + puppeteer-core. No Go server or network access needed.
  */
 const http = require('node:http');
@@ -80,7 +81,7 @@ function serve() {
     });
     await page.waitForFunction(() => window.__GUNNY_TEST__?.ready, { timeout: 60000 });
     const backend = await page.evaluate(() => window.__GUNNY_BACKEND__);
-    assert.equal(backend, 'wasm', 'static host must use the WASM backend');
+    assert.equal(backend, 'js', 'static host must use the pure-JS backend');
 
     const idle = await page.evaluate(() => window.__GUNNY_TEST__.snapshot());
     assert.equal(idle.phase, 'player');
@@ -124,15 +125,15 @@ function serve() {
       const s = window.__GUNNY_TEST__.snapshot();
       return { craters: s.terrain?.craters ?? 0, impact: s.lastImpact };
     });
-    assert.ok(afterPlayer.craters >= 1, 'WASM crater must be recorded after impact');
-    assert.ok(afterPlayer.impact?.removed > 0, 'WASM impact must remove terrain');
+    assert.ok(afterPlayer.craters >= 1, 'JS crater must be recorded after impact');
+    assert.ok(afterPlayer.impact?.removed > 0, 'JS impact must remove terrain');
 
     await page.waitForFunction(() => {
       const s = window.__GUNNY_TEST__.snapshot();
       return s.phase === 'player' || s.phase === 'over';
     }, { timeout: 40000 });
     const afterEnemy = await page.evaluate(() => window.__GUNNY_TEST__.snapshot());
-    assert.equal(afterEnemy.stats.enemyShots, 1, 'WASM AI must take its turn');
+    assert.equal(afterEnemy.stats.enemyShots, 1, 'JS AI must take its turn');
     assert.ok(
       afterEnemy.terrain?.craters >= 2 || afterEnemy.stats.playerDamageTaken > 0,
       `AI turn must produce a crater or direct damage: ${JSON.stringify({ phase: afterEnemy.phase, stats: afterEnemy.stats, impact: afterEnemy.lastImpact, craters: afterEnemy.terrain?.craters })}`,
@@ -141,9 +142,9 @@ function serve() {
     await page.evaluate(() => window.__GUNNY_TEST__.restart());
     await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().stats.playerShots === 0, { timeout: 5000 });
     const afterRestart = await page.evaluate(() => window.__GUNNY_TEST__.snapshot());
-    assert.equal(afterRestart.terrain?.craters ?? 0, 0, 'restart must reset WASM terrain');
+    assert.equal(afterRestart.terrain?.craters ?? 0, 0, 'restart must reset JS terrain');
 
-    await page.screenshot({ path: path.join(SHOTS, 'static-wasm.png') });
+    await page.screenshot({ path: path.join(SHOTS, 'static-js.png') });
     console.log(JSON.stringify({
       backend,
       fps,
@@ -155,7 +156,7 @@ function serve() {
       logs,
     }, null, 2));
     assert.deepEqual(logs, [], `static page errors: ${logs.join(' | ')}`);
-    console.log('STATIC WASM ACCEPTANCE PASS');
+    console.log('STATIC JS ACCEPTANCE PASS');
   } finally {
     await browser.close();
     await new Promise((resolve) => server.close(resolve));

@@ -7,7 +7,7 @@
  * rows or art assets are not readable in this checkout. Never scatter tuning
  * constants through gameplay code — change them here.
  */
-export const BUILD_VERSION = '2.0.0';
+export const BUILD_VERSION = '3.0.0';
 export const SOURCE_COMMIT = '057c71aab877b42ebf08258aa5c642adc6a039ec';
 export const SOURCE_REPO = 'https://github.com/phucdz2kk4/Gunny';
 

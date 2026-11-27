@@ -1,8 +1,9 @@
 /**
  * Selectable battle maps. Every map is resampled from the original Gunny
  * resource set (Tank.Flash/resource/v1.1/image/map/<id>/) onto the fixed
- * engine world size 1843x1020, because the authoritative WASM match reads the
- * world dimensions as compiled constants (see server/game/config.go).
+ * engine world size 1843x1020, because both authoritative engines (Go and the
+ * JS port) read the world dimensions as constants (see server/game/config.go
+ * and dist/js/engine/constants.js).
  *
  * For each map the three artefacts are generated from the SAME resampled
  * foreground, so the render alpha (A > 100) and the collision bitmask are
@@ -11,7 +12,7 @@
  *   - assets/map-<id>-fore.png   visible destructible foreground
  *   - data/<id>.fore.map         [int32 w][int32 h][MSB-first row] bitmask
  *
- * The offline WASM adapter (offline-api.js) loads data/<id>.fore.map and the
+ * The offline adapter (standalone-api.js) loads data/<id>.fore.map and the
  * client (main.js) loads the matching back/fore images. Both read the map id
  * from the ?map= query parameter, so selecting a map simply reloads the page.
  *

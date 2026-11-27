@@ -114,12 +114,12 @@ return (float)num2 / 10f;
 | `TERRAIN.craterTemplates` | 30/58/92/84 | **TEMP + NEW** 原 `Crater=241` 缺失；底层图用仓库存在的 50/401/4，多层形状为网页新增 |
 | `COMBAT.targetHitRadius` | `36` | **PORT** 人物命中圆半径；配合 112×92 角色包围盒 |
 | `CONTROLS.angleMin/angleMax` | `15/65` | **SOURCE** `WeaponInfo.as` 读取 `ItemTemplate.Property5/6`；`TemplateAlllist.xml` TemplateID=70322 为 `15/65` |
-| `CONTROLS.moveSpeed` | `170 px/s` | **PORT** `Player.MOVE_SPEED=2`、`GameLiving.stepX=3/stepY=7` 约 90 px/s；为 4000 px 世界调快到 170 |
-| `CONTROLS.chargeRate` | `640/s` | **PORT** `EnergyView` 每帧 +20，约 600/s@30fps |
+| `CONTROLS.moveSpeed` | `90 px/s` | **PORT** `Player.MOVE_SPEED=2`、`GameLiving.stepX=3/stepY=7` 约 90 px/s |
+| `CONTROLS.chargeRate` | `600/s` | **PORT** `EnergyView` 每帧 +20，约 600/s@30fps（服务端同样 600） |
 | `WORLD.pixelsPerMetre` | `20` | **NEW** 仅用于 HUD 的米制显示，不参与物理 |
 | `WIND.initialAbsMax` | `2.5` | **NEW** 开局风可见；`GetNextWind` 本身仍为 SOURCE |
 | `AI.*` | 见配置 | **NEW** 电脑求解与噪声参数 |
-| `WORLD.*` | 2000×1425、chunk 256 | **NEW** 1001 前景左右镜像拼接；非官方地图尺寸 |
+| `WORLD.*` | 1843×1020、chunk 256 | **PORT** 固定世界尺寸；11 张原版地图都重采样到 1843×1020 |
 | `VIEW.*` | 玩家/双方/炮弹 | **NEW** 世界相机、缩放边界、平滑插值 |
 
 ### 2.1 数据行实际来自哪里
@@ -157,27 +157,27 @@ return (float)num2 / 10f;
 
 - 原版 `Tile.cs:66-79` 从 Bitmap 生成碰撞：`A <= 100` 为空，否则实心；
   `_bw = width/8+1`，按 MSB-first 打包。
-- 服务器地图 `Fighting.Service/bin/Debug/net48/map/1001/fore.map` 的格式是
-  `[int32 width][int32 height][每行 ceil(width/8) 字节]`。本作把该文件放入
-  `reference/map/1001/fore.map` 并用 `tests/verify_map_parity.py` 全图对比。
-- **源图结果：2000×1425、615,968 个实心像素、0 个不一致。**
-- 世界层把源图正向放左半 `0..1999`，水平镜像放右半 `2000..3999`；背景按 1526
-  原始宽度平铺/镜像，不拉伸。镜像后实心像素为 1,231,936（正好 2 倍）。
-- 加载时按 256×256 生成 16×6=96 个 chunk，每个 chunk 有可见 Canvas 和同原点的
-  `Uint8Array` collision mask；`surfaceY[4000]` 记录每列地表。运行时只查当前 chunk。
-- 浏览器测试钩子 `terrainDisplaySync()` 对 2000×1425 全图逐像素比较显示 alpha 与 mask，
-  结果 **5,700,000 checked / 0 mismatches**。
+- 服务器地图 `Fighting.Service/bin/Debug/net48/map/<id>/fore.map` 的格式是
+  `[int32 little-endian width][int32 little-endian height][每行 ceil(width/8) 字节，MSB-first]`。
+  本作把原版文件放入 `reference/map/<id>/fore.map`，站点用 `dist/data/<id>.fore.map`，
+  并用 `tests/verify_map_parity.py` 对默认 1156 全图对比。
+- **默认 1156：1843×1020、588,315 个实心像素、0 个不一致。**
+- 世界层直接使用源图 `0..1842`，不再左右镜像；背景按原始宽度平铺，不拉伸。
+- 加载时按 256×256 生成 8×4=32 个 chunk，每个 chunk 有可见 Canvas 和同原点的
+  `Uint8Array` collision mask；`surfaceY` 记录每列地表。运行时只查当前 chunk。
+- 浏览器测试钩子 `terrainDisplaySync()` 对 1843×1020 全图逐像素比较显示 alpha 与 mask，
+  结果 **1,879,860 checked / 0 mismatches**。
 - 爆炸只更新形状包围盒覆盖的 chunks（实测 medium 4 个受影响 chunks、2 个 mask 变化 chunks），
   只读取这些矩形，不每帧扫描整图、不重建整图。
-- 若替换其他地图，必须确认其 `.map` 与 PNG 符合上述关系；否则需要提供该地图的
-  `.map` 或明确接受 PNG 近似。本版只有 map/1001。
+- 11 张地图都遵循同一关系：`dist/data/<id>.fore.map` 由对应前景 alpha 生成，
+  引擎与渲染读取同一张位图。
 
 ## 4. 素材映射
 
 | 文件 | 原仓库路径 | 用途 |
 | --- | --- | --- |
-| `assets/map-1001-back.jpg` | `Tank.Flash/resource/v1.1/image/map/1001/back.jpg` | 背景；按原 1526×1425 平铺/镜像，不拉伸 |
-| `assets/map-1001-fore.png` | `.../map/1001/fore.png` | 前景、显示、alpha 碰撞、挖洞 |
+| `assets/map-<id>-back.jpg`（11 张） | `Tank.Flash/resource/v1.1/image/map/<id>/back.jpg` | 背景；按原始宽度平铺，不拉伸 |
+| `assets/map-<id>-fore.png`（11 张） | `.../map/<id>/fore.png` | 前景、显示、alpha 碰撞、挖洞（重采样到 1843×1020） |
 | `assets/portrait-player.png` / `portrait-enemy.png` | 网页从人物 sheet 裁切 | 128×128 驾驶舱头像；不是原版独立头像文件 |
 | `assets/shell-bomb.png` | `.../image/arm/bomb/00.png` | 飞行炮弹图标（78×78） |
 | `assets/weapon-bazooka3.png` | `.../image/arm/bazooka3/00.png` | 火箭筒武器贴图（78×78） |
@@ -215,8 +215,9 @@ return (float)num2 / 10f;
 4. **挖洞形状**：原始弹坑图 + 固定 seed 多层不规则形状，按 chunk 局部更新（PORT/TEMP/NEW）。
 5. **回合队列**：原版 `PVPGame` 有 TurnQueue/延迟/状态；单机版固定玩家↔电脑交替，
    仍保留“每次换边更新风”的调用点（PORT 简化）。
-6. **地图尺寸**：1001 的 fore 为 2000×1425、back 为 1526×1425。浏览器把前景左右
-   镜像成 2000×1425 世界，背景按原始宽度平铺；这是网页版拼接，不是官方地图。
+6. **地图尺寸**：原版各图尺寸不一（如 1001 的 fore 为 2000×1425、back 为 1526×1425），
+   本作把前景重采样到固定的 1843×1020 世界，背景按原始宽度平铺；尺寸统一是 PORT 决策，
+   不是官方规则。
 7. **手感参数**：移动、蓄力速度、相机、AI 噪声为浏览器调参（PORT/NEW），
    不影响核心公式。
 
@@ -228,7 +229,7 @@ return (float)num2 / 10f;
 - **不属于原版战斗逻辑**：世界相机、三种视角、平滑插值、屏幕层 HUD、半透明按钮、
   全屏 API、PWA manifest、鼠标拖角/拖力度都属于浏览器展示与输入层（NEW），
   没有改写回合、风力、伤害、重力公式。
-- **相机**：`camera.js` 维护 `cameraX/cameraY/zoom`，把 2000×1425 世界投影到视口：
+- **相机**：`camera.js` 维护 `cameraX/cameraY/zoom`，把 1843×1020 世界投影到视口：
   `screenX = (worldX - cameraX) * zoom + width/2`。位置/缩放用 `smoothDamp()`；
   中心夹紧到地图边界；炮弹飞行允许天空 overscan，但左右仍夹紧。
 - **视角**：`player` 默认；`both` 在结算/电脑回合尝试容纳双方，放不下时保持最小可读

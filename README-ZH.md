@@ -7,11 +7,13 @@
 
 线上试玩：**https://slnp165x30zq.reakh.fun/**（测试钩子：`?test=1`）
 
-当前版本把权威战斗逻辑整体迁到 **Go 服务端**（`server/`），前端只保留 Canvas 渲染、
-输入、音效和非权威的瞄准推荐。同一份 Go 战斗逻辑也能编译成 **WebAssembly**，在没有
-`/api` 后端的纯静态站点里直接运行（见「纯静态部署」）。世界恢复为原版 **2000×1425**
-单幅地图，出生点
-`300 / 1700`，初始水平距离 1400 px（HUD 显示 70 m）。瞄准时双方同屏，炮弹飞行时
+静态站点运行一套 **纯 JavaScript 权威战斗引擎**（`dist/js/engine/`）：页面探测不到
+`/api` 后端时加载 `dist/standalone-api.js`，由它在浏览器内接管 `/api/events` 与
+`/api/command`，不需要 Go、WASM 或任何服务器。**Go 服务端（`server/`）完整保留**，
+作为本地/线上 `/api` 路径的权威实现；两条路径共用同一份规则、常量与地图位图。
+前端只保留 Canvas 渲染、输入、音效和非权威的瞄准推荐。世界为原版 **1843×1020**
+单幅地图（默认 1156 亚特兰蒂斯），出生点 `240 / 1640`，初始水平距离 1400 px
+（HUD 显示 70 m）。瞄准时双方同屏，炮弹飞行时
 镜头跟弹而 HUD 固定；瞄准只显示角色旁的短方向提示，不画完整抛物线。没有加入商城、
 房间、登录或联机。
 
@@ -52,9 +54,10 @@ npm start                 # sh server/run.sh，默认 http://127.0.0.1:8000/
 GUNNY_DEBUG=1 npm start   # 开放 ?test=1 所需的调试命令
 ```
 
-需要 **Go 1.21+**（服务端/WASM）和 Node 18+（仅测试/开发脚本）。Go 进程同时提供
-`dist/` 静态文件、`GET /api/state`、`GET /api/events`（SSE）和
-`POST /api/command`。
+需要 **Go 1.21+**（在线服务端）和 Node 18+（测试/开发脚本）；纯静态游玩两者都不需要，
+只要一个能提供 ES Module 的静态 HTTP 服务。Go 进程同时提供 `dist/` 静态文件、
+`GET /api/state`、`GET /api/events`（SSE）和 `POST /api/command`；静态站点由
+`standalone-api.js` 在浏览器内提供后三者。
 
 > 不要直接双击 `dist/index.html`：页面使用 ES Module 和 EventSource，`file://`
 > 无法连接服务端。`server/run.sh` 会自动寻找 `go`，找不到时可用
@@ -64,28 +67,36 @@ GUNNY_DEBUG=1 npm start   # 开放 ?test=1 所需的调试命令
 
 ```bash
 npm run build:static
-# 产物：gunny-static.zip，index.html 在压缩包根目录
+# 产物：gunny-static.zip，index.html 在压缩包根目录（不含 server/ 与 wasm/）
 ```
 
 `dist/index.html` 启动时先探测 `/api/state`：
 
 - 返回 JSON：走本地/线上 **Go 服务端**，SSE 同步状态；
-- 返回 404/HTML：自动加载 `wasm/wasm_exec.js` 与 `wasm/gunny.wasm`，由
-  **浏览器内 Go 引擎**接管 `/api/events` 与 `/api/command`，不需要任何后端。
+- 返回 404/HTML 或网络错误：加载 `standalone-api.js`，由 **浏览器内纯 JS 引擎**
+  （`js/engine/` 的 `Match` + `LocalEventSource` 适配）接管 `/api/events` 与
+  `/api/command`，不需要任何后端。
 
-静态引擎使用同一份 `server/game` 代码、同一张 `reference/map/1001/fore.map` 和同一组
-原版弹坑 PNG；`dist/data/1001.fore.map` 与 `dist/wasm/gunny.wasm` 必须一起部署。
-首次加载约 3.6 MB WASM + 349 KB 地图，之后由浏览器缓存。公网站点
-**https://slnp165x30zq.reakh.fun/** 使用这条路径。
+静态引擎是 `server/game` 的逐字段移植：同一张 `dist/data/<id>.fore.map` 位图、同一套
+常量（`dist/js/engine/constants.js` ↔ `server/game/config.go`）、同一个 Go
+`math/rand` 兼容 PRNG（`rng.js`，607 抽头滞后斐波那契）。`tests/engine/parity.test.mjs`
+保存了从 Go 引擎导出的金标准——9 个单发场景（未命中/命中/暴击/POW/传送/多弹/增伤）
+加一整回合 AI 互射——逐项比对 seq、血量、伤害与暴击、弹坑 `removed` 数与美术 id、
+能量、事件顺序以及 AI 的力度/角度。唯一已知偏差是 Go `math.Sin` 与 V8 `Math.sin`
+的 1 ulp 差异，只影响未截断的炮口原始浮点坐标；所有整数结果完全一致。
+
+静态站首次加载约 350 KB 地图位图 + 约 1.5k 行 JS，之后由浏览器缓存。公网站点
+**https://slnp165x30zq.reakh.fun/** 使用这条路径。`server/` 仍保留在仓库中用于在线
+路径，`npm run build:wasm` 可以重建旧的 WASM 兜底（`dist/wasm/` 默认不再打进静态包）。
 
 `npm run test:browser:static` 会在本机起一个没有 `/api` 的静态服务器，验证
-WASM 启动、完整回合、AI 行动、弹坑和重开，不需要 Go 服务端。
+纯 JS 引擎启动、完整回合、AI 行动、弹坑和重开，不需要 Go 服务端。
 `npm run test:browser:mobile` 另外用 iPhone UA 模拟 1024×386 浏览器剩余可视区和
 390×844 竖屏，检查控件不越界、全屏说明不遮挡 HUD、竖屏只进入只读预览。
 
-> **后续方向**：仓库已规划把 Go/WASM 权威引擎**全量重构为纯 JS**（零 Go 依赖、静态站点直接部署）。
-> 完整路线、接口契约冻结、Go→JS 模块映射、确定性/PRNG 风险与分阶段验收清单见
-> [`docs/PURE_JS_REFACTOR_PLAN.md`](docs/PURE_JS_REFACTOR_PLAN.md)。该文档仅为规划，未改动任何运行时代码。
+> **重构记录**：Go→JSON 契约、模块映射、确定性/PRNG 风险与分阶段验收清单见
+> [`docs/PURE_JS_REFACTOR_PLAN.md`](docs/PURE_JS_REFACTOR_PLAN.md)。该重构已落地为
+> 3.0.0：静态站点全 JS，Go 服务端按需求保留。
 
 ### 操作
 
@@ -119,9 +130,10 @@ iPhone Safari 和常见嵌入浏览器不能由网页隐藏地址栏；右上角
 
 ### 1.1 世界尺寸
 
-- 世界（world）为 **2000 × 1425 px**，就是原版 map/1001 的单幅尺寸；不再是 v5 的
-  4000 px 镜像竞技场。
-- 玩家出生在 `x=300`，电脑出生在 `x=1700`，初始水平距离 1400 px（HUD 显示 70 m）。
+- 世界（world）为 **1843 × 1020 px**，所有可选地图都重采样到这个固定尺寸，Go 引擎与
+  JS 引擎共享同一组常量；不再是早期版本的 4000 px 镜像竞技场。
+- 玩家出生在 `x=240`，电脑出生在 `x=1640`，初始水平距离 1400 px（HUD 显示 70 m）；
+  具体落脚高度由地图地表决定（1156 上是 y=389 / 522）。
 - 手机或桌面窗口只是世界的一个视口；移动端常见视口只能看到约 1000–1300 世界像素宽，
   因而玩家有真实的移动、瞄准和炮弹飞行空间。
 - 世界坐标、相机坐标、屏幕坐标严格分开：
@@ -195,26 +207,29 @@ HUD、血条、风力、回合、距离、移动/调角/发射按钮全部是 Ca
 
 ### 2.1 原始素材
 
-使用仓库 **map/1001（Cầu vồng / 彩虹海湾）**：
+共 11 张可选地图（`dist/js/maps.js#MAPS`），默认 **1156（亚特兰蒂斯）**，其余为 1001
+彩虹云端、1002 暗夜城堡、1003 七彩泡泡、1008 瀑布孤岛、1014 热带海滩、1035 沙漠枯树、
+1038 岩石岛群、1157 竹海日落、1190 天空之城、1192 碧水绿丘。每张图三件产物
+（背景、前景、碰撞位图）都由同一份重采样前景生成：
 
-| 站点文件 | 原仓库路径 | 原始尺寸 | 用途 |
+| 站点文件 | 原仓库路径 | 尺寸 | 用途 |
 | --- | --- | --- | --- |
-| `dist/assets/map-1001-fore.png` | `Tank.Flash/resource/v1.1/image/map/1001/fore.png` | 2000×1425 | 前景地形、显示、Alpha 碰撞、可破坏层 |
-| `dist/assets/map-1001-back.jpg` | `Tank.Flash/resource/v1.1/image/map/1001/back.jpg` | 1526×1425 | 背景，按原始尺寸平铺/镜像，不拉伸 |
-| `reference/map/1001/fore.map` | `Fighting.Service/bin/Debug/net48/map/1001/fore.map` | 2000×1425 位图 | 服务端碰撞对照，仅验证用 |
+| `dist/assets/map-<id>-fore.png` | `Tank.Flash/resource/v1.1/image/map/<id>/fore.png` | 重采样到 1843×1020 | 前景地形、显示 alpha、可破坏层 |
+| `dist/assets/map-<id>-back.jpg` | `.../map/<id>/back.jpg` | 按原尺寸平铺 | 背景，不拉伸 |
+| `dist/data/<id>.fore.map` | 由前景 alpha 生成 | 1843×1020 位图 | 权威碰撞位图（Go 与 JS 引擎都直接读取） |
+| `reference/map/<id>/fore.map` | `Fighting.Service/bin/Debug/net48/map/<id>/fore.map` | 1843×1020 位图 | 生成/校验对照 |
 
-map/1001 在本次 checkout 中没有 `dead.png`，所以本版没有 dead 装饰层；不会拿其他地图的
-dead 图层硬拼，以免风格混杂。曾评估 map/1014（2106×1500，自带 dead），其镜像接缝在
-中景过于明显，最终没有采用。
+是否使用 `dead.png` 装饰层取决于所选地图素材；没有 dead 图的地图不会借用其他地图的
+图层硬拼，以免风格混杂。
 
 ### 2.2 单幅原版地图（SOURCE）
 
-- 世界 `x=0..1999` 直接使用 map/1001 前景原图，不做镜像第二份。
-- 背景 `back.jpg` 原始宽度 1526，按原尺寸平铺/镜像补齐到 2000 px；这是背景绘制，
-  不是碰撞地形的复制。
-- 前景与碰撞都不缩放、不拉伸；服务端 `terrain.go` 与前端 `terrain.js` 读取同一张
-  2000×1425 位图。
-- v5 的 4000 px 镜像世界已移除，因为它会让右侧角色站在服务端不存在的镜像地形上。
+- 世界 `x=0..1842` 直接使用当前地图前景，不做镜像拼接第二份。
+- 背景按原尺寸平铺补齐到 1843 px；这是背景绘制，不是碰撞地形的复制。
+- 前景与碰撞同源：`dist/data/<id>.fore.map` 由前景 alpha 生成，Go 服务端
+  `terrain.go` 与 JS 引擎 `terrain.js` 读取同一张位图，前端 `dist/js/terrain.js`
+  只负责渲染和非权威显示同步。
+- 早期的 4000 px 镜像世界已移除，因为它会让右侧角色站在引擎不存在的镜像地形上。
 
 ### 2.3 地形碰撞转换（SOURCE + PORT）
 
@@ -222,9 +237,9 @@ dead 图层硬拼，以免风格混杂。曾评估 map/1014（2106×1500，自�
   服务端 `.map` 是 `[int32 width][int32 height][每行 ceil(width/8) 字节]`、MSB-first。
 - 本作在加载时把每个 256×256 chunk 的 PNG alpha 转成 `Uint8Array mask`；
   `isSolid()` 只查该像素所属 chunk，不扫描整图。
-- map/1001 的 `fore.png` 与服务端 `fore.map` 已全图逐像素比较：
-  **2000×1425、615,968 个实心像素、0 个不一致**。
-- 浏览器完整校验 2000×1425 = 2,850,000 像素，显示 alpha 与 collision mask
+- 默认 1156 的 `fore.png` 与其 `fore.map` 已全图逐像素比较：
+  **1843×1020、588,315 个实心像素、0 个不一致**（`tests/verify_map_parity.py`）。
+- 浏览器完整校验 1843×1020 = 1,879,860 像素，显示 alpha 与 collision mask
   **0 个不一致**（`terrainDisplaySync()`，只在测试中执行）。
 - 每个地图加载时生成：`terrainChunks`、每 chunk `mask`、`surfaceY[]`（每列地表）、
   `dirtyChunks`；没有每帧全图扫描。
@@ -233,22 +248,24 @@ dead 图层硬拼，以免风格混杂。曾评估 map/1014（2106×1500，自�
 
 ### 3.1 数据结构
 
-- 本作按 256×256 分块：2000×1425 → **8×6 = 48 chunks**。
+- 本作按 256×256 分块：1843×1020 → **8×4 = 32 chunks**。
 - 每 chunk 拥有：
   - 可见 Canvas（前景 alpha，实际绘制）；
   - 同尺寸 `Uint8Array` collision mask（浏览器显示镜像）；
   - 可选 `holeCanvas`（仅旧版程序化弹坑使用；v6 默认不写深色背衬）；
   - chunk 的 world 原点 `x/y`、尺寸 `w/h`。
-- 权威碰撞在 Go 服务器的 `Terrain.Mask`；浏览器 mask 只用于本地推荐和显示同步。
+- 权威碰撞在引擎侧：Go 服务端是 `Terrain.Mask`，静态站是 `dist/js/engine/terrain.js`；
+  渲染层 `dist/js/terrain.js` 的 mask 只用于本地推荐和显示同步。
 - 地形显示层与 mask 使用 **完全相同的世界坐标和 chunk 原点**，没有额外偏移。
 
 ### 3.2 爆炸如何修改 terrainMask
 
-1. 炮弹在 Go 服务端按 0.04 s Euler + 3 px 子步 CCD 得到命中点 `(cx, cy)`。
-2. `Terrain.Carve()` 取原版 crater 位图（普通 `401`，POW `4`），以命中点为位图中心，
-   只删除“当前实心且位图 alpha > 100”的像素；没有程序化 lobes。
-3. 服务端返回 `impact.removed` 和 `craters` 列表；前端收到后调用
-   `Terrain#carveSource()` 用同一张位图的二值 mask 重放，移除像素数必须一致。
+1. 权威引擎（Go 或 JS，同一套 0.04 s Euler + 3 px 子步 CCD）得到命中点 `(cx, cy)`。
+2. 挖除取原版 crater 位图（普通 `401`，POW `4`），以命中点为位图中心，只删除
+   “当前实心且位图 alpha > 100”的像素；没有程序化 lobes。
+3. 引擎返回 `impact.removed` 和 `craters` 列表（Go 经 API、JS 引擎直接写 snapshot）；
+   前端收到后调用 `Terrain#carveSource()` 用同一张位图的二值 mask 重放，移除像素数
+   必须一致。
 4. 前端只在受影响的 chunk 内 `getImageData()` 读回 alpha，以 `alpha > 100` 更新 mask；
    同时更新这些 chunk 的 `surfaceY` 和 `dirtyChunks`。
 5. 重绘时只画视口内的 chunk；不在每帧调用 `getImageData`，不重建整张地图。
@@ -344,28 +361,28 @@ dead 图层硬拼，以免风格混杂。曾评估 map/1014（2106×1500，自�
 | --- | --- | --- |
 | `PHYSICS.dt` | 0.04 s | **SOURCE** `SimpleBomb.cs` |
 | `PHYSICS.forceMax` | 2000 | **SOURCE** `EnergyView.as` / `Player.as` |
-| `PHYSICS.mapGravity` | 10 | **SOURCE** map/1001 `LoadMapsItems.xml` `Weight=10` |
-| `PHYSICS.mapDragIndex` | 2 | **SOURCE** map/1001 `DragIndex=2` |
+| `PHYSICS.mapGravity` | 10 | **SOURCE** 原版 `LoadMapsItems.xml` `Weight=10`（各图一致） |
+| `PHYSICS.mapDragIndex` | 2 | **SOURCE** 原版 `LoadMapsItems.xml` `DragIndex=2`（各图一致） |
 | `PHYSICS.mass` | 10 | **SOURCE** `BallList.xml` ID=243 `Mass=10` |
 | `PHYSICS.gravityFactor` | 70 | **SOURCE** `BallList.xml` ID=243 `Weight=70` |
 | `PHYSICS.windFactor` | 240 | **SOURCE** `BallList.xml` ID=243 `Wind=240` |
 | `PHYSICS.airResistFactor` | 1 | **SOURCE** `BallList.xml` ID=243 `DragIndex=1` |
 | `COMBAT.blastRadius` | 55 | **SOURCE** `BallList.xml` ID=243 `Radii=55` |
-| 角度范围 | 风神 15°–50°、烈火/水果篮 20°–50°、黑白家电 50°–70°、轰天 55°–70° | **SOURCE** 五件原版炮塔模板 `Property5/6` |
+| 角度范围 | 13 件武器各不相同（风神 15°–50°、烈火/水果篮 20°–50°、黑白家电 50°–70°、轰天 55°–70° 等），完整表见 `dist/js/engine/constants.js#WEAPON_DEFS` | **SOURCE** 原版炮塔模板 `Property5/6` |
 | 玩家 `baseDamage/attack/baseGuard/defence` | 360/100/80/40 | **TEMP** 数据库缺明文行；公式结构来自 `SimpleBomb.cs` |
 | 弹坑半径/等级 | 30/58/92/84 | **TEMP + NEW**：原 `Crater=241` 缺失，使用 50/401/4 原始图代替 |
 | `CONTROLS.moveSpeed` | 90 px/s | **SOURCE** `Player.MOVE_SPEED=2` + `GameLiving.stepX=3` @30fps |
 | 相机缩放/平滑/模式 | `VIEW.*` | **NEW** 网页相机 |
 | `BATTLE` 的 HP/治疗/力度标记 | 见 `config.js` | **NEW** 网页规则，不是原版功能 |
 | 角色重力/坠落伤害/碎片上限 | 见 `COMBAT/TERRAIN` | **NEW** 网页可玩性 |
-| 地图尺寸 | 2000×1425 | **SOURCE** map/1001 `ForegroundWidth/Height` |
+| 地图尺寸 | 1843×1020 | **PORT** 固定世界尺寸；各原版地图重采样到此尺寸 |
 
 ## 六、素材映射（摘要）
 
 | 站点文件 | 原仓库路径 | 说明 |
 | --- | --- | --- |
-| `map-1001-fore.png` | `Tank.Flash/resource/v1.1/image/map/1001/fore.png` | 前景/碰撞/挖洞 |
-| `map-1001-back.jpg` | `.../map/1001/back.jpg` | 背景，原尺寸平铺 |
+| `map-<id>-fore.png` | `Tank.Flash/resource/v1.1/image/map/<id>/fore.png` | 前景/碰撞/挖洞（11 张） |
+| `map-<id>-back.jpg` | `.../map/<id>/back.jpg` | 背景，原尺寸平铺 |
 | `crater-50.png` 等 | `Tank.Flash/resource/v1.1/image/bomb/crater/50` 等 | 原始弹坑/边缘图 |
 | `weapon-bazooka3.png` | `.../image/arm/bazooka3/00.png` | 火箭筒 |
 | `shell-bomb.png` | `.../image/arm/bomb/00.png` | 飞行炮弹 |
@@ -382,38 +399,57 @@ dead 图层硬拼，以免风格混杂。曾评估 map/1014（2106×1500，自�
 
 ```text
 gunny-wind-arena/
-├── dist/                       # 可部署前端（站点根目录）
-│   ├── index.html
+├── dist/                       # 可部署前端（站点根目录，纯静态）
+│   ├── index.html              # 探测 /api/state，离线时加载 standalone-api.js
+│   ├── standalone-api.js       # 静态站点适配：本地 EventSource + /api/command
 │   ├── styles.css
 │   ├── manifest.webmanifest
 │   ├── js/
+│   │   ├── engine/             # 纯 JS 权威引擎（Go server/game 的移植）
+│   │   │   ├── index.js        #   GunnyEngine 门面：init/command/update/snapshot/events
+│   │   │   ├── match.js        #   状态机、回合、命令分发
+│   │   │   ├── physics.js      #   Euler、风、弹道 CCD、伤害/暴击
+│   │   │   ├── terrain.js      #   位图解析、弹坑挖除、BEDROCK
+│   │   │   ├── ai.js           #   确定性 AI（与 Go chooseShot 同网格）
+│   │   │   ├── actions.js      #   开火/结算/治疗/回合推进
+│   │   │   ├── rng.js          #   Go math/rand 兼容 PRNG
+│   │   │   ├── crater-masks.js #   50/401/4 原始弹坑位图
+│   │   │   ├── constants.js    #   ↔ server/game/config.go
+│   │   │   ├── snapshot.js     #   ↔ server/game/snapshot.go（字段顺序一致）
+│   │   │   └── json.js         #   与 Go encoding/json 对齐的字段名
 │   │   ├── config.js           # SOURCE / TEMP / NEW 参数
-│   │   ├── physics.js          # Euler、风、弹道、CCD、伤害
+│   │   ├── physics.js          # 前端预测/推荐的物理辅助
 │   │   ├── explosion.js        # FNV-1a + mulberry32 确定性爆炸形状
-│   │   ├── terrain.js          # 96 chunk、alpha mask、局部破坏
+│   │   ├── terrain.js          # 32 chunk、alpha mask、局部破坏
+│   │   ├── maps.js             # 11 张可选地图
 │   │   ├── camera.js           # 玩家/双方/炮弹相机、平滑和夹紧
 │   │   ├── renderer.js         # 世界层绘制、视口裁剪、方向提示
-│   │   ├── net-client.js       # Go 服务端 SSE/命令客户端
+│   │   ├── net-client.js       # SSE/命令客户端（Go 或本地 JS 引擎）
 │   │   ├── ai.js               # 非权威瞄准推荐（固定角度扫力度）
 │   │   ├── input.js            # Pointer/键盘/取消
 │   │   └── main.js             # 启动、HUD、全屏、测试钩子
-│   └── assets/                 # map/1001、弹坑、武器、人物 sheet
-├── reference/map/1001/fore.map # 服务端权威碰撞位图
-├── server/                    # Go 权威战斗服务
+│   ├── assets/                 # 11 张地图、弹坑、武器、人物 sheet
+│   └── data/*.fore.map         # 权威碰撞位图（站点直接读取）
+├── reference/map/<id>/fore.map # 原版碰撞位图，仅生成/校验用
+├── server/                     # Go 权威战斗服务（在线路径，保留）
 │   ├── main.go                 # 静态文件 + JSON/SSE API
+│   ├── wasm/                   # 旧 WASM 绑定（npm run build:wasm 仍可用）
 │   └── game/                   # config/physics/terrain/match/ai
 ├── tests/
 │   ├── physics.test.mjs
+│   ├── engine/
+│   │   ├── match.test.mjs      # game_test.go 的 JS 移植（21 项）
+│   │   └── parity.test.mjs     # 从 Go 引擎导出的金标准（9 场景 + 一整回合）
 │   ├── browser_acceptance.cjs  # 双视口画面验收
 │   ├── browser_controls_audio.cjs
 │   ├── browser_mobile.cjs      # 手机横竖屏/全屏说明验收
-│   ├── browser_static.cjs      # 无后端 WASM 验收
+│   ├── browser_static.cjs      # 无后端纯 JS 引擎验收
 │   └── verify_map_parity.py
 ├── docs/SOURCE_MAPPING.md
 ├── docs/GO_SERVER.md
 ├── docs/IMMERSIVE_UI.md
 ├── docs/VALIDATION.md
-├── docs/PURE_JS_REFACTOR_PLAN.md # 纯 JS 全量重构规划（仅规划，未实施）
+├── docs/PURE_JS_REFACTOR_PLAN.md # Go→JS 重构规划与交付记录
 └── package.json
 ```
 
@@ -422,12 +458,19 @@ gunny-wind-arena/
 ```bash
 npm test
 # Go: go test ./...（地形、Euler、风、伤害、AI、回合）
+# JS: node --test tests/physics.test.mjs tests/engine/*.mjs
+
+npm run test:engine
+# 只跑 JS 引擎套件（21 项功能 + 6 项 Go 金标准 parity），不需要 Go
 
 npm run check
-# 全部 JS node --check + gofmt
+# dist/js、engine、standalone-api 的 node --check + gofmt + go vet
 
 python3 tests/verify_map_parity.py
-# 2000×1425 · solid 615,968 · mismatches 0 · PASS
+# 1843×1020 · solid 588,315 · mismatches 0 · PASS（默认 1156 地图）
+
+npm run test:browser:static
+# 自起无 /api 静态服务器，验证纯 JS 引擎：开局、命中、AI 回合、弹坑、重开
 
 # 先启动 GUNNY_DEBUG=1 npm start，再运行浏览器验收
 CHROME_PATH='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' npm run test:browser
@@ -452,19 +495,19 @@ npm run test:browser:mobile
   只选中；长按数字不重复切换；输入框/帮助弹窗隔离 Space；触摸点技能+长按发射；
 - 静音、全部音频文件 404、AudioContext 构造失败三种情况下仍可正常蓄力和发射；
 - 连续可命中区间显示蓝带；1–8 固定槽位顺序不变；console/page error 为空；
-- 攻击+2 同轨迹连续 3 发、三向散射同时 3 发、攻击+1 同轨迹连续 2 发；五件武器弹体均实际渲染；
+- 攻击+2 同轨迹连续 3 发、三向散射同时 3 发、攻击+1 同轨迹连续 2 发；每件武器的弹体均实际渲染；
 - 开局武器弹窗可切换并锁定，治疗 `H` 不发射，增幅在服务端叠加并消耗。
 
 设备矩阵、旧版对比和真实手机限制见 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
 
 ## 九、已知边界
 
-- 本版只有一张战斗地图（map/1001 镜像拼接），没有地图选择 UI；`Terrain.dispose()` 已提供
-  缓存释放路径，重开会重建 chunk 并清除全部弹坑。没有可切换的第二张地图，因此
-  “切换地图”验收项在本版不适用，不能声称已实测。
+- 共 11 张可选地图（`?map=<id>`，开局有选图面板），默认 1156；`Terrain.dispose()` 提供
+  缓存释放路径，重开会重建 chunk 并清除全部弹坑。地图切换目前通过整页重载完成，
+  不做无刷新热换图。
 - 玩家战斗属性没有可读数据库行，`baseDamage` 等为 `TEMP`；不保证与原服具体账号一致。
 - `Crater=241` 原始素材缺失，弹坑底层图使用 50/401/4 替代；多层不规则边缘是网页新增。
-- 五件主武器的炮塔/炮弹素材、角度与弹坑来自原版资源；1–8 道具、增幅、无限体力、治疗与 POW 是网页新增单机规则；没有宠物技能、队友伤害或联机同步。
+- 13 件主武器的炮塔/炮弹素材、角度与弹坑来自原版资源；1–8 道具、增幅、无限体力、治疗与 POW 是网页新增单机规则；没有宠物技能、队友伤害或联机同步。
 - 没有商城、房间、登录、联机；电脑为本地 AI（NEW）。
 - 地图/角色/炮弹素材来自仓库；人物 sheet 使用原版完整套装图集。待机/移动/举枪/
   开炮/受击的帧序已按 `GameCharacter.as` 对齐（待机去掉 6/7 仰头帧），但不是完整 SWF 时间线。

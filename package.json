@@ -1,13 +1,13 @@
 {
   "name": "gunny-wind-arena",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
-  "description": "Gunny turn-based artillery duel with an authoritative Go server and JS renderer.",
+  "description": "Gunny turn-based artillery duel: pure-JS authoritative engine for the static build, with the Go server retained for the online path.",
   "scripts": {
     "start": "sh server/run.sh",
     "start:debug": "GUNNY_DEBUG=1 sh server/run.sh",
-    "test": "sh server/test.sh && sh scripts/node.sh --test tests/physics.test.mjs",
+    "test": "sh server/test.sh && sh scripts/node.sh --test tests/physics.test.mjs tests/engine/match.test.mjs tests/engine/parity.test.mjs",
     "test:map": "python3 tests/verify_map_parity.py",
     "check": "sh server/check.sh",
     "test:browser": "npm run test:browser:visual && npm run test:browser:controls && npm run test:browser:mobile",
@@ -16,7 +16,8 @@
     "test:browser:mobile": "sh scripts/node.sh tests/browser_mobile.cjs",
     "build:wasm": "sh scripts/build-wasm.sh",
     "build:static": "sh scripts/build-static.sh",
-    "test:browser:static": "sh scripts/node.sh tests/browser_static.cjs"
+    "test:browser:static": "sh scripts/node.sh tests/browser_static.cjs",
+    "test:engine": "sh scripts/node.sh --test tests/engine/match.test.mjs tests/engine/parity.test.mjs"
   },
   "devDependencies": {
     "puppeteer-core": "^23.11.1"
