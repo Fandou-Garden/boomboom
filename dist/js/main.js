@@ -1,14 +1,14 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=32';
-import { loadImage, Terrain } from './terrain.js?v=32';
-import { RemoteMatch } from './net-client.js?v=32';
-import { Renderer, DEATH_SEQUENCE } from './renderer.js?v=32';
-import { Camera, projectPoint } from './camera.js?v=32';
-import { InputController } from './input.js?v=32';
-import { solvePerfect } from './ai.js?v=32';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=32';
-import { MAPS, getMap, resolveMapId } from './maps.js?v=32';
-import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=32';
-import { loadSave, claimReward, hasClaimed, resetSave, formatAmount } from './save.js?v=32';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=33';
+import { loadImage, Terrain } from './terrain.js?v=33';
+import { RemoteMatch } from './net-client.js?v=33';
+import { Renderer, DEATH_SEQUENCE } from './renderer.js?v=33';
+import { Camera, projectPoint } from './camera.js?v=33';
+import { InputController } from './input.js?v=33';
+import { solvePerfect } from './ai.js?v=33';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=33';
+import { MAPS, getMap, resolveMapId } from './maps.js?v=33';
+import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=33';
+import { loadSave, claimReward, hasClaimed, resetSave, formatAmount } from './save.js?v=33';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -1256,7 +1256,7 @@ function rewardLabel(kind) {
 }
 
 function rewardIcon(kind) {
-  return kind === 'stone' ? 'assets/ui/icon-stones.png' : 'assets/ui/icon-gold.png';
+  return kind === 'stone' ? 'assets/ui/icon-stones.png?v=33' : 'assets/ui/icon-gold.png?v=33';
 }
 
 /** Repaint the always-on wallet chips (top-left under the minimap). */
@@ -1290,15 +1290,15 @@ function setupResultCards(win) {
   row.innerHTML = rewards.map((prize, i) => `
     <button class="result-card" type="button" data-card="${i}" data-kind="${prize.kind}" data-amount="${prize.amount}" aria-label="第 ${i + 1} 张卡，点击翻开">
       <span class="card-inner">
-        <span class="card-back"><img src="assets/ui/card-back.png?v=32" alt="" draggable="false"></span>
+        <span class="card-back"><img src="assets/ui/card-back.png?v=33" alt="" draggable="false"></span>
         <span class="card-flip" aria-hidden="true"></span>
         <span class="card-face">
-          <img class="card-face-bg" src="assets/ui/card-face.png?v=32" alt="" draggable="false">
-          <img class="card-frame" src="assets/ui/card-selected.png?v=32" alt="" draggable="false">
+          <img class="card-face-bg" src="assets/ui/card-face.png?v=33" alt="" draggable="false">
+          <img class="card-frame" src="assets/ui/card-selected.png?v=33" alt="" draggable="false">
           ${prize.kind === 'coin'
-            ? '<img class="card-gold-label" src="assets/ui/card-gold-label.png?v=32" alt="Gold" draggable="false">'
+            ? '<img class="card-gold-label" src="assets/ui/card-gold-label.png?v=33" alt="Gold" draggable="false">'
             : ''}
-          <img class="card-icon" src="${prize.kind === 'coin' ? 'assets/ui/card-gold.png?v=32' : rewardIcon(prize.kind)}" alt="" draggable="false">
+          <img class="card-icon" src="${prize.kind === 'coin' ? 'assets/ui/card-gold.png?v=33' : rewardIcon(prize.kind)}" alt="" draggable="false">
           <b>+${prize.amount}</b><small>${rewardLabel(prize.kind)}</small>
         </span>
       </span>
@@ -1418,7 +1418,7 @@ function showResult(data) {
   els.modalBody.innerHTML = `
     <div class="settle-frame">
       <header class="settle-head">
-        <span class="settle-index" aria-hidden="true"><img src="assets/ui/num-0.png?v=32" alt=""><img src="assets/ui/num-1.png?v=32" alt=""></span>
+        <span class="settle-index" aria-hidden="true"><img src="assets/ui/num-0.png?v=33" alt=""><img src="assets/ui/num-1.png?v=33" alt=""></span>
         <div class="settle-head-text">
           <h2>游戏结算</h2>
           <p>每个玩家可免费进行两次翻牌 · 也可花费点券增加一次翻牌机会</p>
@@ -1429,8 +1429,8 @@ function showResult(data) {
       <div class="settle-main">
         <section class="settle-left" aria-label="战绩">
           <div class="settle-hero">
-            <img class="hero-light" src="assets/ui/character-light.png?v=32" alt="" draggable="false">
-            <img class="hero-figure" src="assets/ui/hero-figure.png?v=32" alt="" draggable="false">
+            <img class="hero-light" src="assets/ui/character-light.png?v=33" alt="" draggable="false">
+            <img class="hero-figure" src="assets/ui/hero-figure.png?v=33" alt="" draggable="false">
             <span class="hero-caption">${win ? '漂亮的收尾！' : '下一局再来'}</span>
           </div>
           <div class="settle-team">
@@ -2638,7 +2638,7 @@ function startMapLoad(id) {
     () => loadImage(urls.thumb),
     () => loadImage(urls.fore),
     () => loadImage(urls.back),
-    () => fetch(`${urls.collision}?v=32`).then((res) => {
+    () => fetch(`${urls.collision}?v=33`).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.arrayBuffer();
     }),

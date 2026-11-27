@@ -15,9 +15,9 @@
  * mask. The match RNG never runs here: the main thread applies the aim error
  * itself, so the deterministic wind/AI random stream is unchanged.
  */
-import { loadTerrainFromBytes } from './engine/terrain.js?v=32';
-import { solveShotForWeapon } from './engine/ai.js?v=32';
-import { solveForceForAngle } from './ai.js?v=32';
+import { loadTerrainFromBytes } from './engine/terrain.js?v=33';
+import { solveShotForWeapon } from './engine/ai.js?v=33';
+import { solveForceForAngle } from './ai.js?v=33';
 
 let terrain = null;
 let applied = 0;

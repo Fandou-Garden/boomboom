@@ -1551,7 +1551,7 @@ svg { display: block; }
 }
 .team-table {
   position: relative; padding: 6px 10px 10px;
-  background: url("assets/ui/score-table.png?v=32") center / 100% 100% no-repeat;
+  background: url("assets/ui/score-table.png?v=33") center / 100% 100% no-repeat;
   min-height: 96px;
 }
 .team-row { display: grid; grid-template-columns: 1fr 1fr 1fr; height: 30px; align-items: center; text-align: center; }
@@ -1601,7 +1601,7 @@ svg { display: block; }
 /* 原版 cardMc 5 帧翻牌序列：LuckyCard.play() -> cardMc.gotoAndPlay(2) */
 .modal.is-result .card-flip {
   display: none; z-index: 1;
-  background: url("assets/ui/card-flip-sprite.png?v=32") 0 0 / 500% 100% no-repeat;
+  background: url("assets/ui/card-flip-sprite.png?v=33") 0 0 / 500% 100% no-repeat;
 }
 .modal.is-result .result-card.is-flipped .card-back { display: none; }
 .modal.is-result .result-card.is-flipped .card-flip {

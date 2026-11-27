@@ -6,7 +6,7 @@
  * internally the launch is the equivalent of the original signed angle
  * (positive unit vector toward the opponent, negative screen Y).
  */
-import { PHYSICS, WIND, COMBAT, WORLD } from './config.js?v=32';
+import { PHYSICS, WIND, COMBAT, WORLD } from './config.js?v=33';
 
 export const TAU = Math.PI * 2;
 export const clamp = (value, min, max) => Math.min(max, Math.max(min, value));

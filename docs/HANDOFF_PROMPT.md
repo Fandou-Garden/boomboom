@@ -42,16 +42,17 @@ tests/                    ← browser_acceptance / browser_controls_audio / brow
 9. **原版素材回填（v31）**：卡背 = `gameover.swf` 的 `asset.takeoutCard.LuckyCard`(id 122, 249×286)；卡框 = `DefineSprite_115` 第 20 帧（第 1 帧全透明，别用）；加载界面 = `room.swf` 的 `asset.roomLoading.Bg/BattleFieldBg/FieldNameBg/CharacterBg_*`（`game.swf`/`gameii.swf`/`_corei.swf` 都没有，别再说在 game.swf）；翻卡音 008 + 048（`audio.swf` 的 `7_Sound048.flv`）。
 10. **镜头垂直构图（v31）**：`VIEW.focusBottomFraction = 0.62` 已接入 `_desired()`，角色落在 62% 高度；`allowOverscanX = false`，贴边时宁可角色偏也不露地图外空白。
 11. **体力固定 2000（v31）**：`beginTurnLocked()` 直接 `= STAMINA_MAX`（不再累加 500），走路 `60/s` 扣，静止 0 回血，UI 显示 `x/2000`。
-12. 版本参数全站统一 `?v=31`（index.html / js/*.js / standalone-api.js）。
+12. 版本参数全站统一 `?v=33`（index.html / js/*.js / standalone-api.js）。
 13. **别再凭印象写素材位置**：`cardbox/*/icon.png` 是独立宝箱图标文件（但原版卡背中央画的**就是宝箱**，见 `art-source/takeoutcard/cardMc/001.png`，橙红卷草纹边框；对照结论见 `art-source/REFERENCE_CHECK.md`）；`1156` 的 fore.map 在服务端 `Fighting.Service/bin/Debug/net48/map/1156/`，客户端 `resource/v1.1/image/map/` 下**没有** 1156 目录，地图预览图需用站点自带 jpg。
+14. **玄武石图标（v33 勘误）**：v32 之前的 `icon-stones.png` 取自 `unfrightprop/stones/icon.png`，按目录名猜的，**不是玄武石**（`TemplateAlllist.xml:3205` 里 `Pic="stones"` 是藏宝图碎片/武士碎片任务道具）。真正的玄武石是 `unfrightprop/xuanwu{1..5}/icon.png`（蓝色宝石，60×60），映射见 `TemplateAlllist.xml:1590-1593,1616` 的 `Pic="xuanwu1..5"` ↔ `Name="Đá Huyền Vũ 1..5"` ↔ TemplateID 11005-11008/11031。站点采用 4 级 `xuanwu4`。**别再按目录名猜道具**，唯一可靠映射是 `TemplateAlllist.xml` 的 `Pic → Name → TemplateID`；完整证据见 `art-source/ITEM_XUANWU.md`。
 
 ## 四、标准流程（每次改动的固定闭环）
 
 1. 改 `dist/` 下的文件。
-2. **版本参数 +1**（当前 v=31 → v=32，全站统一替换，别漏 `collision` 拉取那一处和引擎内部 `v=31` 导入）。
+2. **版本参数 +1**（当前 v=33 → v=34，全站统一替换，别漏 `collision` 拉取那一处和引擎内部的版本导入串）。
 3. 跑回归（在项目根目录）：
    ```bash
-   npm run test:engine            # 引擎 55 项
+   npm run test:engine            # 引擎 48 项
    npm run test:map               # 地形 parity（python3）
    npm run test:browser           # visual + controls + mobile 三套
    npm run test:browser:static    # 静态模式浏览器回归
