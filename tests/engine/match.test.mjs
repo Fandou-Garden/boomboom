@@ -19,7 +19,7 @@ import {
   beginTurnLocked, fireLocked, finishFlightLocked, resolveImpactLocked,
 } from '../../dist/js/engine/actions.js';
 import { nextWind, simulateShot, sourceCriticalDamage, sourceDamage } from '../../dist/js/engine/physics.js';
-import { chooseShotInRange } from '../../dist/js/engine/ai.js';
+import { chooseShotInRange, solveShotForWeapon } from '../../dist/js/engine/ai.js';
 import { GoRand } from '../../dist/js/engine/rng.js';
 import {
   ANGLE_MAX, ANGLE_MIN, BALL_DEFS, BEDROCK_Y, CRITICAL_LUCKY, CRITICAL_REDUCE,
@@ -463,4 +463,58 @@ test('carry is available again on the next player turn', () => {
   assert.ok(!m.canCarry, 'consumed');
   beginTurnLocked(m, 0, false);
   assert.ok(m.canCarry && !m.carryArmed, 'new player turn should restore canCarry');
+});
+
+test('async AI solver reproduces the synchronous plan exactly', async () => {
+  const sync = newMatch(42);
+  sync.endEnemyMoveLocked();
+  const want = { ...sync.aiPlan };
+
+  const asyncMatch = newMatch(42);
+  let seen = null;
+  asyncMatch.aiSolver = (job, done) => {
+    seen = job;
+    const best = solveShotForWeapon(
+      job.shooter, job.target, job.wind, asyncMatch.terrain,
+      { startAngle: job.startAngle, angleMin: job.angleMin, angleMax: job.angleMax },
+      job.maxSeconds, job.forceMax,
+    );
+    setTimeout(() => done(best), 0);
+  };
+  asyncMatch.endEnemyMoveLocked();
+  assert.equal(asyncMatch.aiPending, true, 'phase must wait for the worker');
+  assert.equal(asyncMatch.phase, 'enemy_think');
+  assert.equal(asyncMatch.aiPlan, null);
+  assert.equal(seen.craters, 0, 'job carries the terrain crater count');
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(asyncMatch.aiPending, false);
+  assert.equal(asyncMatch.aiPlan.solvedAngle, want.solvedAngle);
+  assert.equal(asyncMatch.aiPlan.solvedForce, want.solvedForce);
+  assert.equal(asyncMatch.aiPlan.angle, want.angle);
+  assert.equal(asyncMatch.aiPlan.force, want.force);
+  assert.equal(asyncMatch.enemyAimTo, want.angle);
+  assert.equal(asyncMatch.phase, 'enemy_think');
+});
+
+test('stale async AI results are ignored after reset', async () => {
+  const m = newMatch(42);
+  let done = null;
+  m.aiSolver = (job, finish) => { done = finish; };
+  m.endEnemyMoveLocked();
+  const token = m.aiToken;
+  m.reset();
+  assert.ok(m.aiToken !== token, 'reset must invalidate in-flight searches');
+  done({ angle: 10, force: 999, direction: 1, expected: null, solvedAngle: 10, solvedForce: 999 });
+  assert.equal(m.aiPlan, null, 'stale plan must not land');
+  assert.equal(m.aiPending, false);
+});
+
+test('worker timeout falls back to a playable default plan', () => {
+  const m = newMatch(42);
+  m.aiSolver = () => {}; // never answers
+  m.endEnemyMoveLocked();
+  for (let i = 0; i < 600 && m.aiPending; i += 1) m.update(PHYSICS_DT);
+  assert.equal(m.aiPending, false, 'fallback must release the turn');
+  assert.equal(m.aiPlan.angle, m.enemyWeapon().startAngle);
+  assert.equal(m.aiPlan.force, 1200);
 });

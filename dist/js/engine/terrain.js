@@ -6,8 +6,8 @@
  * really is LITTLE-endian — dist/data/1156.fore.map starts 33 07 00 00 fc 03).
  * Crater art comes from baked alpha bitmasks generated out of the original PNGs.
  */
-import { BEDROCK_Y } from './constants.js?v=24';
-import { CRATER_MASKS } from './crater-masks.js?v=24';
+import { BEDROCK_Y } from './constants.js?v=25';
+import { CRATER_MASKS } from './crater-masks.js?v=25';
 
 function base64ToBytes(b64) {
   const bin = atob(b64);

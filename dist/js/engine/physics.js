@@ -10,7 +10,7 @@ import {
   MAP_GRAVITY, MOVE_STEP_X, PHYSICS_DT, TARGET_HIT_RADIUS, WEAPON_BARREL_LENGTH,
   WEAPON_GRIP_X, WEAPON_GRIP_Y, WIND_FACTOR, WORLD_HEIGHT, WORLD_WIDTH,
   degToRad,
-} from './constants.js?v=24';
+} from './constants.js?v=25';
 
 /** Mirrors Game.Logic/Phy/Maths/EulerVector; X0 is an int in C#. */
 export class Euler {

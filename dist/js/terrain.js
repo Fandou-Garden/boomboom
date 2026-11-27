@@ -11,8 +11,8 @@
  * BaseBomb.DigMap() removes a pre-authored crater shape. The browser keeps an
  * original Gunny crater bitmap as the base and adds seeded lobes.
  */
-import { WORLD, TERRAIN } from './config.js?v=25';
-import { buildExplosionShape, explosionSeed } from './explosion.js?v=25';
+import { WORLD, TERRAIN } from './config.js?v=26';
+import { buildExplosionShape, explosionSeed } from './explosion.js?v=26';
 
 export const SOLID_ALPHA_THRESHOLD = TERRAIN.solidAlphaThreshold;
 
@@ -132,18 +132,23 @@ export class Terrain {
       const mctx = maskCanvas.getContext('2d', { willReadFrequently: true });
       mctx.drawImage(shape, 0, 0);
       const src = mctx.getImageData(0, 0, sw, sh);
-      for (let i = 3; i < src.data.length; i += 4) {
-        const solid = src.data[i] > SOLID_ALPHA_THRESHOLD;
-        src.data[i - 3] = 255;
-        src.data[i - 2] = 255;
-        src.data[i - 1] = 255;
-        src.data[i] = solid ? 255 : 0;
+      const bits = new Uint8Array(sw * sh);
+      for (let i = 0, p = 3; i < bits.length; i += 1, p += 4) {
+        const solid = src.data[p] > SOLID_ALPHA_THRESHOLD;
+        bits[i] = solid ? 1 : 0;
+        src.data[p - 3] = 255;
+        src.data[p - 2] = 255;
+        src.data[p - 1] = 255;
+        src.data[p] = solid ? 255 : 0;
       }
       mctx.putImageData(src, 0, 0);
       craterArt[id] = {
         shape,
         brink,
         maskCanvas,
+        // Binary mask: the canvas cut uses this same 0/255 alpha, so collision
+        // can be updated from these bits without a per-crater pixel readback.
+        maskBits: bits,
         bbox: imageAlphaBounds(shape),
         brinkBbox: imageAlphaBounds(brink),
       };
@@ -634,6 +639,7 @@ export class Terrain {
     const art = this.craterArt[artId];
     if (!art?.maskCanvas) return { removed: 0, bounds: null };
     const mask = art.maskCanvas;
+    const bits = art.maskBits;
     const w = mask.width;
     const h = mask.height;
     const x0 = Math.trunc(cx - w / 2);
@@ -662,18 +668,25 @@ export class Terrain {
       const lx1 = Math.min(chunk.w - 1, x1 - chunk.x);
       const ly1 = Math.min(chunk.h - 1, cutBottom - chunk.y);
       if (lx1 < lx0 || ly1 < ly0) continue;
-      const rw = lx1 - lx0 + 1;
-      const rh = ly1 - ly0 + 1;
-      const data = chunk.ctx.getImageData(lx0, ly0, rw, rh).data;
-      for (let y = 0; y < rh; y += 1) {
-        for (let x = 0; x < rw; x += 1) {
-          const idx = (ly0 + y) * chunk.w + (lx0 + x);
-          const next = data[(y * rw + x) * 4 + 3] > SOLID_ALPHA_THRESHOLD ? 1 : 0;
-          if (chunk.mask[idx] && !next) removed += 1;
-          chunk.mask[idx] = next;
+      // The cut draws a binary 0/255 alpha mask, so the resulting pixel is
+      // solid iff the crater bit is 0 and the old pixel was solid. Applying
+      // that directly avoids the synchronous canvas readback that dominated
+      // multi-shell (scatter/POW) cratering.
+      let changed = false;
+      for (let ly = ly0; ly <= ly1; ly += 1) {
+        const row = ly * chunk.w;
+        const arow = (chunk.y + ly - y0) * w;
+        for (let lx = lx0; lx <= lx1; lx += 1) {
+          if (!bits[arow + (chunk.x + lx - x0)]) continue;
+          const idx = row + lx;
+          if (chunk.mask[idx]) {
+            chunk.mask[idx] = 0;
+            removed += 1;
+            changed = true;
+          }
         }
       }
-      this.dirtyChunks.add(chunk.index);
+      if (changed) this.dirtyChunks.add(chunk.index);
     }
     for (let x = Math.max(0, x0); x <= Math.min(this.width - 1, x1); x += 1) {
       let y = Math.max(0, this.surfaceY[x]);

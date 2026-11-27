@@ -11,8 +11,8 @@
  *
  * UI remains in the DOM outside this transform.
  */
-import { WORLD, VIEW } from './config.js?v=25';
-import { clamp } from './physics.js?v=25';
+import { WORLD, VIEW } from './config.js?v=26';
+import { clamp } from './physics.js?v=26';
 
 export function coverZoom(width, height) {
   return Math.max(1 / WORLD.width, width / WORLD.width, height / WORLD.height);
@@ -47,6 +47,11 @@ export function computeView({
   zoom,
   allowSky = false,
   allowWide = false,
+  // Exact actor centring near a spawn can require the camera centre to sit
+  // closer to the world edge than half a viewport. Rendering already paints
+  // sky outside the map, so the extra margin is safe and keeps the followed
+  // actor truly centred instead of pinned against a clamp.
+  allowOverscanX = false,
 }) {
   const safeW = Math.max(1, width);
   const safeH = Math.max(1, height);
@@ -61,7 +66,7 @@ export function computeView({
   // Wide aim framing can show a sliver beyond the 4000 px map on very narrow
   // phones. Sky and a vignette cover that margin; the alternative would be
   // moving spawns closer or clipping a player, both of which are forbidden.
-  if (viewW >= WORLD.width) {
+  if (viewW >= WORLD.width || allowOverscanX) {
     cx = clamp(cx, -VIEW.skyOverscan, WORLD.width + VIEW.skyOverscan);
   } else {
     cx = clamp(cx, viewW / 2, WORLD.width - viewW / 2);
@@ -92,6 +97,7 @@ export function computeView({
     cameraY: cy,
     allowSky,
     allowWide,
+    allowOverscanX,
   };
 }
 
@@ -152,6 +158,18 @@ export class Camera {
     this.manualX = 0;
     this.manualY = 0;
     this.lockedShotZoom = null;
+    // Minimap drag writes the camera every pointermove. While it is held we
+    // snap instead of smooth-damp, otherwise the 0.36 s easing tail makes the
+    // drag feel detached from the finger.
+    this.dragging = false;
+  }
+
+  beginDrag() {
+    this.dragging = true;
+  }
+
+  endDrag() {
+    this.dragging = false;
   }
 
   panBy(dxWorld, dyWorld) {
@@ -178,6 +196,7 @@ export class Camera {
     let targetZoom = base;
     let allowSky = false;
     let allowWide = false;
+    let allowOverscanX = false;
 
     if (mode === 'shot' && shot) {
       targetZoom = this.lockedShotZoom ?? clamp(base * 0.78, 0.3, 0.62);
@@ -217,14 +236,20 @@ export class Camera {
       allowSky = true;
       allowWide = targetZoom < Math.max(coverZoom(width, height), VIEW.minZoomFloor);
     } else {
+      // Turn camera: the active actor sits at the exact screen centre. No
+      // walk-direction lead and no fixed vertical offset — the prompts call
+      // for the shooter itself to be centred, and the HUD is clear at the
+      // middle of the viewport. Horizontal overscan is allowed for the few
+      // frames where a spawn is closer to the edge than half a viewport.
       const actor = actors?.[activeIndex] ?? actors?.[0];
       if (actor) {
-        targetX = actor.x + (actor.walkDirection || 0) * 70;
+        targetX = actor.x;
         targetY = actor.y;
+      } else {
+        targetY = WORLD.height * 0.62;
       }
-      const viewHAtBase = height / base;
-      targetY -= (VIEW.focusBottomFraction - 0.5) * viewHAtBase;
       allowSky = true;
+      allowOverscanX = true;
     }
 
     // Manual minimap drag affects only the camera. Flight always clears it so
@@ -237,11 +262,20 @@ export class Camera {
     const actualZoom = targetZoom;
     const viewW = width / actualZoom;
     const viewH = height / actualZoom;
-    if (viewW < WORLD.width && !allowWide) targetX = clamp(targetX, viewW / 2, WORLD.width - viewW / 2);
+    if (viewW < WORLD.width && !allowWide && !allowOverscanX) {
+      targetX = clamp(targetX, viewW / 2, WORLD.width - viewW / 2);
+    }
     if (viewH < WORLD.height && !allowSky && !allowWide) {
       targetY = clamp(targetY, viewH / 2, WORLD.height - viewH / 2);
     }
-    return { targetX, targetY, targetZoom: clamp(targetZoom, VIEW.minZoomWide, max), allowSky, allowWide };
+    return {
+      targetX,
+      targetY,
+      targetZoom: clamp(targetZoom, VIEW.minZoomWide, max),
+      allowSky,
+      allowWide,
+      allowOverscanX,
+    };
   }
 
   update({
@@ -264,7 +298,7 @@ export class Camera {
       this.mode = mode;
     }
     const desired = this._desired({ width, height, mode, shot, actors, activeIndex, focusPoint });
-    if (!this.initialized || reducedMotion) {
+    if (!this.initialized || reducedMotion || this.dragging) {
       this.cameraX = desired.targetX;
       this.cameraY = desired.targetY;
       this.zoom = desired.targetZoom;
@@ -291,6 +325,7 @@ export class Camera {
       zoom: this.zoom,
       allowSky: desired.allowSky,
       allowWide: desired.allowWide,
+      allowOverscanX: desired.allowOverscanX,
     });
   }
 }

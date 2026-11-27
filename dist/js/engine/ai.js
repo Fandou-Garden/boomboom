@@ -4,8 +4,8 @@
  * Search policy is a NEW addition (the original checkout has no aiming AI), but
  * it runs against the same source ballistics, so a fixed seed reproduces it.
  */
-import { clamp } from './constants.js?v=24';
-import { muzzlePoint, simulateShot } from './physics.js?v=24';
+import { clamp } from './constants.js?v=25';
+import { muzzlePoint, simulateShot } from './physics.js?v=25';
 
 function scoreCandidate(shooter, target, terrain, wind, angle, force, direction, maxSeconds, forceMax) {
   const { x: mx, y: my } = muzzlePoint(shooter, angle, direction);
@@ -16,7 +16,14 @@ function scoreCandidate(shooter, target, terrain, wind, angle, force, direction,
   return { angle, force, muzzleX: mx, muzzleY: my, result: r, score };
 }
 
-export function chooseShotInRange(shooter, target, wind, terrain, rng, startAngle, angleMin, angleMax, maxSeconds, forceMax) {
+/**
+ * Search-only half of the AI aim: coarse sweep, fine refinement, no RNG. The
+ * result feeds either the synchronous chooseShotInRange (which adds the
+ * triangular aim error) or the async host solver — keeping the search itself
+ * free of the match RNG means a Web Worker can run it without perturbing the
+ * deterministic wind/AI random stream.
+ */
+export function solveShotInRange(shooter, target, wind, terrain, startAngle, angleMin, angleMax, maxSeconds, forceMax) {
   const direction = target.x < shooter.x ? -1 : 1;
   let best = { score: Infinity, angle: startAngle, force: 1200 };
 
@@ -40,19 +47,36 @@ export function chooseShotInRange(shooter, target, wind, terrain, rng, startAngl
     }
   }
 
+  return {
+    angle: best.angle, force: best.force, direction,
+    expected: best.result, solvedAngle: best.angle, solvedForce: best.force,
+  };
+}
+
+export function chooseShotInRange(shooter, target, wind, terrain, rng, startAngle, angleMin, angleMax, maxSeconds, forceMax) {
+  const best = solveShotInRange(
+    shooter, target, wind, terrain, startAngle, angleMin, angleMax, maxSeconds, forceMax,
+  );
   let angle = best.angle + triangularNoise(rng) * 1.6;
   let force = best.force + triangularNoise(rng) * 28;
   angle = clamp(angle, angleMin, angleMax);
   force = clamp(force, 420, forceMax);
   return {
-    angle, force, direction,
-    expected: best.result, solvedAngle: best.angle, solvedForce: best.force,
+    angle, force, direction: best.direction,
+    expected: best.expected, solvedAngle: best.solvedAngle, solvedForce: best.solvedForce,
   };
 }
 
 export function chooseShotForWeapon(shooter, target, wind, terrain, rng, weapon, maxSeconds, forceMax) {
   return chooseShotInRange(
     shooter, target, wind, terrain, rng,
+    weapon.startAngle, weapon.angleMin, weapon.angleMax, maxSeconds, forceMax,
+  );
+}
+
+export function solveShotForWeapon(shooter, target, wind, terrain, weapon, maxSeconds, forceMax) {
+  return solveShotInRange(
+    shooter, target, wind, terrain,
     weapon.startAngle, weapon.angleMin, weapon.angleMax, maxSeconds, forceMax,
   );
 }

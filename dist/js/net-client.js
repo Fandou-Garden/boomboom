@@ -5,9 +5,9 @@
  * snapshot and sends intent commands over HTTP; server events arrive through
  * SSE. Local physics remains only for the non-firing aim recommendation.
  */
-import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=25';
-import { solveForceForAngle } from './ai.js?v=25';
-import { muzzlePoint } from './physics.js?v=25';
+import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=26';
+import { solveForceForAngle } from './ai.js?v=26';
+import { muzzlePoint } from './physics.js?v=26';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const FIRE_ANIM_SECONDS = 0.28;
@@ -79,6 +79,7 @@ export class RemoteMatch {
     this.effects = emptyEffects();
     this.playerVolley = null;
     this.recommendationCache = null;
+    this._recommendationPendingKey = null;
 
     this.connected = false;
     this.connectionError = '';
@@ -778,30 +779,78 @@ export class RemoteMatch {
     return v > 0 ? '向右' : '向左';
   }
 
+  recommendationKey() {
+    const powActive = this.powSelected && this.energy >= BATTLE.energyMax;
+    return [this.angle.toFixed(2), this.wind.value.toFixed(2),
+      this.player?.x.toFixed(1), this.player?.y.toFixed(1),
+      this.enemy?.x.toFixed(1), this.enemy?.y.toFixed(1),
+      this.terrain?.craters?.length ?? 0, this.selectedSkill || '-',
+      this.selectedBuffs.join(',') || '-', this.weapon || '-',
+      powActive ? 'pow' : '-'].join('|');
+  }
+
+  recommendationRequest() {
+    const powActive = this.powSelected && this.energy >= BATTLE.energyMax;
+    return {
+      shooter: { x: this.player.x, y: this.player.y, slope: this.player.slope || 0 },
+      target: { x: this.enemy.x, y: this.enemy.y, alive: this.enemy.alive },
+      wind: this.wind.value,
+      angle: this.angle,
+      skill: this.selectedSkill || null,
+      buffs: [...this.selectedBuffs],
+      angleMin: this.angleMin,
+      angleMax: this.angleMax,
+      pow: powActive,
+    };
+  }
+
   recommendation() {
     if (this.phase !== 'player' || !this.player?.alive || !this.enemy?.alive) {
       return { reachable: false, force: null, reason: 'not-player' };
     }
-    const powActive = this.powSelected && this.energy >= BATTLE.energyMax;
-    const key = [this.angle.toFixed(2), this.wind.value.toFixed(2),
-      this.player.x.toFixed(1), this.player.y.toFixed(1),
-      this.enemy.x.toFixed(1), this.enemy.y.toFixed(1),
-      this.terrain?.craters?.length ?? 0, this.selectedSkill || '-',
-      this.selectedBuffs.join(',') || '-', this.weapon || '-', powActive ? 'pow' : '-'].join('|');
+    const key = this.recommendationKey();
     if (this.recommendationCache?.key === key) return this.recommendationCache.value;
     const value = solveForceForAngle({
-      shooter: this.player,
-      target: this.enemy,
-      wind: this.wind.value,
+      ...this.recommendationRequest(),
       terrain: this.terrain,
-      angle: this.angle,
-      skill: this.selectedSkill || null,
-      buffs: this.selectedBuffs,
-      angleMin: this.angleMin,
-      angleMax: this.angleMax,
-      pow: powActive,
     });
     this.recommendationCache = { key, value };
     return value;
+  }
+
+  /**
+   * UI-path recommendation: uses the Web Worker replica when the static host
+   * provides one, so the angle sweep never blocks the animation frame. Returns
+   * the cached value for the current aim state, or null while the worker is
+   * still computing (the caller shows a neutral "calculating" state). Falls
+   * back to the synchronous sweep on the Go backend or if the worker died.
+   */
+  requestRecommendation() {
+    if (this.phase !== 'player' || !this.player?.alive || !this.enemy?.alive) {
+      return { reachable: false, force: null, reason: 'not-player' };
+    }
+    const key = this.recommendationKey();
+    if (this.recommendationCache?.key === key) return this.recommendationCache.value;
+    const search = typeof window !== 'undefined' ? window.__GUNNY_SEARCH__ : null;
+    if (!search || !search.ready?.()) {
+      this._recommendationPendingKey = null;
+      return this.recommendation();
+    }
+    if (this._recommendationPendingKey !== key) {
+      this._recommendationPendingKey = key;
+      const request = this.recommendationRequest();
+      search.recommend(request, (value) => {
+        if (this._recommendationPendingKey === key) this._recommendationPendingKey = null;
+        // Only accept a result that still describes the current aim state.
+        if (!value || this.recommendationKey() !== key) return;
+        this.recommendationCache = { key, value };
+      });
+    }
+    return null;
+  }
+
+  /** True while an off-thread recommendation for the current aim is in flight. */
+  recommendationPending() {
+    return this._recommendationPendingKey != null;
   }
 }

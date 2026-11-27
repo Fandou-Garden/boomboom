@@ -12,8 +12,8 @@
  * masks pre-baked (scripts/gen_engine_assets.go), so the crater buffers are
  * accepted for signature compatibility but no longer required.
  */
-import { loadTerrainFromBytes } from './terrain.js?v=24';
-import { Match } from './match.js?v=24';
+import { loadTerrainFromBytes } from './terrain.js?v=25';
+import { Match } from './match.js?v=25';
 
 let seedCounter = 0;
 
@@ -29,6 +29,9 @@ export class GunnyEngine {
   constructor() {
     this.match = null;
     this.lastSeq = 0;
+    // Optional off-thread search hook, installed by the static host once its
+    // Web Worker replica is ready. See Match.aiSolver.
+    this.aiSolver = null;
   }
 
   init(mapBytes, crater50, crater401, crater4, debug) {
@@ -48,8 +51,15 @@ export class GunnyEngine {
       debug: !!debug,
       clock: () => (typeof performance !== 'undefined' ? performance.now() / 1000 : Date.now() / 1000),
     });
+    this.match.aiSolver = this.aiSolver;
     this.lastSeq = 0;
     return '';
+  }
+
+  /** Install or clear the async AI search hook (null = synchronous search). */
+  setAISolver(fn) {
+    this.aiSolver = typeof fn === 'function' ? fn : null;
+    if (this.match) this.match.aiSolver = this.aiSolver;
   }
 
   command(json) {

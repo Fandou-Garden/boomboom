@@ -1,13 +1,13 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=25';
-import { loadImage, Terrain } from './terrain.js?v=25';
-import { RemoteMatch } from './net-client.js?v=25';
-import { Renderer } from './renderer.js?v=25';
-import { Camera, projectPoint } from './camera.js?v=25';
-import { InputController } from './input.js?v=25';
-import { solvePerfect } from './ai.js?v=25';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=25';
-import { MAPS, getMap, resolveMapId } from './maps.js?v=25';
-import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=25';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=26';
+import { loadImage, Terrain } from './terrain.js?v=26';
+import { RemoteMatch } from './net-client.js?v=26';
+import { Renderer } from './renderer.js?v=26';
+import { Camera, projectPoint } from './camera.js?v=26';
+import { InputController } from './input.js?v=26';
+import { solvePerfect } from './ai.js?v=26';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=26';
+import { MAPS, getMap, resolveMapId } from './maps.js?v=26';
+import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=26';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -70,6 +70,15 @@ let camera = null;
 let game = null;
 let input = null;
 let minimapBase = null;
+// Small-map backing store. The world is projected with ONE uniform scale
+// (canvas height / world height), so the viewport frame aspect always equals
+// the main canvas viewport aspect. Horizontal letterboxing is filled with the
+// panel colour instead of stretching the map.
+const MINIMAP_WIDTH = 280;
+const MINIMAP_HEIGHT = 128;
+// At high zoom the frame could shrink to a sliver; inflate both dimensions
+// together so it stays visible without breaking the aspect ratio.
+const MINIMAP_MIN_FRAME = 12;
 let layout = { width: 1, height: 1, topInset: 0, bottomInset: 0, dpr: 1 };
 let view = null;
 let lastFrame = performance.now();
@@ -86,9 +95,6 @@ let lastTurnKey = '';
 let portraitDismissed = false;
 let booted = false;
 let minimapDrag = null;
-let lastRecommendationAt = 0;
-let lastRecommendation = null;
-let lastRecommendationMode = '';
 let selectedWeaponId = 'fruit';
 let weaponPickerBuilt = false;
 
@@ -504,6 +510,9 @@ function measureLayout() {
   const dpr = Math.min(dprCap, window.devicePixelRatio || 1);
   layout = { width, height, dpr, topInset: 0, bottomInset: 0 };
   renderer?.resize(width, height, dpr);
+  // The viewport frame is derived from the live view on every draw, but redraw
+  // once here so it is correct on the very next paint after a resize.
+  drawMinimap();
   lastFrame = performance.now();
 }
 
@@ -530,9 +539,12 @@ function applyPlayerControls(dt) {
 }
 
 function effectiveCameraMode() {
-  if (!game) return 'both';
+  // Follow the shell while it flies; otherwise lock onto the actor whose turn
+  // it is (game.turn is the authoritative index). The old 'both' midpoint
+  // framing is gone because it never truly centred the shooter.
+  if (!game) return 'player';
   if (game.phase === 'flight' && game.shot) return 'shot';
-  return 'both';
+  return 'player';
 }
 
 function frame(now) {
@@ -572,11 +584,17 @@ function frame(now) {
   renderer.draw(game, view, reducedMotion);
   // The minimap redraws cached layers plus several shadowBlur strokes; at
   // 120 Hz that is wasted work on a tiny widget. Cap it at ~30 Hz while the
-  // main canvas keeps the full refresh rate.
-  minimapAccum += dt;
-  if (minimapAccum >= 1 / 30) {
+  // main canvas keeps the full refresh rate. While dragging, redraw only the
+  // frame layer on every frame so the viewport tracks the finger exactly.
+  if (minimapDrag) {
     minimapAccum = 0;
-    drawMinimap();
+    drawMinimapFast();
+  } else {
+    minimapAccum += dt;
+    if (minimapAccum >= 1 / 30) {
+      minimapAccum = 0;
+      drawMinimap();
+    }
   }
   syncUI();
   requestAnimationFrame(frame);
@@ -641,8 +659,6 @@ function syncUI() {
   const phase = game.phase;
   const wind = game.wind.value;
   const pct = Math.round(game.force / PHYSICS.forceMax * 100);
-  const hp = [p.hp, e.hp];
-  const now = performance.now();
 
   if (uiCache.hp[0] !== p.hp) {
     els.hpBar0.style.width = `${Math.max(0, p.hp / p.maxHp * 100)}%`;
@@ -704,24 +720,17 @@ function syncUI() {
   const roundedForce = Math.round(game.force);
   setText(els.forceRaw, `力度 ${roundedForce} / ${PHYSICS.forceMax}`);
 
-  // Recommendation is recomputed only while both movement and angle input
-  // are stationary. Real projectile simulation is not run every animation
-  // frame. During charging the angle is locked, so the cache stays valid.
+  // Recommendation exists only for the current aim state and only while both
+  // movement and angle input are stationary (during charging the angle is
+  // locked, so the cached value stays valid). On the static build the force
+  // sweep runs in a Web Worker — requestRecommendation returns null while the
+  // result is in flight instead of blocking this frame with a 100-trajectory
+  // sweep. It is keyed on angle/wind/positions/terrain/skill/weapon, so a
+  // result computed for a different angle is never displayed.
   const angleHeld = input?.getAimDirection?.() ?? 0;
   let recommendation = null;
   if (phase === 'player' && !p.walkDirection && !angleHeld) {
-    const modeKey = `${game.angle.toFixed(2)}|${wind.toFixed(2)}|${p.x.toFixed(1)}|${p.y.toFixed(1)}|${e.x.toFixed(1)}|${e.y.toFixed(1)}|${game.terrain?.craters?.length ?? 0}|${game.selectedSkill || '-'}|${game.powSelected ? 'pow' : '-'}`;
-    if (lastRecommendationMode !== modeKey || now - lastRecommendationAt > 170) {
-      recommendation = game.recommendation();
-      lastRecommendation = recommendation;
-      lastRecommendationMode = modeKey;
-      lastRecommendationAt = now;
-    } else {
-      recommendation = lastRecommendation;
-    }
-  } else {
-    lastRecommendation = null;
-    lastRecommendationMode = '';
+    recommendation = game.requestRecommendation();
   }
 
   const lastPct = game.lastPower != null ? Math.round(game.lastPower / PHYSICS.forceMax * 100) : null;
@@ -769,6 +778,8 @@ function syncUI() {
     else if (recommendation) {
       aimMessage = '当前角度无可命中力度';
       aimBad = true;
+    } else if (game.recommendationPending()) {
+      aimMessage = '推荐计算中…';
     }
   } else if (phase === 'flight') {
     aimMessage = '飞行中 · 镜头跟随';
@@ -959,8 +970,6 @@ function handleEvent(type, data = {}) {
     camera?.reset();
     camera?.clearPan();
     input?.cancelAll('reset');
-    lastRecommendationAt = 0;
-    lastRecommendation = null;
   } else if (type === 'turn') {
     const key = `${data.turn}:${data.round}`;
     if (key !== lastTurnKey) {
@@ -1203,9 +1212,6 @@ function restartMatch() {
   uiCache.weapon = null;
   uiCache.weaponLocked = null;
   uiCache.stamina = null;
-  lastRecommendationAt = 0;
-  lastRecommendation = null;
-  lastRecommendationMode = '';
   lastFrame = performance.now();
   showToast('已重开 · 观察本回合风力', { duration: 2400 });
 }
@@ -1482,16 +1488,24 @@ function setupInput() {
   input.bind();
 }
 
+function minimapLayout() {
+  const scale = MINIMAP_HEIGHT / WORLD.height;
+  const mapW = WORLD.width * scale;
+  return {
+    scale,
+    mapW,
+    mapH: MINIMAP_HEIGHT,
+    ox: (MINIMAP_WIDTH - mapW) / 2,
+    oy: 0,
+  };
+}
+
 function buildMinimapBase(back, fore) {
   const canvas = document.createElement('canvas');
-  canvas.width = 280;
-  canvas.height = 128;
+  canvas.width = MINIMAP_WIDTH;
+  canvas.height = MINIMAP_HEIGHT;
   const ctx = canvas.getContext('2d');
-  const ox = 0;
-  const oy = 14;
-  const mapW = 280;
-  const mapH = 100;
-  const scaleX = mapW / WORLD.width;
+  const { scale, mapW, mapH, ox, oy } = minimapLayout();
   const tileW = back.naturalWidth || back.width;
   const tileH = back.naturalHeight || back.height;
 
@@ -1506,12 +1520,12 @@ function buildMinimapBase(back, fore) {
     const x = i * tileW;
     ctx.save();
     if (i % 2 === 1) {
-      ctx.translate(ox + (x + tileW) * scaleX, oy);
+      ctx.translate(ox + (x + tileW) * scale, oy);
       ctx.scale(-1, 1);
     } else {
-      ctx.translate(ox + x * scaleX, oy);
+      ctx.translate(ox + x * scale, oy);
     }
-    ctx.drawImage(back, 0, 0, tileW, tileH, 0, 0, tileW * scaleX, mapH);
+    ctx.drawImage(back, 0, 0, tileW, tileH, 0, 0, tileW * scale, mapH);
     ctx.restore();
   }
   if (fore) {
@@ -1537,39 +1551,45 @@ function buildMinimapBase(back, fore) {
   shade.addColorStop(1, 'rgba(2,16,23,0.34)');
   ctx.fillStyle = shade;
   ctx.fillRect(ox, oy, mapW, mapH);
+  // Thin map edge, baked into the cached layer so drag redraws stay cheap.
+  ctx.strokeStyle = 'rgba(170, 231, 243, 0.18)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(ox + 0.5, oy + 0.5, mapW - 1, mapH - 1);
   return canvas;
 }
 
-function drawMinimap() {
-  if (!minimapBase || !game || !view) return;
-  const canvas = els.minimap;
-  const ctx = canvas.getContext('2d');
-  const mapW = 280;
-  const mapH = 100;
-  const oy = 14;
-  const scaleX = mapW / WORLD.width;
-  const scaleY = mapH / WORLD.height;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(minimapBase, 0, 0);
-
-  const clampX = (x) => Math.max(0, Math.min(mapW, x));
-  const clampY = (y) => Math.max(0, Math.min(mapH, y));
-  const left = clampX(view.worldLeft * scaleX);
-  const top = clampY(view.worldTop * scaleY);
-  const right = clampX((view.worldLeft + view.viewW) * scaleX);
-  const bottom = clampY((view.worldTop + view.viewH) * scaleY);
+/**
+ * Draw the camera viewport frame. The frame is the viewport rectangle projected
+ * with the same uniform scale as the map, so its width/height ratio equals the
+ * main canvas viewport ratio at every zoom and after every resize.
+ */
+function drawMinimapFrame(ctx, geom, withShadow) {
+  if (!view) return;
+  const { scale, ox, oy } = geom;
+  const rawW = view.viewW * scale;
+  const rawH = view.viewH * scale;
+  const grow = Math.max(1, MINIMAP_MIN_FRAME / Math.max(0.001, rawW), MINIMAP_MIN_FRAME / Math.max(0.001, rawH));
+  const w = rawW * grow;
+  const h = rawH * grow;
+  const cx = ox + (view.worldLeft + view.viewW / 2) * scale;
+  const cy = oy + (view.worldTop + view.viewH / 2) * scale;
   ctx.save();
   ctx.strokeStyle = 'rgba(244, 254, 255, 0.94)';
   ctx.lineWidth = 1.6;
-  ctx.shadowColor = 'rgba(0,0,0,0.5)';
-  ctx.shadowBlur = 3;
-  ctx.strokeRect(left + 1, oy + top + 1, Math.max(3, right - left - 2), Math.max(3, bottom - top - 2));
+  if (withShadow) {
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 3;
+  }
+  ctx.strokeRect(cx - w / 2 + 0.8, cy - h / 2 + 0.8, Math.max(1, w - 1.6), Math.max(1, h - 1.6));
   ctx.restore();
+}
 
+function drawMinimapActors(ctx, geom) {
+  const { scale, ox, oy } = geom;
   for (const actor of game.actors) {
     if (!actor?.alive) continue;
-    const x = (actor.renderX ?? actor.x) * scaleX;
-    const y = oy + (actor.renderY ?? actor.y) * scaleY;
+    const x = ox + (actor.renderX ?? actor.x) * scale;
+    const y = oy + (actor.renderY ?? actor.y) * scale;
     ctx.save();
     ctx.fillStyle = actor.index === 0 ? '#56e0d2' : '#ffad66';
     ctx.shadowColor = ctx.fillStyle;
@@ -1580,8 +1600,8 @@ function drawMinimap() {
     ctx.restore();
   }
   if (game.shot) {
-    const x = (game.shot.renderX ?? game.shot.x) * scaleX;
-    const y = oy + (game.shot.renderY ?? game.shot.y) * scaleY;
+    const x = ox + (game.shot.renderX ?? game.shot.x) * scale;
+    const y = oy + (game.shot.renderY ?? game.shot.y) * scale;
     ctx.save();
     ctx.fillStyle = '#ffe07b';
     ctx.shadowColor = '#ffe07b';
@@ -1591,10 +1611,31 @@ function drawMinimap() {
     ctx.fill();
     ctx.restore();
   }
-  // Small corner marks keep the map readable without extra cards.
-  ctx.fillStyle = 'rgba(4,24,33,0.55)';
-  ctx.fillRect(0, 0, mapW, oy);
-  ctx.fillRect(0, oy + mapH, mapW, 14);
+}
+
+/** Full minimap redraw: cached scene + dots + shadowed frame (~30 Hz). */
+function drawMinimap() {
+  if (!minimapBase || !game || !view) return;
+  const ctx = els.minimap.getContext('2d');
+  const geom = minimapLayout();
+  ctx.clearRect(0, 0, MINIMAP_WIDTH, MINIMAP_HEIGHT);
+  ctx.drawImage(minimapBase, 0, 0);
+  drawMinimapActors(ctx, geom);
+  drawMinimapFrame(ctx, geom, true);
+}
+
+/**
+ * Drag redraw: only the cached scene plus the viewport frame, skipping the
+ * glow/shadow strokes and the actor decorations. This runs every animation
+ * frame while a pointer is held so the frame tracks the finger 1:1.
+ */
+function drawMinimapFast() {
+  if (!minimapBase || !game || !view) return;
+  const ctx = els.minimap.getContext('2d');
+  const geom = minimapLayout();
+  ctx.clearRect(0, 0, MINIMAP_WIDTH, MINIMAP_HEIGHT);
+  ctx.drawImage(minimapBase, 0, 0);
+  drawMinimapFrame(ctx, geom, false);
 }
 
 function setupMinimap() {
@@ -1602,8 +1643,8 @@ function setupMinimap() {
   const localPoint = (event) => {
     const rect = wrap.getBoundingClientRect();
     return {
-      x: (event.clientX - rect.left) / rect.width * 280,
-      y: (event.clientY - rect.top) / rect.height * 128,
+      x: (event.clientX - rect.left) / rect.width * MINIMAP_WIDTH,
+      y: (event.clientY - rect.top) / rect.height * MINIMAP_HEIGHT,
     };
   };
   wrap.addEventListener('pointerdown', (event) => {
@@ -1612,6 +1653,8 @@ function setupMinimap() {
     event.preventDefault();
     const p = localPoint(event);
     minimapDrag = { id: event.pointerId, lastX: p.x, lastY: p.y };
+    // Snap camera writes while the pointer is held; see Camera.beginDrag().
+    camera?.beginDrag();
     wrap.classList.add('dragging');
     try { wrap.setPointerCapture(event.pointerId); } catch { /* no-op */ }
   });
@@ -1623,13 +1666,18 @@ function setupMinimap() {
     const dy = p.y - minimapDrag.lastY;
     minimapDrag.lastX = p.x;
     minimapDrag.lastY = p.y;
-    camera?.panBy(-dx / 280 * WORLD.width, -dy / 128 * WORLD.height);
+    // Uniform world scale: the same pixels-per-world-unit in both axes.
+    const { scale } = minimapLayout();
+    camera?.panBy(-dx / scale, -dy / scale);
     lastFrame = performance.now();
   });
   const end = (event) => {
     if (!minimapDrag || event.pointerId !== minimapDrag.id) return;
     minimapDrag = null;
+    camera?.endDrag();
     wrap.classList.remove('dragging');
+    // Restore the glow decorations once the finger is up.
+    drawMinimap();
   };
   wrap.addEventListener('pointerup', end);
   wrap.addEventListener('pointercancel', end);
@@ -2037,6 +2085,11 @@ function exposeTestApi() {
       if (!game) return null;
       return segmentTerrainHit(x0, y0, x1, y1, game.terrain, 2, 2.5);
     },
+    // UI-path recommendation (worker-backed on the static build): returns the
+    // cached value for the current aim, null while a solve is in flight.
+    requestRecommendation: () => game?.requestRecommendation() ?? null,
+    recommendationPending: () => !!game?.recommendationPending(),
+    searchWorkerReady: () => !!window.__GUNNY_SEARCH__?.ready?.(),
     terrainInfo: () => game?.terrain.info() ?? null,
     terrainCraters: () => game?.terrain.craters.length ?? 0,
     terrainCraterRecords: () => (game?.terrain.craters ?? []).map((c) => ({ ...c })),
@@ -2067,16 +2120,23 @@ function exposeTestApi() {
     },
     minimapInfo() {
       if (!game || !view) return null;
+      const { scale, mapW, mapH, ox, oy } = minimapLayout();
+      const toX = (x) => ox + x * scale;
+      const toY = (y) => oy + y * scale;
       return {
-        mapW: 280,
-        mapH: 100,
-        mapY: 14,
-        actors: game.actors.map((actor) => ({ x: actor.x / WORLD.width * 280, y: 14 + actor.y / WORLD.height * 100 })),
+        mapW,
+        mapH,
+        mapX: ox,
+        mapY: oy,
+        actors: game.actors.map((actor) => ({ x: toX(actor.x), y: toY(actor.y) })),
+        // Same uniform projection as the drawing path, so callers can verify
+        // the frame ratio against the live camera viewport.
         frame: {
-          left: Math.max(0, Math.min(280, view.worldLeft / WORLD.width * 280)),
-          top: Math.max(0, Math.min(100, view.worldTop / WORLD.height * 100)),
-          right: Math.max(0, Math.min(280, (view.worldLeft + view.viewW) / WORLD.width * 280)),
-          bottom: Math.max(0, Math.min(100, (view.worldTop + view.viewH) / WORLD.height * 100)),
+          left: toX(view.worldLeft),
+          top: toY(view.worldTop),
+          right: toX(view.worldLeft + view.viewW),
+          bottom: toY(view.worldTop + view.viewH),
+          ratio: view.viewW / view.viewH,
         },
       };
     },
@@ -2242,7 +2302,7 @@ function startMapLoad(id) {
     () => loadImage(urls.thumb),
     () => loadImage(urls.fore),
     () => loadImage(urls.back),
-    () => fetch(`${urls.collision}?v=25`).then((res) => {
+    () => fetch(`${urls.collision}?v=26`).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.arrayBuffer();
     }),

@@ -14,15 +14,15 @@ import {
   MIN_FIRE_FORCE, MOVE_SPEED, MOVE_STEP_X, MOVE_STEP_Y, PIXELS_PER_METRE, PLAYER_MAX_HP,
   RESOLVE_DELAY, SHOOT_MINUS, SKILL_DEFS, SKILL_ORDER, SPAWN_PROBE_Y, SPAWN_X,
   STAMINA_MAX, WORLD_HEIGHT, WORLD_WIDTH, clamp, weaponFor, WEAPON_DEFS, LUCKY,
-} from './constants.js?v=24';
-import { nextWind } from './physics.js?v=24';
-import { GoRand } from './rng.js?v=24';
-import { chooseShotForWeapon } from './ai.js?v=24';
+} from './constants.js?v=25';
+import { nextWind } from './physics.js?v=25';
+import { GoRand } from './rng.js?v=25';
+import { chooseShotForWeapon, triangularNoise } from './ai.js?v=25';
 import {
   beginTurnLocked, finishResolveLocked, fireLocked, healLocked, updateFlightLocked,
-} from './actions.js?v=24';
-import { buildSnapshot } from './snapshot.js?v=24';
-import { aiPlanJson } from './json.js?v=24';
+} from './actions.js?v=25';
+import { buildSnapshot } from './snapshot.js?v=25';
+import { aiPlanJson } from './json.js?v=25';
 
 function makeActor(overrides) {
   return {
@@ -61,6 +61,10 @@ export class Match {
     this.queuedShots = [];
     this.skillUses = {};
     this.stats = emptyStats();
+    // Optional host hook (standalone-api installs one when a Web Worker is
+    // available): (job, done) => void. Runs the ballistic search off-thread;
+    // the match keeps ownership of the RNG and the authoritative plan.
+    this.aiSolver = null;
     this.resetLocked();
   }
 
@@ -110,6 +114,10 @@ export class Match {
     this.showCountdown = false;
     this.moveDir = 0;
     this.aiPlan = null;
+    this.aiPending = false;
+    // Invalidate any in-flight worker search from a previous match/turn.
+    this.aiToken = (this.aiToken || 0) + 1;
+    this.aiWait = 0;
     this.aiMoveTarget = 0;
     this.enemyAimAngle = enemyWeapon.startAngle;
     this.enemyAimFrom = enemyWeapon.startAngle;
@@ -426,6 +434,13 @@ export class Match {
         updateFlightLocked(this, step);
         break;
       case 'enemy_think': {
+        if (this.aiPending) {
+          // A worker search is in flight; hold the turn until it lands. The
+          // hard deadline keeps the match playable if the worker dies.
+          this.aiWait += step;
+          if (this.aiWait > 5) this.aiFallbackLocked();
+          break;
+        }
         this.timer -= step;
         if (this.timer <= 0) {
           this.phase = 'enemy_aim';
@@ -646,15 +661,77 @@ export class Match {
     if (e.x < this.actors[0].x) e.facing = 1;
     e.slope = this.terrain.slopeAt(e.x, e.y, 22);
     this.aiMoveTarget = 0;
-    this.aiPlan = chooseShotForWeapon(
-      e, this.actors[0], this.wind, this.terrain, this.rng, this.enemyWeapon(),
-      14.0, FORCE_MAX,
-    );
+    if (this.aiSolver) {
+      const target = this.actors[0];
+      const weapon = this.enemyWeapon();
+      const token = (this.aiToken = (this.aiToken || 0) + 1);
+      this.aiPending = true;
+      this.aiWait = 0;
+      this.aiPlan = null;
+      try {
+        this.aiSolver({
+          shooter: { x: e.x, y: e.y, slope: e.slope, alive: e.alive },
+          target: { x: target.x, y: target.y, alive: target.alive },
+          wind: this.wind,
+          startAngle: weapon.startAngle,
+          angleMin: weapon.angleMin,
+          angleMax: weapon.angleMax,
+          maxSeconds: 14.0,
+          forceMax: FORCE_MAX,
+          craters: this.terrain.craters.length,
+        }, (best) => this.applyAISearchLocked(token, best));
+      } catch (error) {
+        console.warn('AI solver hook failed, using synchronous search', error);
+        this.aiPending = false;
+        this.aiPlan = chooseShotForWeapon(
+          e, target, this.wind, this.terrain, this.rng, weapon, 14.0, FORCE_MAX,
+        );
+      }
+    } else {
+      this.aiPlan = chooseShotForWeapon(
+        e, this.actors[0], this.wind, this.terrain, this.rng, this.enemyWeapon(),
+        14.0, FORCE_MAX,
+      );
+    }
     this.enemyAimFrom = this.enemyAimAngle;
-    this.enemyAimTo = this.aiPlan.angle;
+    this.enemyAimTo = this.aiPlan ? this.aiPlan.angle : this.enemyWeapon().startAngle;
     this.phase = 'enemy_think';
     this.timer = ENEMY_THINK_SECONDS;
     this.emit('toast', { text: '电脑正在测算风向与弹道…' });
+  }
+
+  /**
+   * Accept a worker search result. The aim error (triangular noise) is applied
+   * here, on the match's own RNG, so the random stream is identical to the
+   * synchronous search — the worker only decides the solved angle/force.
+   */
+  applyAISearchLocked(token, best) {
+    if (!this.aiPending || token !== this.aiToken) return;
+    if (!best || !Number.isFinite(best.angle) || !Number.isFinite(best.force)) {
+      this.aiFallbackLocked();
+      return;
+    }
+    const weapon = this.enemyWeapon();
+    let angle = best.angle + triangularNoise(this.rng) * 1.6;
+    let force = best.force + triangularNoise(this.rng) * 28;
+    angle = clamp(angle, weapon.angleMin, weapon.angleMax);
+    force = clamp(force, 420, FORCE_MAX);
+    this.aiPlan = {
+      angle, force,
+      direction: best.direction,
+      expected: best.expected ?? null,
+      solvedAngle: best.solvedAngle,
+      solvedForce: best.solvedForce,
+    };
+    this.enemyAimTo = angle;
+    this.aiPending = false;
+  }
+
+  aiFallbackLocked() {
+    const weapon = this.enemyWeapon();
+    this.aiPlan = { angle: weapon.startAngle, force: 1200 };
+    this.enemyAimTo = this.aiPlan.angle;
+    this.aiPending = false;
   }
 
   chooseEnemyMoveTargetLocked() {

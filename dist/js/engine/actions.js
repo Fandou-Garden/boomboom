@@ -13,9 +13,9 @@ import {
   ENERGY_PER_VOLLEY, ENERGY_PER_HEAL, FORCE_MAX, GROUND_BOTTOM, HEAL_AMOUNT,
   HEAL_DELAY, HEALS_PER_ROUND, MAX_FLIGHT_SECONDS, PHYSICS_DT, RESOLVE_DELAY,
   SKILL_DEFS, SKILL_ORDER, WORLD_WIDTH, ballFor, clamp,
-} from './constants.js?v=24';
-import { blastDamage, launch, muzzlePoint, sourceCriticalDamage, stepProjectile } from './physics.js?v=24';
-import { makeImpact } from './json.js?v=24';
+} from './constants.js?v=25';
+import { blastDamage, launch, muzzlePoint, sourceCriticalDamage, stepProjectile } from './physics.js?v=25';
+import { makeImpact } from './json.js?v=25';
 
 export function fireLocked(m, index, angle, force) {
   if (m.phase === 'over' || index < 0 || index > 1) return false;
