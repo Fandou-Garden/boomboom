@@ -91,7 +91,9 @@ resolve --下一回合--> player
 | `dist/js/input.js` | Pointer/键盘/取消，只产生命令 |
 | `dist/js/explosion.js` | 粒子形状与视觉噪声（不修改 mask） |
 | `dist/js/main.js` | 启动 `RemoteMatch`、HUD、手机全屏说明、PWA、测试钩子 |
-| `dist/data/<id>.fore.map` | 权威碰撞位图（11 张图），Go 与 JS 引擎都直接读取 |
+| `dist/js/map-manifest.js` | 地图分组（5 core / 6 extra）与四件资源 URL；extra 按需下载并记 localStorage |
+| `scripts/gen-map-assets.py` | 从原版 fore/back 生成一张地图的 fore.png/webp、back/thumb、fore.map(.gz) |
+| `dist/data/<id>.fore.map` | 权威碰撞位图（12 张图），Go 与 JS 引擎都直接读取 |
 
 前端 `physics.js` 与服务端 `physics.go` 的公式必须保持一致；任何偏差只影响
 “推荐力度”，不会影响真实命中。权威引擎的另一份实现 `dist/js/engine/physics.js`

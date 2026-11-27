@@ -31,6 +31,7 @@ export const MAPS = Object.freeze([
   { id: '1157', name: '竹海日落', trait: '东方 · 竹海古道' },
   { id: '1190', name: '天空之城', trait: '遗迹 · 玛雅金字塔' },
   { id: '1192', name: '碧水绿丘', trait: '幻境 · 翡翠神殿' },
+  { id: '1049', name: '玛雅废墟', trait: '遗迹 · 石柱古城废墟' },
 ]);
 
 export const DEFAULT_MAP_ID = '1156';

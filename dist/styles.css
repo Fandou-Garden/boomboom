@@ -912,6 +912,19 @@ svg { display: block; }
 .map-option .map-name { font-size: clamp(12px, 1.3vw, 15px); font-weight: 800; }
 .map-option .map-id { position: absolute; top: 10px; left: 10px; padding: 1px 7px; border-radius: 6px; background: rgba(3, 20, 28, 0.78); color: #ffe1a0; font: 700 10px/1.5 ui-monospace, Menlo, monospace; }
 .map-option .map-trait { color: #9bcbd5; font-size: 10px; line-height: 1.2; }
+/* On-demand maps: a locked card shows a placeholder plus a status badge. */
+.map-option.is-locked { border-style: dashed; opacity: 0.9; }
+.map-option.is-locked:hover { opacity: 1; }
+.map-thumb-locked {
+  display: grid; place-items: center; width: 100%; aspect-ratio: 240 / 133;
+  border-radius: 8px; background: repeating-linear-gradient(45deg, #0b2c38, #0b2c38 8px, #0d3442 8px, #0d3442 16px);
+  color: rgba(180, 226, 236, 0.5); font: 800 30px/1 ui-monospace, Menlo, monospace;
+}
+.map-load-badge {
+  position: absolute; right: 10px; bottom: 9px; padding: 2px 8px; border-radius: 7px;
+  background: rgba(6, 26, 35, 0.92); border: 1px solid rgba(255, 197, 84, 0.6);
+  color: #ffd979; font: 700 10px/1.4 ui-monospace, Menlo, monospace;
+}
 .map-dialog-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 14px; }
 #mapSource { min-width: 0; overflow: hidden; color: #86aeb9; font: 10px/1.3 ui-monospace, Menlo, monospace; text-overflow: ellipsis; white-space: nowrap; }
 .map-confirm {
