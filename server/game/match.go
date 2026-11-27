@@ -200,6 +200,55 @@ func (m *Match) Reset() {
 	m.resetLocked()
 }
 
+// SOURCE: BaseGame.cs 以 mapPos.PosX / PosX1 作为双方出生列。静态版固定
+// SpawnX={240,1640}，但部分地图（如 1157）在这些列的上方有悬空前景——
+// FindGroundY「从探测起点向下找第一个实心」会把角色放进悬空珊瑚内部。
+// 这里按原版出生点语义就地扫描：脚下有连续地面、身体与头顶 110px 净空
+// 内无任何碰撞，找不到时才回退固定列。
+func (m *Match) spawnColumnLocked(index int) (float64, float64) {
+	prefer := int(SpawnX[index])
+	width := m.Terrain.Width
+	offsets := []int{0}
+	for d := 10; d <= 360; d += 10 {
+		offsets = append(offsets, d, -d)
+	}
+	for _, d := range offsets {
+		x := prefer + d
+		if x < 80 || x > width-80 {
+			continue
+		}
+		gy, ok := m.Terrain.FindGroundY(x, SpawnProbeY, GroundBottom)
+		if !ok {
+			continue
+		}
+		clear := true
+		for y := gy - 110; y < gy; y++ {
+			if m.Terrain.IsSolid(x, y) {
+				clear = false
+				break
+			}
+		}
+		if !clear {
+			continue
+		}
+		supported := false
+		for y := gy + 1; y <= gy+8 && y < m.Terrain.Height; y++ {
+			if m.Terrain.IsSolid(x-16, y) || m.Terrain.IsSolid(x+16, y) {
+				supported = true
+				break
+			}
+		}
+		if !supported {
+			continue
+		}
+		return float64(x), float64(gy)
+	}
+	if gy, ok := m.Terrain.FindGroundY(prefer, SpawnProbeY, GroundBottom); ok {
+		return float64(prefer), float64(gy)
+	}
+	return float64(prefer), WorldHeight - 60
+}
+
 func (m *Match) resetLocked() {
 	m.Terrain.Reset()
 	m.Time = 0
@@ -253,18 +302,15 @@ func (m *Match) resetLocked() {
 	m.EnemyAimTo = enemyWeapon.StartAngle
 	m.EnemyAimElapsed = 0
 
-	spawnY := [2]float64{}
-	for i, x := range SpawnX {
-		if gy, ok := m.Terrain.FindGroundY(int(x), SpawnProbeY, GroundBottom); ok {
-			spawnY[i] = float64(gy)
-		} else {
-			spawnY[i] = WorldHeight - 60
-		}
+	spawn := [2][2]float64{}
+	for i := range SpawnX {
+		x, y := m.spawnColumnLocked(i)
+		spawn[i] = [2]float64{x, y}
 	}
 	m.Actors = [2]*Actor{
 		{
 			Index: 0, ID: "player", Name: "蓝波", Subtitle: "你",
-			X: SpawnX[0], Y: spawnY[0], HP: PlayerMaxHP, MaxHP: PlayerMaxHP,
+			X: spawn[0][0], Y: spawn[0][1], HP: PlayerMaxHP, MaxHP: PlayerMaxHP,
 			Facing: 1, Alive: true, Grounded: true, AimAngle: playerWeapon.StartAngle, Weapon: playerWeapon.ID,
 			BaseDamage: BaseDamage, Attack: Attack, BaseGuard: BaseGuard,
 			Defence: Defence, Grade: Grade, Lucky: Lucky,
@@ -272,7 +318,7 @@ func (m *Match) resetLocked() {
 		},
 		{
 			Index: 1, ID: "enemy", Name: "芽芽", Subtitle: "电脑",
-			X: SpawnX[1], Y: spawnY[1], HP: EnemyMaxHP, MaxHP: EnemyMaxHP,
+			X: spawn[1][0], Y: spawn[1][1], HP: EnemyMaxHP, MaxHP: EnemyMaxHP,
 			Facing: -1, Alive: true, Grounded: true, AimAngle: enemyWeapon.StartAngle, Weapon: enemyWeapon.ID,
 			BaseDamage: BaseDamage, Attack: Attack, BaseGuard: BaseGuard,
 			Defence: Defence, Grade: Grade, Lucky: Lucky,

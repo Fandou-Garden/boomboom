@@ -55,11 +55,30 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 	// volley entirely, so POW and attack items are ignored for this shot.
 	carry := index == 0 && m.CarryArmed && m.CanCarry
 	pow := index == 0 && !carry && m.PowSelected && m.Energy >= EnergyMax
+	// SOURCE: bombconfig.xml Common/Special → BallList.xml。普通击用 Common 弹，
+	// POW 大招用 Special 弹：弹数(Amount)、伤害系数(Power)、爆炸半径(Radii)与
+	// 弹坑(Crater) 全部取自 BallList 该弹行；雷霆(151)/烈火(171)/水果篮(411)/
+	// 马桶(371) 的大招是三连发（Amount=3，Power 0.5~0.6），其余大招单发加伤。
+	ball := BallFor(weapon.BallID)
+	if pow {
+		ball = BallFor(weapon.SpecialBallID)
+	}
+	ballPower := ball.Power
+	if carry {
+		ballPower = 0
+	}
 	if carry {
 		offsets = []float64{0}
 		scales = []float64{1}
-	} else if pow {
-		// NEW browser POW: one heavy shell with the original crater-4 bitmap.
+	} else if pow && ball.Amount > 1 {
+		// SOURCE: BallList Amount=3 的大招（151/171/371/411）按 Player.ShootImp
+		// 顺序发射同一向量；scales 必须全 1（make 的零值会把力度压成 1）。
+		offsets = make([]float64, ball.Amount)
+		scales = make([]float64, ball.Amount)
+		for i := range scales {
+			scales[i] = 1
+		}
+		sequential = true
 	} else if index == 0 && m.SelectedSkill != "" {
 		if def, ok := SkillDefs[m.SelectedSkill]; ok && def.Kind == "attack" && m.SkillUses[m.SelectedSkill] > 0 {
 			offsets = def.Offsets
@@ -100,8 +119,8 @@ func (m *Match) fireLocked(index int, angle, force float64) bool {
 			VX: vx, VY: vy, Alive: true, Direction: direction,
 			Elevation: elevation, Force: f, Trail: []TrailPoint{{X: mx, Y: my}},
 			VolleyID: volleyID, Slot: i, Shells: len(offsets), Skill: firedSkill,
-			Weapon: weapon.ID, CraterArt: weapon.CraterArt,
-			DamageScale: damageScale, Pow: pow,
+			Weapon: weapon.ID, CraterArt: ball.Crater, BlastRadius: ball.Radii,
+			DamageScale: damageScale * ballPower, Pow: pow,
 		}
 		if carry {
 			// BallList ID=3: Power=0, Crater="" — no damage, no crater. The
@@ -299,14 +318,19 @@ func (m *Match) resolveImpactLocked(p *Projectile) {
 		Owner: p.Owner, Shell: p.Slot, Shells: p.Shells,
 	}
 	if impactType == "ground" || impactType == "actor" {
+		// SOURCE: BallList.xml — 弹坑(Crater)与爆炸半径(Radii)来自该发弹自身，
+		// 不再按 POW 全局覆盖。
 		art := p.CraterArt
 		if art == "" {
 			art = m.weaponForActor(p.Owner).CraterArt
 		}
 		kind := "medium"
-		radius := BlastRadius
-		if p.Pow {
-			art, kind, radius = PowCraterArt, "large", PowBlastRadius
+		radius := p.BlastRadius
+		if radius <= 0 {
+			radius = BlastRadius
+		}
+		if radius >= 60 {
+			kind = "large"
 		}
 		removed, _, ok := m.Terrain.Carve(ix, iy, art, kind)
 		impact.Removed, impact.CraterKind, impact.CraterArt = removed, kind, art
@@ -319,10 +343,9 @@ func (m *Match) resolveImpactLocked(p *Projectile) {
 			m.refreshSupportLocked(a)
 		}
 		damage, distance := BlastDamage(target, float64(ix), float64(iy), attacker, radius)
+		// SOURCE: SimpleBomb.MakeDamage —— 弹的 Power 系数在发射时已并入
+		// DamageScale（普通弹 1.0，大招弹 1.5/1.3/0.6/0.5，carry 弹 0）。
 		damage = int(float64(damage) * p.DamageScale)
-		if p.Pow {
-			damage = int(float64(damage) * PowDamageMultiplier)
-		}
 		if damage < 0 {
 			damage = 0
 		}

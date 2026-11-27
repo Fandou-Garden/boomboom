@@ -567,3 +567,112 @@ func TestCarryAvailableAgainOnNewPlayerTurn(t *testing.T) {
 		t.Fatalf("new player turn should restore CanCarry (armed=%v available=%v)", m.CarryArmed, m.CanCarry)
 	}
 }
+
+// SOURCE: BallList.xml + bombconfig.xml —— POW 使用 bombconfig Special 弹的
+// Amount/Power/Radii/Crater：水果篮大招弹 411（三连发榴莲、Power 0.5、半径
+// 65、弹坑 411），风神普通弹 121 用原版弹坑。雷霆 151 / 烈火 171 / 马桶 371
+// 同为三连发。
+func TestPowVolleyUsesSpecialBall(t *testing.T) {
+	if b := BallFor("411"); b.Amount != 3 || b.Power != 0.5 || b.Radii != 65 || b.Crater != "411" {
+		t.Fatalf("ball 411 = %+v", b)
+	}
+	if b := BallFor("171"); b.Amount != 3 || b.Power != 0.6 || b.Radii != 45 {
+		t.Fatalf("ball 171 = %+v", b)
+	}
+	if b := BallFor("151"); b.Amount != 3 || b.Power != 0.6 {
+		t.Fatalf("ball 151 = %+v", b)
+	}
+	if b := BallFor("371"); b.Amount != 3 || b.Power != 0.5 {
+		t.Fatalf("ball 371 = %+v", b)
+	}
+	if w := WeaponFor("fruit"); w.SpecialBallID != "411" || w.SpecialActionType != 0 || w.ActionType != 0 {
+		t.Fatalf("fruit def = %+v", w)
+	}
+	if w := WeaponFor("bow"); w.ActionType != 1 || w.SpecialActionType != 1 {
+		t.Fatalf("bow def = %+v", w)
+	}
+
+	// 水果篮 POW：一击三发 sequential，弹体带 411 坑 / 65 半径 / 0.5 伤害系数。
+	m := NewMatch(testTerrain(t), 7, false)
+	m.PlayerWeapon = "fruit"
+	m.Energy = EnergyMax
+	m.PowSelected = true
+	if !m.fireLocked(0, 45, 1200) {
+		t.Fatal("pow fire rejected")
+	}
+	if m.VolleyTotal != 3 || len(m.QueuedShots) != 2 || m.Shot == nil {
+		t.Fatalf("fruit pow volley = total %d queued %d", m.VolleyTotal, len(m.QueuedShots))
+	}
+	if m.Shot.CraterArt != "411" || m.Shot.BlastRadius != 65 {
+		t.Fatalf("fruit pow shell art=%s radius=%v", m.Shot.CraterArt, m.Shot.BlastRadius)
+	}
+	if math.Abs(m.Shot.DamageScale-0.5) > 1e-9 {
+		t.Fatalf("fruit pow damageScale = %v, want 0.5", m.Shot.DamageScale)
+	}
+	if !m.Shot.Pow {
+		t.Fatal("shell must be flagged pow")
+	}
+
+	// 风神普通弹 121：原版弹坑 + 标准半径。
+	m2 := NewMatch(testTerrain(t), 7, false)
+	m2.PlayerWeapon = "wind"
+	if !m2.fireLocked(0, 40, 1200) {
+		t.Fatal("wind fire rejected")
+	}
+	if m2.Shot.CraterArt != "121" || m2.Shot.BlastRadius != 55 {
+		t.Fatalf("wind shell art=%s radius=%v", m2.Shot.CraterArt, m2.Shot.BlastRadius)
+	}
+	if math.Abs(m2.Shot.DamageScale-1.0) > 1e-9 {
+		t.Fatalf("wind damageScale = %v", m2.Shot.DamageScale)
+	}
+
+	// 轰天大招 111：单发、Power 1.3、半径 65。
+	m3 := NewMatch(testTerrain(t), 7, false)
+	m3.PlayerWeapon = "cannon"
+	m3.Energy = EnergyMax
+	m3.PowSelected = true
+	if !m3.fireLocked(0, 65, 1200) {
+		t.Fatal("cannon pow fire rejected")
+	}
+	if m3.VolleyTotal != 1 {
+		t.Fatalf("cannon pow volley = %d", m3.VolleyTotal)
+	}
+	if m3.Shot.CraterArt != "401" || m3.Shot.BlastRadius != 65 {
+		t.Fatalf("cannon pow shell art=%s radius=%v", m3.Shot.CraterArt, m3.Shot.BlastRadius)
+	}
+	if math.Abs(m3.Shot.DamageScale-1.3) > 1e-9 {
+		t.Fatalf("cannon pow damageScale = %v", m3.Shot.DamageScale)
+	}
+}
+
+// SOURCE: BaseGame.cs PosX/PosX1 出生列。1157 等地图在固定列上方有悬空
+// 前景，出生必须扫描到「脚下有地面 + 净空无碰撞」的站立位。
+func TestSpawnColumnAvoidsFloatingTerrain(t *testing.T) {
+	root := filepath.Join("..", "..")
+	for _, id := range []string{"1156", "1001", "1002", "1003", "1008", "1014", "1035", "1038", "1157", "1190", "1192"} {
+		tr, err := LoadTerrain(filepath.Join(root, "dist/data", id+".fore.map"), filepath.Join(root, "dist/assets"))
+		if err != nil {
+			t.Fatalf("%s: %v", id, err)
+		}
+		m := NewMatch(tr, 7, false)
+		for i, a := range m.Actors {
+			x, y := int(a.X), int(a.Y)
+			if y < SpawnProbeY || y >= tr.Height-20 {
+				t.Fatalf("%s actor %d spawns out of bounds (%d,%d)", id, i, x, y)
+			}
+			// 身体区（y-40..y-1）与头顶净空不得嵌入实心。
+			for sy := y - 110; sy < y; sy++ {
+				if sy < 0 {
+					continue
+				}
+				if tr.IsSolid(x, sy) {
+					t.Fatalf("%s actor %d embedded in terrain at (%d,%d)", id, i, x, sy)
+				}
+			}
+			// 脚下必须落在地面上（或即将落地——不再悬空）。
+			if !tr.IsSolid(x, y) {
+				t.Fatalf("%s actor %d has no ground under (%d,%d)", id, i, x, y)
+			}
+		}
+	}
+}

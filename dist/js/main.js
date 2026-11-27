@@ -1,12 +1,12 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=21';
-import { loadImage, Terrain } from './terrain.js?v=21';
-import { RemoteMatch } from './net-client.js?v=21';
-import { Renderer } from './renderer.js?v=21';
-import { Camera, projectPoint } from './camera.js?v=21';
-import { InputController } from './input.js?v=21';
-import { solvePerfect } from './ai.js?v=21';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=21';
-import { MAPS, getMap, resolveMapId } from './maps.js?v=21';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=22';
+import { loadImage, Terrain } from './terrain.js?v=22';
+import { RemoteMatch } from './net-client.js?v=22';
+import { Renderer } from './renderer.js?v=22';
+import { Camera, projectPoint } from './camera.js?v=22';
+import { InputController } from './input.js?v=22';
+import { solvePerfect } from './ai.js?v=22';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=22';
+import { MAPS, getMap, resolveMapId } from './maps.js?v=22';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -1840,6 +1840,10 @@ function exposeTestApi() {
         shot: game.shot ? {
           x: game.shot.x, y: game.shot.y, renderX: game.shot.renderX, renderY: game.shot.renderY,
           vx: game.shot.vx, vy: game.shot.vy, owner: game.shot.owner,
+          pow: game.shot.pow, shells: game.shot.shells, slot: game.shot.slot,
+          weapon: game.shot.weapon, craterArt: game.shot.craterArt,
+          blastRadius: game.shot.blastRadius, damageScale: game.shot.damageScale,
+          carry: game.shot.carry,
         } : null,
         stats: { ...game.stats },
         lastImpact: game.lastImpact,
@@ -2256,6 +2260,10 @@ async function boot() {
       50: { shape: 'assets/crater-50.png', brink: 'assets/craterbrink-50.png' },
       401: { shape: 'assets/crater-401.png', brink: 'assets/craterbrink-401.png' },
       4: { shape: 'assets/crater-4.png', brink: 'assets/craterbrink-4.png' },
+      // SOURCE: BallList.xml Crater 列 —— 原版真图：121/131 风神、411 榴莲坑。
+      121: { shape: 'assets/crater-121.png', brink: 'assets/craterbrink-121.png' },
+      131: { shape: 'assets/crater-131.png', brink: 'assets/craterbrink-131.png' },
+      411: { shape: 'assets/crater-411.png', brink: 'assets/craterbrink-411.png' },
     };
     const weaponIds = ['axe', 'bow', 'gun', 'goldgun', 'fire', 'cannon', 'wind', 'thunder', 'brick', 'fruit', 'scalpel', 'toilet', 'appliance'];
     const mapBackUrl = `assets/map-${currentMapId}-back.jpg`;
@@ -2263,7 +2271,7 @@ async function boot() {
     // Reflect the chosen map in the minimap header (was hard-coded "亚特兰蒂斯").
     const minimapTitle = document.querySelector('.minimap-title');
     if (minimapTitle) minimapTitle.textContent = currentMap.name;
-    const [back, playerSheet, enemySheet, shell, loadedTerrain, weaponImages, projectileImages, fruitPowImage, carryImage] = await Promise.all([
+    const [back, playerSheet, enemySheet, shell, loadedTerrain, weaponImages, projectileImages, fruitPowImage, carryImage, powImages] = await Promise.all([
       loadImage(mapBackUrl),
       loadImage('assets/character-player-sheet.png'),
       loadImage('assets/character-enemy-sheet.png'),
@@ -2276,12 +2284,20 @@ async function boot() {
       Promise.all(weaponIds.map(async (id) => [id, await loadImage(`assets/projectile-${id}.png`)])).then(Object.fromEntries),
       loadImage('assets/projectile-fruit-pow.png'),
       loadImage('assets/projectile-carry.png'),
+      // SOURCE: BallList.xml Amount=3 的大招弹（171/151/371）换专属弹体，
+      // 与 411 榴莲（fruit-pow）一样让 POW 一眼可辨。
+      Promise.all([
+        ['fire-pow', loadImage('assets/projectile-fire-pow.png')],
+        ['thunder-pow', loadImage('assets/projectile-thunder-pow.png')],
+        ['toilet-pow', loadImage('assets/projectile-toilet-pow.png')],
+      ]).then(Object.fromEntries),
     ]);
     // POW ammo visual: original durian item art replaces the tomato on a
     // fruit-basket POWER shot (browser-only, see README).
     projectileImages['fruit-pow'] = fruitPowImage;
     // SOURCE: SetBall(3) fly/carry ball — a paper-plane teleport shell.
     projectileImages['carry'] = carryImage;
+    Object.assign(projectileImages, powImages);
     terrain = loadedTerrain;
     renderer = new Renderer({
       canvas: els.canvas,

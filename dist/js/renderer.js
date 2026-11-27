@@ -1,7 +1,7 @@
 /** Canvas renderer. World layers use world coordinates; HUD stays in DOM. */
-import { PHYSICS, COMBAT, WORLD, COLORS } from './config.js?v=21';
-import { clamp, muzzlePoint, weaponGripPoint } from './physics.js?v=21';
-import { projectPoint } from './camera.js?v=21';
+import { PHYSICS, COMBAT, WORLD, COLORS } from './config.js?v=22';
+import { clamp, muzzlePoint, weaponGripPoint } from './physics.js?v=22';
+import { projectPoint } from './camera.js?v=22';
 
 // SOURCE: GameCharacter.as action frame arrays. The 3×13 sheet is a frame atlas,
 // not three independent suit rows: STAND/WALK/SHOWGUN/SHOT/HIT all index into it.
@@ -15,6 +15,11 @@ const ACTOR_FRAMES = {
   show: [19, 20, 21],
   shot: [22, 23, 26, 27, 27],
   hit: [12, 24, 25, 38, 11],
+  // SOURCE: GameCharacter.as — 开火准备动作按 BallList @ActionType 二选一：
+  //   SHOWGUN    = PlayerAction("showgun",    [[19, 20, 21, 21, 21]]) 举枪
+  //   SHOWTHROWS = PlayerAction("showthrows", [[28, 29, 30, 30, 30]]) 投掷
+  showgun: [19, 20, 21, 21, 21],
+  showthrows: [28, 29, 30, 30, 30],
 };
 const FIRE_ANIM_SECONDS = 0.28;
 const HURT_ANIM_SECONDS = 0.5;
@@ -238,6 +243,20 @@ export class Renderer {
     };
   }
 
+  // SOURCE: PrepareShootAction.doPrepareToShootAction() —
+  //   _actionType = ball.ActionType == 0 ? GameCharacter.SHOWTHROWS
+  //                                       : GameCharacter.SHOWGUN;
+  // 枪炮类（弓箭/AK/黄金枪/轰天/雷霆/马桶）开火举枪 SHOWGUN；投掷类
+  // （石斧/风神/烈火/司马砸缸/水果篮/手术刀/黑白家电）开火抡臂 SHOWTHROWS。
+  // POW 大招按 Special 弹自己的 ActionType（数据上与普通弹一致）。
+  _fireFrames(game, actor) {
+    const def = game.weapons?.find((w) => w.id === actor.weapon);
+    if (!def) return ACTOR_FRAMES.shot;
+    const pow = !!(game.shot && game.shot.owner === actor.index && game.shot.pow);
+    const actionType = pow ? def.specialActionType : def.actionType;
+    return actionType === 0 ? ACTOR_FRAMES.showthrows : ACTOR_FRAMES.showgun;
+  }
+
   _frameForActor(game, actor) {
     if ((actor.hurtTimer || 0) > 0) {
       const progress = clamp(1 - actor.hurtTimer / HURT_ANIM_SECONDS, 0, 0.999);
@@ -245,7 +264,8 @@ export class Renderer {
     }
     if ((actor.fireTimer || 0) > 0) {
       const progress = clamp(1 - actor.fireTimer / FIRE_ANIM_SECONDS, 0, 0.999);
-      return ACTOR_FRAMES.shot[Math.floor(progress * ACTOR_FRAMES.shot.length)];
+      const frames = this._fireFrames(game, actor);
+      return frames[Math.floor(progress * frames.length)];
     }
     if (actor.walkDirection) {
       const phase = actor.walkPhase ?? actor.walkTime ?? 0;
@@ -613,10 +633,14 @@ export class Renderer {
       ctx.stroke();
     }
 
-    // POWER shot of the fruit basket swaps the tomato for the original durian
-    // item art; a carry (fly/teleport) ball uses the original paper-plane art.
+    // SOURCE: BallList.xml Amount=3 的大招弹换专属弹体（411 榴莲 / 171 烈火 /
+    // 151 雷霆 / 371 马桶），其余大招沿用该武器普通弹体；carry 弹是纸飞机。
+    const POW_PROJECTILES = {
+      fruit: 'fruit-pow', fire: 'fire-pow', thunder: 'thunder-pow', toilet: 'toilet-pow',
+    };
     const ammoKey = shot.carry ? 'carry'
-      : (shot.pow && shot.weapon === 'fruit') ? 'fruit-pow' : shot.weapon;
+      : (shot.pow && POW_PROJECTILES[shot.weapon]) ? POW_PROJECTILES[shot.weapon]
+      : shot.weapon;
     const image = this.images.projectiles?.[ammoKey] || this.images.projectiles?.[shot.weapon] || this.images.shell;
     // Draw shells at a uniform fraction of their ORIGINAL art instead of
     // stretching every weapon to a fixed ~70 px. The old rule blew small

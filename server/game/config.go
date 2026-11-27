@@ -89,13 +89,12 @@ const (
 	EnergyPerHeal   = 8.0
 	// NEW: 体力无限。保留字段供旧调试接口读取，但移动不扣体力，
 	// 服务端也不再因体力耗尽而停下角色。
-	StaminaMax          = 100.0
-	StaminaMoveCost     = 0.0
-	StaminaIdleRegen    = 0.0
-	StaminaTurnRestore  = 0.0
-	PowBlastRadius      = 82.0
-	PowDamageMultiplier = 1.8
-	PowCraterArt        = "4"
+	StaminaMax         = 100.0
+	StaminaMoveCost    = 0.0
+	StaminaIdleRegen   = 0.0
+	StaminaTurnRestore = 0.0
+	// POW 不再使用全局倍率/半径/弹坑：SOURCE BallList.xml 每发弹自带
+	// Power/Radii/Crater/Amount，POW 改用各武器的 Special 弹（见 BallDefs）。
 
 	// SOURCE: TemplateAlllist.xml TemplateID=70322 Property5/6 = 15/65.
 	// 五种武器的实际角度范围来自各自 WeaponDef；这两个常量只作为
@@ -187,6 +186,63 @@ type WeaponDef struct {
 	StartAngle   float64 `json:"startAngle"`
 	CraterArt    string  `json:"craterArt"`
 	WeaponSprite string  `json:"weaponSprite"`
+	// SOURCE: bombconfig.xml <Item TemplateID=... Common=/Special=>。
+	// SpecialBallID 是 POW 大招弹（BallList Special 列）。
+	SpecialBallID string `json:"specialBallId"`
+	// SOURCE: PrepareShootAction.doPrepareToShootAction() —
+	// ball.ActionType == 0 → GameCharacter.SHOWTHROWS（投掷动作），
+	// ball.ActionType == 1 → GameCharacter.SHOWGUN（举枪动作）。
+	ActionType        int `json:"actionType"`
+	SpecialActionType int `json:"specialActionType"`
+}
+
+// SOURCE: GameAdmin/Backup/XMLReader/XMLImport/BallList.xml。Power=伤害系数、
+// Radii=爆炸半径(px)、Crater=弹坑贴图 ID、Amount=每击弹数、ActionType=开火
+// 动作（0 投掷 / 1 举枪）。Crater 素材缺失的弹按仓库既有映射规则落到
+// 4/50/401（README「素材映射」章节同规则）；121/131/411 使用原版真图。
+type BallDef struct {
+	ID         string
+	Power      float64
+	Radii      float64
+	Crater     string
+	Amount     int
+	ActionType int
+}
+
+var BallDefs = map[string]BallDef{
+	"20":  {ID: "20", Power: 1.0, Radii: 55, Crater: "4", Amount: 1, ActionType: 0},
+	"21":  {ID: "21", Power: 1.5, Radii: 65, Crater: "401", Amount: 1, ActionType: 0},
+	"18":  {ID: "18", Power: 1.0, Radii: 50, Crater: "50", Amount: 1, ActionType: 1},
+	"19":  {ID: "19", Power: 1.5, Radii: 59, Crater: "401", Amount: 1, ActionType: 1},
+	"22":  {ID: "22", Power: 1.0, Radii: 55, Crater: "50", Amount: 1, ActionType: 1},
+	"23":  {ID: "23", Power: 1.5, Radii: 65, Crater: "401", Amount: 1, ActionType: 1},
+	"30":  {ID: "30", Power: 1.0, Radii: 55, Crater: "50", Amount: 1, ActionType: 1},
+	"31":  {ID: "31", Power: 1.5, Radii: 65, Crater: "401", Amount: 1, ActionType: 1},
+	"101": {ID: "101", Power: 1.0, Radii: 55, Crater: "401", Amount: 1, ActionType: 1},
+	"111": {ID: "111", Power: 1.3, Radii: 65, Crater: "401", Amount: 1, ActionType: 1},
+	"121": {ID: "121", Power: 1.0, Radii: 55, Crater: "121", Amount: 1, ActionType: 0},
+	"131": {ID: "131", Power: 1.5, Radii: 65, Crater: "131", Amount: 1, ActionType: 0},
+	"141": {ID: "141", Power: 1.0, Radii: 55, Crater: "401", Amount: 1, ActionType: 1},
+	"151": {ID: "151", Power: 0.6, Radii: 65, Crater: "401", Amount: 3, ActionType: 1},
+	"161": {ID: "161", Power: 1.0, Radii: 55, Crater: "401", Amount: 1, ActionType: 0},
+	"171": {ID: "171", Power: 0.6, Radii: 45, Crater: "4", Amount: 3, ActionType: 0},
+	"341": {ID: "341", Power: 1.0, Radii: 55, Crater: "50", Amount: 1, ActionType: 0},
+	"351": {ID: "351", Power: 1.5, Radii: 65, Crater: "401", Amount: 1, ActionType: 0},
+	"381": {ID: "381", Power: 1.0, Radii: 55, Crater: "4", Amount: 1, ActionType: 0},
+	"391": {ID: "391", Power: 1.5, Radii: 65, Crater: "401", Amount: 1, ActionType: 0},
+	"401": {ID: "401", Power: 1.0, Radii: 55, Crater: "401", Amount: 1, ActionType: 0},
+	"411": {ID: "411", Power: 0.5, Radii: 65, Crater: "411", Amount: 3, ActionType: 0},
+	"361": {ID: "361", Power: 1.0, Radii: 55, Crater: "401", Amount: 1, ActionType: 1},
+	"371": {ID: "371", Power: 0.5, Radii: 65, Crater: "401", Amount: 3, ActionType: 1},
+	"321": {ID: "321", Power: 1.0, Radii: 55, Crater: "50", Amount: 1, ActionType: 0},
+	"331": {ID: "331", Power: 1.5, Radii: 65, Crater: "401", Amount: 1, ActionType: 0},
+}
+
+func BallFor(id string) BallDef {
+	if b, ok := BallDefs[id]; ok {
+		return b
+	}
+	return BallDef{ID: id, Power: 1.0, Radii: BlastRadius, Crater: "50", Amount: 1, ActionType: 1}
 }
 
 const (
@@ -202,82 +258,93 @@ var WeaponOrder = []string{
 var WeaponDefs = map[string]WeaponDef{
 	"axe": {
 		ID: "axe", Label: "石斧", Trait: "低角 · 大坑重击", Source: "Template 7001 · Pic axe · Ball 20",
-		Pic: "axe", BallID: "20", Projectile: "axe",
+		Pic: "axe", BallID: "20", SpecialBallID: "21", Projectile: "axe",
 		AngleMin: 25, AngleMax: 60, StartAngle: 42, CraterArt: "4",
 		WeaponSprite: "weapon-axe",
 	},
 	"bow": {
 		ID: "bow", Label: "弓箭", Trait: "高角 · 轻巧速射", Source: "Template 7002 · Pic bow · Ball 18",
-		Pic: "bow", BallID: "18", Projectile: "bow",
+		Pic: "bow", BallID: "18", SpecialBallID: "19", Projectile: "bow",
 		AngleMin: 35, AngleMax: 65, StartAngle: 50, CraterArt: "50",
 		WeaponSprite: "weapon-bow",
 	},
 	"gun": {
 		ID: "gun", Label: "AK-48", Trait: "高角 · 稳定火力", Source: "Template 7003 · Pic gun · Ball 22",
-		Pic: "gun", BallID: "22", Projectile: "gun",
+		Pic: "gun", BallID: "22", SpecialBallID: "23", Projectile: "gun",
 		AngleMin: 35, AngleMax: 60, StartAngle: 48, CraterArt: "50",
 		WeaponSprite: "weapon-gun",
 	},
 	"goldgun": {
 		ID: "goldgun", Label: "黄金枪", Trait: "低角 · 黄金弹幕", Source: "Template 7005 · Pic goldgun · Ball 30",
-		Pic: "goldgun", BallID: "30", Projectile: "goldgun",
+		Pic: "goldgun", BallID: "30", SpecialBallID: "31", Projectile: "goldgun",
 		AngleMin: 20, AngleMax: 40, StartAngle: 30, CraterArt: "50",
 		WeaponSprite: "weapon-goldgun",
 	},
 	"fire": {
 		ID: "fire", Label: "烈火", Trait: "中角 · 高攻爆发", Source: "Template 7006/7103 · Pic bombpack · Ball 161 · Crater 161",
-		Pic: "bombpack", BallID: "161", Projectile: "fire",
+		Pic: "bombpack", BallID: "161", SpecialBallID: "171", Projectile: "fire",
 		AngleMin: 20, AngleMax: 50, StartAngle: 35, CraterArt: "401",
 		WeaponSprite: "weapon-fire",
 	},
 	"cannon": {
 		ID: "cannon", Label: "轰天", Trait: "高角 · 重炮挖坑", Source: "Template 7007/7104 · Pic bomb · Ball 101 · Crater 101",
-		Pic: "bomb", BallID: "101", Projectile: "cannon",
+		Pic: "bomb", BallID: "101", SpecialBallID: "111", Projectile: "cannon",
 		AngleMin: 55, AngleMax: 70, StartAngle: 65, CraterArt: "401",
 		WeaponSprite: "weapon-cannon",
 	},
 	"wind": {
 		ID: "wind", Label: "风神", Trait: "低角 · 高敏先手", Source: "Template 7008/7105 · Pic dart · Ball 121",
-		Pic: "dart", BallID: "121", Projectile: "wind",
+		Pic: "dart", BallID: "121", SpecialBallID: "131", Projectile: "wind",
 		AngleMin: 15, AngleMax: 50, StartAngle: 35, CraterArt: "50",
 		WeaponSprite: "weapon-wind",
 	},
 	"thunder": {
 		ID: "thunder", Label: "雷霆", Trait: "中角 · 雷暴爆发", Source: "Template 7009/7106 · Pic electricbar · Ball 141",
-		Pic: "electricbar", BallID: "141", Projectile: "thunder",
+		Pic: "electricbar", BallID: "141", SpecialBallID: "151", Projectile: "thunder",
 		AngleMin: 25, AngleMax: 60, StartAngle: 42, CraterArt: "401",
 		WeaponSprite: "weapon-thunder",
 	},
 	"brick": {
 		ID: "brick", Label: "司马砸缸", Trait: "广角 · 巨坑压制", Source: "Template 7010/7107 · Pic brick · Ball 381",
-		Pic: "brick", BallID: "381", Projectile: "brick",
+		Pic: "brick", BallID: "381", SpecialBallID: "391", Projectile: "brick",
 		AngleMin: 20, AngleMax: 65, StartAngle: 42, CraterArt: "4",
 		WeaponSprite: "weapon-brick",
 	},
 	"fruit": {
 		ID: "fruit", Label: "水果篮", Trait: "中角 · 敏幸均衡", Source: "Template 7011/7108 · Pic fruit · Ball 401",
-		Pic: "fruit", BallID: "401", Projectile: "fruit",
+		Pic: "fruit", BallID: "401", SpecialBallID: "411", Projectile: "fruit",
 		AngleMin: 20, AngleMax: 50, StartAngle: 35, CraterArt: "401",
 		WeaponSprite: "weapon-fruit",
 	},
 	"scalpel": {
 		ID: "scalpel", Label: "手术刀", Trait: "低角 · 精准切割", Source: "Template 7012/7109 · Pic OPSbox · Ball 341",
-		Pic: "OPSbox", BallID: "341", Projectile: "scalpel",
+		Pic: "OPSbox", BallID: "341", SpecialBallID: "351", Projectile: "scalpel",
 		AngleMin: 15, AngleMax: 45, StartAngle: 30, CraterArt: "50",
 		WeaponSprite: "weapon-scalpel",
 	},
 	"toilet": {
 		ID: "toilet", Label: "马桶", Trait: "低角 · 刁钻弹道", Source: "Template 7013/7110 · Pic closestool · Ball 361",
-		Pic: "closestool", BallID: "361", Projectile: "toilet",
+		Pic: "closestool", BallID: "361", SpecialBallID: "371", Projectile: "toilet",
 		AngleMin: 20, AngleMax: 45, StartAngle: 32, CraterArt: "401",
 		WeaponSprite: "weapon-toilet",
 	},
 	"appliance": {
 		ID: "appliance", Label: "黑白家电", Trait: "高角 · 四维均衡", Source: "Template 7014/7111 · Pic television · Ball 321",
-		Pic: "television", BallID: "321", Projectile: "appliance",
+		Pic: "television", BallID: "321", SpecialBallID: "331", Projectile: "appliance",
 		AngleMin: 50, AngleMax: 70, StartAngle: 60, CraterArt: "50",
 		WeaponSprite: "weapon-appliance",
 	},
+}
+
+// init 用 BallDefs 填充每件武器的开火动作类型（SOURCE PrepareShootAction：
+// ball.ActionType 0=SHOWTHROWS 投掷 / 1=SHOWGUN 举枪）。
+func init() {
+	for id := range WeaponDefs {
+		w := WeaponDefs[id]
+		w.ActionType = BallFor(w.BallID).ActionType
+		w.SpecialActionType = BallFor(w.SpecialBallID).ActionType
+		WeaponDefs[id] = w
+	}
 }
 
 func WeaponFor(id string) WeaponDef {
