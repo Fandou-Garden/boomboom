@@ -996,7 +996,7 @@ function handleEvent(type, data = {}) {
     showToast(active.length
       ? `已选 ${active.map(skillName).join(' + ')} · 下一发生效，仍用蓝色主键发射`
       : '已取消技能选择', { duration: 2200 });
-    sound.play('skill-select');
+    // Sound is played immediately in useSkillSlot() to match original click timing.
   } else if (type === 'weapon-select') {
     showToast(`主武器：${data.label || data.weapon} · 角度 ${data.angleMin}°–${data.angleMax}°`, { duration: 2600 });
     sound.play('select');
@@ -1395,7 +1395,13 @@ function useSkillSlot(index) {
     return success;
   }
   const success = game.toggleSkill(id);
-  if (success) lastFrame = performance.now();
+  if (success) {
+    lastFrame = performance.now();
+    // SOURCE: RightPropBar.__itemClicked() plays SoundManager.instance.play("008")
+    // before useProp(), so the click feedback is immediate rather than after the
+    // engine echo. We mirror that timing here.
+    sound.play('skill-select');
+  }
   return success;
 }
 
