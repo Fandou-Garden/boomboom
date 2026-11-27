@@ -27,6 +27,7 @@ export class InputController {
     onAbort = () => {},
     onSkillSlot = () => {},
     onPowShortcut = () => {},
+    onCarryShortcut = () => {},
     onHealShortcut = () => {},
     onUserGesture = () => {},
     canAcceptInput = () => true,
@@ -45,6 +46,7 @@ export class InputController {
     this.onAbort = onAbort;
     this.onSkillSlot = onSkillSlot;
     this.onPowShortcut = onPowShortcut;
+    this.onCarryShortcut = onCarryShortcut;
     this.onHealShortcut = onHealShortcut;
     this.onUserGesture = onUserGesture;
     this.canAcceptInput = canAcceptInput;
@@ -247,6 +249,12 @@ export class InputController {
     if (event.code === 'KeyR') {
       event.preventDefault();
       this.onPowShortcut();
+      return;
+    }
+    // SOURCE: WeaponPropCell("f") — the original fly prop answers to F.
+    if (event.code === 'KeyF') {
+      event.preventDefault();
+      this.onCarryShortcut();
       return;
     }
     if (event.code === 'KeyH') {

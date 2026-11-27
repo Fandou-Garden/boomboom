@@ -1434,6 +1434,26 @@ function usePowShortcut() {
   return success;
 }
 
+// SOURCE: WeaponPropCell("f") — F triggers the 10016 fly prop like the
+// original bottom prop bar.
+function useCarryShortcut() {
+  unlockSound();
+  if (!canUsePlayerUi()) return false;
+  if (game.phase !== 'player' || game.charging) return false;
+  if (!game.canCarry) {
+    showToast('飞行已用过：每回合只能飞行一次', { alert: true, duration: 2000 });
+    return false;
+  }
+  if (game.toggleCarry()) {
+    showToast(game.carryArmed
+      ? '飞行已就绪：下一发是传送弹，落到哪里你就飞到哪里'
+      : '已取消飞行', { duration: 2200 });
+    lastFrame = performance.now();
+    return true;
+  }
+  return false;
+}
+
 function beginPlayerCharge() {
   unlockSound();
   if (!game || game.phase !== 'player') return false;
@@ -1473,6 +1493,7 @@ function setupInput() {
     onChargeCancel: cancelPlayerCharge,
     onSkillSlot: useSkillSlot,
     onPowShortcut: usePowShortcut,
+    onCarryShortcut: useCarryShortcut,
     onHealShortcut: useHeal,
     onUserGesture: unlockSound,
     onAngleTap: (delta) => {

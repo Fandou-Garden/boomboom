@@ -64,7 +64,9 @@ export const PHYSICS = Object.freeze({
   forceToVelocity: 1.0,
 
   // SOURCE: EnergyView SHOOT_FORCE_STEP=20 per ENTER_FRAME (30 fps), clamps
-  // at FORCE_MAX and does not rebound. 20 * 30 = 600 force units per second.
+  // SOURCE: EnergyView.calcForce() — force rises 20/frame (30fps), reverses
+  // (dir = -1) at FORCE_MAX and drains back; draining to 0 while still held
+  // skips the turn. 20 * 30 = 600 force units per second.
   chargeRate: 600,
 
   maxFlightSeconds: 14,
