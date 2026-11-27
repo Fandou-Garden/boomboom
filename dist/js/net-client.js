@@ -5,9 +5,9 @@
  * snapshot and sends intent commands over HTTP; server events arrive through
  * SSE. Local physics remains only for the non-firing aim recommendation.
  */
-import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=24';
-import { solveForceForAngle } from './ai.js?v=24';
-import { muzzlePoint } from './physics.js?v=24';
+import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=25';
+import { solveForceForAngle } from './ai.js?v=25';
+import { muzzlePoint } from './physics.js?v=25';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const FIRE_ANIM_SECONDS = 0.28;

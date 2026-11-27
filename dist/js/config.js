@@ -161,7 +161,10 @@ export const COMBAT = Object.freeze({
   // visible feet/belly to the terrain instead so the prone sprite cannot sink.
   characterFrameWidth: 114,
   characterFrameHeight: 95,
-  characterScale: 1.55,
+  // SOURCE: 原版仅做水平翻转（GameLiving._actionMovie.scaleX = ±direction），
+  // 角色按 114×95 单元格 1:1 原始尺寸绘制，不放大。此前的 1.55 为早期
+  // 调屏值，导致角色相对地形（尤其原尺寸的 1156 亚特兰蒂斯）明显偏大。
+  characterScale: 1.0,
   characterAnchorY: 95,
   slopeMaxDegrees: 22,
 
@@ -171,7 +174,9 @@ export const COMBAT = Object.freeze({
   weaponGripX: 19,
   weaponGripY: -31,
   weaponBarrelLength: 86,
-  weaponDrawScale: 1.35,
+  // SOURCE: 原版武器 MovieClip 仅随身体水平翻转（GamePlayer: weaponMovie.scaleX
+  // = body.scaleX），不做缩放；此前的 1.35 是配合 1.55 角色放大的调屏值。
+  weaponDrawScale: 1.0,
   weaponPivotX: 28,
   weaponPivotY: 52,
   weaponArtAngle: 45,
