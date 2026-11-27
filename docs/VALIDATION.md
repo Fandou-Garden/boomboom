@@ -171,17 +171,18 @@ iPhone 真机地址栏高度、Home Indicator 和嵌入浏览器顶部栏与仿�
 - 历史：版本 6 首次切换到浏览器内 WASM；版本 7 修正文档与加载文案尺寸；版本 8 合并
   远端角色支撑、待机与流畅度修复；版本 9 修复 iPhone 横屏体验。
 - **3.0.0** 把静态后端从 WASM 换成纯 JS 引擎（`dist/js/engine/` +
-  `dist/standalone-api.js`），Go 服务端保留用于在线路径；静态资源查询版本现为 `?v=28`
+  `dist/standalone-api.js`），Go 服务端保留用于在线路径；静态资源查询版本现为 `?v=29`
   （3.0.0 首发为 v24，v25 随「角色/武器回退原版 1:1 尺寸」升级，v26 随「弹道搜索移入
   Web Worker」升级，v27 随「技能改为出牌制」升级，v28 随「原版技能图标 / 音效来源校正 /
-  移除伪造的合成击中音」升级；`js/engine/` 内部引用仍为 `?v=25`）。
-- 公网 `index.html` 引用 `styles.css?v=28`、`js/main.js?v=28`、`standalone-api.js?v=28`；
+  移除伪造的合成击中音」升级，v29 随「帮助文案与音频行为对齐」升级；
+  `js/engine/` 内部引用仍为 `?v=25`）。
+- 公网 `index.html` 引用 `styles.css?v=29`、`js/main.js?v=29`、`standalone-api.js?v=29`；
   静态包不再包含 `wasm/gunny.wasm`。
 - 静态路径同步 v22 规则：`BallList.xml` 每发弹自带 `Power/Radii/Crater/Amount`，
   POW 打各武器 Special 弹（雷霆/烈火/水果篮/马桶三连发）；出生按原版语义扫描列，
   12 张地图均不嵌入悬空地形；`crater/121/131/411` 原版真图随包发布。
 - 地图位图走预压缩 `data/<id>.fore.map.gz`（`DecompressionStream` 解压，
-  无该 API 时回退原始 `.map`），前景图用无损 WebP，版本串 `?v=28`。
+  无该 API 时回退原始 `.map`），前景图用无损 WebP，版本串 `?v=29`。
 - 公网 844×390 冒烟：后端 `js`、双方 x=240/1640、待机帧 9、120 fps、
   玩家 1 发落地生成 1 个弹坑、console/page error 为 0。
 - 静态资源首次加载约 350 KB 地图位图 + 约 1.5k 行 JS；浏览器随后使用版本化缓存。

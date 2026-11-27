@@ -11,8 +11,8 @@
  *
  * UI remains in the DOM outside this transform.
  */
-import { WORLD, VIEW } from './config.js?v=28';
-import { clamp } from './physics.js?v=28';
+import { WORLD, VIEW } from './config.js?v=29';
+import { clamp } from './physics.js?v=29';
 
 export function coverZoom(width, height) {
   return Math.max(1 / WORLD.width, width / WORLD.width, height / WORLD.height);

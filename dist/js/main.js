@@ -1,13 +1,13 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=28';
-import { loadImage, Terrain } from './terrain.js?v=28';
-import { RemoteMatch } from './net-client.js?v=28';
-import { Renderer, DEATH_SEQUENCE } from './renderer.js?v=28';
-import { Camera, projectPoint } from './camera.js?v=28';
-import { InputController } from './input.js?v=28';
-import { solvePerfect } from './ai.js?v=28';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=28';
-import { MAPS, getMap, resolveMapId } from './maps.js?v=28';
-import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=28';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=29';
+import { loadImage, Terrain } from './terrain.js?v=29';
+import { RemoteMatch } from './net-client.js?v=29';
+import { Renderer, DEATH_SEQUENCE } from './renderer.js?v=29';
+import { Camera, projectPoint } from './camera.js?v=29';
+import { InputController } from './input.js?v=29';
+import { solvePerfect } from './ai.js?v=29';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=29';
+import { MAPS, getMap, resolveMapId } from './maps.js?v=29';
+import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=29';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -1163,7 +1163,7 @@ function openHelp() {
       <dt>标记</dt><dd>你出手后，地图上以世界坐标标出上一发的站位“起”和实际落点“落”；镜头移动不会让标记漂移。电脑的落点不会覆盖你的记录。</dd>
       <dt>倒计时</dt><dd>右上时钟按钮可开启练习计时；默认关闭，单机练习不会催你。计时只显示，不自动出手。</dd>
       <dt>全屏</dt><dd>${displayHelp}</dd>
-      <dt>音效</dt><dd>首次点技能、按空格或按发射键时会自动尝试解锁音频，不需要先点空白处；静音、解锁失败或素材加载失败都不会阻断蓄力与开炮。开炮与爆炸按 <code>BombConfig.xml</code>/<code>BallList.xml</code> 的 Common 弹体逐武器取原版音：烈火 025/087、轰天 023/087、水果篮 114/102、黑白家电 110/100、风神 029/089；道具/POW 039、阵亡 042、选道具 008、回合 016/038、胜负 063/064 同样来自 <code>audio.swf</code> 离线提取。原版没有独立受击音，网页用明确标注的合成替代。完整映射见 <a href="docs/AUDIO_MAPPING.md" target="_blank" rel="noopener"><code>docs/AUDIO_MAPPING.md</code></a>。</dd>
+      <dt>音效</dt><dd>首次点技能、按空格或按发射键时会自动尝试解锁音频，不需要先点空白处；静音、解锁失败或素材加载失败都不会阻断蓄力与开炮。开炮与爆炸按 <code>BombConfig.xml</code>/<code>BallList.xml</code> 的 Common 弹体逐武器取原版音：烈火 025/087、轰天 023/087、水果篮 114/102、黑白家电 110/100、风神 029/089；道具/POW 039、阵亡 042、选道具 008、回合 016/038、胜负 063/064 同样来自 <code>audio.swf</code> 离线提取。原版没有独立受击音，受击反馈由爆炸声承担，不再合成替代。完整映射见 <a href="docs/AUDIO_MAPPING.md" target="_blank" rel="noopener"><code>docs/AUDIO_MAPPING.md</code></a>。</dd>
     </dl>
     <p><strong>物理来源：</strong> 重力、空气阻力与风力来自 <code>BombObject.UpdateAGW()</code> 与 <code>EulerVector.ComputeOneEulerStep()</code>；开炮速度使用 <code>Living.ShootImp()</code>；风每回合按 <code>BaseGame.GetNextWind()</code> 变化。</p>
     <p><strong>音效来源：</strong> 原版 <code>SoundManager.as</code> 的 SoundID 经 <code>audio.swf</code> 离线解码为 MP3，不运行 Flash；触发点按 <code>ShootBombAction.executeImp()</code>、<code>SimpleBomb.bomb()</code>、<code>doUseItemAnimation()</code> 与 <code>die()</code> 对齐。</p>
@@ -2427,7 +2427,7 @@ function startMapLoad(id) {
     () => loadImage(urls.thumb),
     () => loadImage(urls.fore),
     () => loadImage(urls.back),
-    () => fetch(`${urls.collision}?v=28`).then((res) => {
+    () => fetch(`${urls.collision}?v=29`).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.arrayBuffer();
     }),
