@@ -168,6 +168,17 @@
 - `itemstrengthengoodsinfo.xml` 与 `StrengthenInfo.cs` / `StrengthenGoodsInfo.cs` 显示原版强化为
   Rock + 装备进阶机制，与本轮规则不同，未混用。详见 `docs/ASSET_MANIFEST.md`。
 
+### 复验（2026-11-28 04:01，代码未改动，工作区干净）
+
+- `npm run typecheck:server`：通过，0 错误。
+- `npm run test:server`：通过（1/1，4189ms），临时端口 51316 与 `/tmp` 临时库，未触碰用户存档。
+- `npm run test:server:browser`：通过，11 项 UI 验收 + 站点版 offline 回归，页面无 JS 错误。
+- `npm run test:server:perf`：通过，报告 `.../ddt-perf-3fYRT7/perf-report.json`。
+  本次实测：后端空闲 RSS **108.05 MB**（heapUsed 12.16 MB）、战斗中 **120.28 MB**（heapUsed 19.30 MB）、
+  浏览器 JS 堆 **2.67 MB**、首屏 encoded 2.86 MB / 144 请求、`dist/` 30.23 MB。
+  与上一轮（108.50 / 109.91 / 2.59 MB）存在正常波动，**两组都是实测值，不互相覆盖**。
+- `npm test`：**60/61 通过**，唯一失败仍是 `tests/physics.test.mjs:207` 的镜头边界断言（v33 既有）。
+
 ## 阻塞
 
 1. **【权限失败，待用户处理】推送开发分支失败（2026-11-28 实测）**。
@@ -189,6 +200,16 @@
      不再反复重试。
    - 需要用户执行：提供有效 PAT / 重新登录 `gh` / 配置可用的认证方式后执行
      `git push -u origin feat/node-server-mode`。本地分支与全部提交已就绪。
+   - 04:01 复核（补充诊断，不是重复盲试）：
+     `GIT_TERMINAL_PROMPT=0 git ls-remote origin HEAD` **成功**返回 `cbfe149`——
+     公开仓库匿名 HTTPS 读取不触发鉴权，**读通不代表写通**；
+     而 `git push` 返回 `fatal: could not read Username for 'https://github.com'`。
+     检查发现 `~/.git-credentials`（03:53 更新）现仅剩 `gitlab.kinm.dev` 一条，
+     **已无 github.com 条目**；`git credential fill` 无可用 GitHub 凭证，
+     `gh auth status` 仍报告 `The token in default is invalid.`
+     （合理推断：先前数次鉴权失败后 Git 的 `credential reject` 清除了 store 中失效的 PAT；
+     此为机制推断，非实测结论）。即凭证链当前为空 + `gh` token 失效，
+     **写权限确实不可用，不再重试**。
 2. **既有测试 1 项失败（非本轮引入）**：`tests/physics.test.mjs` 的
    「shot mode follows the shell and permits sky overscan」边界断言
    `view.worldLeft + view.viewW <= WORLD.width + 1e-6`。
@@ -198,7 +219,9 @@
 
 ## 下一步（剩余工作）
 
-1. 最终提交开发分支并再尝试一次推送；若仍失败，按上面第 1 条列出准确原因。
-2. 若用户提供有效凭证，推送 `feat/node-server-mode`。
+1. ~~最终提交并再尝试一次推送~~ **已完成**：04:01 复验全部通过，最后一次推送尝试已记录准确原因
+   （见「阻塞」第 1 条），不重复盲试。
+2. 【待用户处理】配置有效的 GitHub 凭证（新的 PAT / `gh auth login` / SSH）后执行
+   `git push -u origin feat/node-server-mode`；本地分支与全部提交已就绪，无需重做开发。
 3. 可选后续（不影响本轮闭环）：导出并接入原版铁匠铺 UI / 强化音效、移植原版强化规则、
    接入 `art-source/` 中已导出但未接线的逐帧序列与 BGM、同步 `physics.test.mjs` 的镜头断言。

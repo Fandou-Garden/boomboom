@@ -151,6 +151,11 @@ docs/ASSET_MANIFEST.md    原版代码与素材对应清单
 
 数据由 `npm run test:server:perf` 生成，报告保存在脚本输出的临时目录。
 
+04:01 复验（代码未改动）：再次实测后端空闲 RSS **108.05 MB**、战斗中 **120.28 MB**、
+浏览器 JS 堆 **2.67 MB**、首屏 encoded 2.86 MB、`dist/` 30.23 MB。
+与上表数值有正常波动，两组均为实测值；`typecheck:server` / `test:server` /
+`test:server:browser` / `npm test`（60/61）结果不变。
+
 ## 8. 已知缺失 / 剩余问题
 
 1. **原版铁匠铺 UI 与强化音效未导出**：当前房间内铁匠铺为明确标注的单机临时界面，
@@ -168,5 +173,10 @@ docs/ASSET_MANIFEST.md    原版代码与素材对应清单
 
 - 开发分支：`feat/node-server-mode`（基于 `main` @ `cbfe149`），每完成一个可运行阶段都有本地提交；
   具体提交列表用 `git log --oneline main..HEAD` 查看。
-- 向 `origin` 的推送目前被 GitHub 凭证失效阻塞，准确原因与现场记录见
+- 向 `origin` 的推送目前被 GitHub 写凭证阻塞，准确原因与现场记录见
   `docs/PROGRESS.md`「阻塞」章节。代码不受影响，本地分支可直接使用或由用户配置有效凭证后推送。
+- 04:01 最终复核：匿名 HTTPS 读取正常（`git ls-remote` 返回 `cbfe149`），但推送失败：
+  `~/.git-credentials` 已无 github.com 条目，`git credential fill` 无可用凭证，
+  `gh auth status` 报告 `The token in default is invalid.`。
+  **读通不等于写通**，此处是写权限问题，不是网络或代码问题。
+- 用户侧恢复推送只需一次：配置有效凭证后执行 `git push -u origin feat/node-server-mode`。
