@@ -297,7 +297,9 @@ export function resolveImpactLocked(m, p) {
         m.stats.enemyHits += 1;
         m.stats.playerDamageTaken += total;
       }
-      m.emit('sound', { name: 'hit' });
+      // SOURCE: the original Flash build has no standalone "hit" SoundID —
+      // the explosion sample IS the hit feedback. The old browser-only synth
+      // chime was invented and is deliberately removed.
       if (critical > 0) m.emit('sound', { name: 'critical' });
       if (target.hp <= 0) {
         target.hp = 0;

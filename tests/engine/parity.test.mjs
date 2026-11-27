@@ -60,7 +60,9 @@ test('parity: straight shot goes out of the arena', () => {
 
 test('parity: connecting shot damage and distance', () => {
   const r = runScenario({ angle: 22, force: 1125 });
-  assert.equal(r.seq, 10);
+  // No extra 'sound' event on hit: the browser-only synth chime was removed
+  // because the original Flash build has no standalone hit SoundID.
+  assert.equal(r.seq, 9);
   assert.equal(r.a1.hp, 1712);
   assert.equal(r.lastImpact.damage, 288);
   assert.equal(r.lastImpact.type, 'actor');
@@ -73,7 +75,7 @@ test('parity: connecting shot damage and distance', () => {
 
 test('parity: seeded critical adds damage and changes the summary', () => {
   const r = runScenario({ seed: 62, angle: 22, force: 1125 });
-  assert.equal(r.seq, 11);
+  assert.equal(r.seq, 10);
   assert.equal(r.lastImpact.damage, 288);
   assert.equal(r.lastImpact.critical, 151);
   assert.equal(r.a1.hp, 1561);
@@ -88,7 +90,8 @@ test('parity: POW fires the special ball volley', () => {
     setup: (m) => m.command({ type: 'pow', value: 100 }),
     angle: 22, force: 1125,
   });
-  assert.equal(r.seq, 22);
+  // Three connecting shells used to emit three fake 'hit' sound events.
+  assert.equal(r.seq, 19);
   assert.equal(r.lastImpact.damage, 148);
   assert.equal(r.lastImpact.type, 'actor');
   assert.equal(r.lastImpact.shell, 2);
@@ -146,7 +149,7 @@ test('parity: full AI exchange (move, aim, fire, resolve, next turn)', () => {
   assert.equal(steps, 286);
   assert.deepEqual(phases, [
     [0, 'flight', 6], [61, 'resolve', 9], [111, 'enemy_move', 11], [129, 'enemy_think', 12],
-    [152, 'enemy_aim', 13], [165, 'flight', 15], [236, 'resolve', 19], [286, 'player', 21],
+    [152, 'enemy_aim', 13], [165, 'flight', 15], [236, 'resolve', 18], [286, 'player', 20],
   ]);
   const s = m.snapshot();
   assert.equal(s.phase, 'player');

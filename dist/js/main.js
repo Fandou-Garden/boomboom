@@ -1,13 +1,13 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=27';
-import { loadImage, Terrain } from './terrain.js?v=27';
-import { RemoteMatch } from './net-client.js?v=27';
-import { Renderer, DEATH_SEQUENCE } from './renderer.js?v=27';
-import { Camera, projectPoint } from './camera.js?v=27';
-import { InputController } from './input.js?v=27';
-import { solvePerfect } from './ai.js?v=27';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=27';
-import { MAPS, getMap, resolveMapId } from './maps.js?v=27';
-import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=27';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=28';
+import { loadImage, Terrain } from './terrain.js?v=28';
+import { RemoteMatch } from './net-client.js?v=28';
+import { Renderer, DEATH_SEQUENCE } from './renderer.js?v=28';
+import { Camera, projectPoint } from './camera.js?v=28';
+import { InputController } from './input.js?v=28';
+import { solvePerfect } from './ai.js?v=28';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=28';
+import { MAPS, getMap, resolveMapId } from './maps.js?v=28';
+import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=28';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -136,6 +136,13 @@ class SoundEngine {
     // Original IDs extracted from flash/audio.swf; see docs/AUDIO_MAPPING.md.
     // Fire/explosion are per weapon: BallList.xml ShootSound/BombSound of the
     // Common ball referenced by BombConfig.xml.
+    // 008 = every battle UI click. SOURCE: RightPropBar.as:252
+    //   `SoundManager.instance.play("008")` inside __itemClicked(), before
+    //   useProp(); also PropShortCutView.as:90/97 (keys 1-8), WeaponPropBar.as:61,
+    //   SoulPropBar.as:142, CustomPropBar.as:99. Skill cards AND POW selection
+    //   therefore share this one ID — there is no separate "POW select" sound.
+    // 039 = GameLiving.as:1550 / GamePlayer.as:515 doUseItemAnimation(), i.e.
+    //   the prop actually taking effect (POW ball / item use), NOT the click.
     this.sampleMap = {
       select: '008',
       'skill-select': '008',
@@ -249,7 +256,9 @@ class SoundEngine {
   loadSamples() {
     if (this.sampleLoading || !this.ctx) return this.sampleLoading;
     this.sampleError = '';
-    this.sampleLoading = Promise.all(Object.entries(this.sampleFiles).map(async ([id, url]) => {
+    const loadOne = async (id) => {
+      if (this.buffers.has(id)) return;
+      const url = this.sampleFiles[id];
       try {
         const response = await fetch(url, { cache: 'force-cache' });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -261,7 +270,12 @@ class SoundEngine {
       } catch (error) {
         this.sampleError = `${id}: ${error?.message || error}`;
       }
-    })).then(() => this.buffers.size);
+    };
+    // UI clicks must always use the original 008/039 samples — never the
+    // browser synth. Decode just those two first so the feedback is instant
+    // even while the 2 MB weapon/boom set is still streaming.
+    this.uiSampleLoading = Promise.all(['008', '039'].map(loadOne));
+    this.sampleLoading = Promise.all(Object.keys(this.sampleFiles).map(loadOne)).then(() => this.buffers.size);
     return this.sampleLoading;
   }
 
@@ -406,10 +420,6 @@ class SoundEngine {
       this.noise(0.68, 0.22, 620);
       this.tone(78, 0.55, 'sine', 0.18, 28);
       this.tone(52, 0.42, 'triangle', 0.12, 24, 0.03);
-    } else if (name === 'hit') {
-      this.noise(0.12, 0.1, 2600);
-      this.tone(520, 0.15, 'square', 0.055, 220);
-      this.tone(820, 0.09, 'sine', 0.04, 340, 0.02);
     } else if (name === 'pow') {
       this.tone(180, 0.45, 'sawtooth', 0.075, 760);
       this.tone(360, 0.38, 'triangle', 0.055, 980, 0.08);
@@ -429,9 +439,9 @@ class SoundEngine {
     } else if (name === 'land') {
       this.noise(0.16, 0.045, 360);
       this.tone(110, 0.12, 'sine', 0.035, 60);
-    } else if (name === 'select' || name === 'skill-select' || name === 'pow-select') {
-      this.tone(760, 0.05, 'sine', 0.025);
     }
+    // No synth branch for UI clicks / hits: the original soundtrack has no
+    // such sounds, and inventing them is what made the browser build sound off.
   }
 
   _measure(name, sampleId = null) {
@@ -453,14 +463,30 @@ class SoundEngine {
     window.setTimeout(read, 0);
   }
 
-  play(name, weapon = null) {
+  play(name, weapon = null, retried = false) {
     if (!this.enabled) return;
+    // Removed: the invented browser "hit" chime. The original has no hit
+    // SoundID; explosion audio is the hit feedback.
+    if (name === 'hit') return;
     let id = this.sampleMap[name];
     if (name === 'fire') id = this.fireSamples[weapon] || id;
     else if (name === 'explosion') id = this.boomSamples[weapon] || id;
     const buffer = id ? this.buffers.get(id) : null;
+    // Every sound with a real SoundID must play that original sample. The old
+    // code fell back to a synthesized chime while samples were still loading,
+    // which is exactly the fake "not from the source" audio. Wait for the
+    // (tiny) UI decode instead, then stay silent if it truly failed.
+    if (id && !buffer && !retried) {
+      const uiClick = ['select', 'skill-select', 'pow-select', 'pow', 'heal', 'carry', 'critical'].includes(name);
+      const pending = uiClick ? this.uiSampleLoading : this.sampleLoading;
+      if (pending) {
+        Promise.resolve(pending).then(() => this.play(name, weapon, true));
+        return;
+      }
+    }
     this._measure(name, buffer ? id : null);
     if (buffer && this._playBuffer(buffer, name)) return;
+    if (id) return;
     this._playSynth(name);
   }
 
@@ -579,11 +605,14 @@ function trackDeathClocks(dt) {
 function tombstonesSettled() {
   if (!game) return false;
   let dead = 0;
-  game.actors.forEach((actor, index) => {
-    if (!actor || actor.alive !== false) return;
+  // A plain loop: `return false` inside forEach would only skip that element
+  // and the gate would open while graves are still forming.
+  for (let index = 0; index < game.actors.length; index += 1) {
+    const actor = game.actors[index];
+    if (!actor || actor.alive !== false) continue;
     dead += 1;
     if ((deathClocks.get(index) ?? 0) < DEATH_SEQUENCE.total) return false;
-  });
+  }
   return dead > 0;
 }
 
@@ -1075,7 +1104,7 @@ function handleEvent(type, data = {}) {
     sound.play('select');
   } else if (type === 'pow-select') {
     showToast(data.selected ? 'POW 已选中 · 下一发增强，仍用蓝色主键发射' : '已取消 POW', { duration: 2200 });
-    sound.play('pow-select');
+    // Sound plays in usePowShortcut() at click time (original UI-click timing).
   } else if (type === 'impact') {
     const sentinel = data.owner === 0 ? '芽芽' : '你';
     if (data.damage > 0) {
@@ -1498,7 +1527,13 @@ function usePowShortcut() {
   }
   // R shares the POW button's toggle semantics: selected again = cancel.
   const success = game.togglePow();
-  if (success) lastFrame = performance.now();
+  if (success) {
+    lastFrame = performance.now();
+    // SOURCE: every battle UI click (RightPropBar / WeaponPropBar /
+    // PropShortCutView / SoulPropBar) calls SoundManager.instance.play("008")
+    // before useProp — so POW selection plays 008 immediately, not on echo.
+    sound.play('pow-select');
+  }
   return success;
 }
 
@@ -1969,6 +2004,7 @@ function exposeTestApi() {
           facing: actor.facing, walkDirection: actor.walkDirection, slope: actor.slope,
           vy: actor.vy, falling: actor.falling, grounded: actor.grounded,
           fireTimer: actor.fireTimer, hurtTimer: actor.hurtTimer,
+          tombAge: actor.tombAge ?? 0,
         })),
         lastPower: game.lastPower,
         lastPowerPct: game.lastPower != null ? Math.round(game.lastPower / PHYSICS.forceMax * 100) : null,
@@ -2391,7 +2427,7 @@ function startMapLoad(id) {
     () => loadImage(urls.thumb),
     () => loadImage(urls.fore),
     () => loadImage(urls.back),
-    () => fetch(`${urls.collision}?v=27`).then((res) => {
+    () => fetch(`${urls.collision}?v=28`).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.arrayBuffer();
     }),

@@ -727,28 +727,19 @@ svg { display: block; }
   background: #ffd36a;
   box-shadow: 0 0 6px rgba(255, 211, 106, 0.9);
 }
+/* Original 10001–10008 icons: extracted from corei.swf's
+   game.crazyTank.view.PropXXAsset bitmaps (61x61, transparent), mapped via
+   TemplateAlllist.xml's Pic field. No redrawn vectors — these are the real art. */
 .skill-icon {
-  width: 23px;
-  height: 23px;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
   overflow: visible;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
   transition: transform 110ms ease, filter 110ms ease;
+  pointer-events: none;
+  user-select: none;
 }
-.skill-button svg.skill-icon { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-/* Icon language follows the original 10001–10008 art, redrawn as solid vector
-   shapes: double orange/red bolts for +2, a filled blue three-ray fan for ×3,
-   one gold bolt for +1, gold power stars for amplifiers 4–7, and a flame for
-   slot 8 (10008) to match the original right-side 必杀技 emphasis. */
-.skill-button svg.icon-double-bolt path.bolt-back { fill: #ff8a2b; stroke: #fff1cf; stroke-width: 1.2; }
-.skill-button svg.icon-double-bolt path.bolt-front { fill: #e8341f; stroke: #ffd9a8; stroke-width: 1.2; }
-.skill-button svg.icon-trispark path.fan { fill: #2f9de0; stroke: #bff0ff; stroke-width: 1.4; }
-.skill-button svg.icon-trispark path.fan-shine { fill: #9fe8ff; stroke: #e8fbff; stroke-width: 0.8; }
-.skill-button svg.icon-single-bolt path { fill: #ffca3d; stroke: #fff6cd; stroke-width: 1.2; }
-.skill-button svg.icon-power path.power-star { fill: #ffc93d; stroke: #fff2bf; stroke-width: 1; }
-.skill-button svg.icon-power path.power-arrow { fill: #ff9d2e; stroke: #ffd98a; stroke-width: 1; }
-/* Slot 8 (10008 / +10%) uses the original 必杀技-style flame instead of the generic amplifier star. */
-.skill-button svg.icon-ultimate path.ultimate-flame { fill: #ff7b2e; stroke: #ffd9a8; stroke-width: 1; }
-.skill-button svg.icon-ultimate path.ultimate-core { fill: #ffe555; stroke: #fff8d1; stroke-width: 0.8; }
 .skill-button.is-selected .skill-icon { transform: translateY(-1px) scale(1.06); filter: drop-shadow(0 0 5px rgba(255, 228, 142, 0.62)); }
 .skill-copy { max-width: 100%; color: currentColor; font-size: 6px; font-weight: 700; line-height: 1; letter-spacing: 0; white-space: nowrap; opacity: 0.88; }
 .skill-badge {

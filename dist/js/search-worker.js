@@ -17,7 +17,7 @@
  */
 import { loadTerrainFromBytes } from './engine/terrain.js?v=25';
 import { solveShotForWeapon } from './engine/ai.js?v=25';
-import { solveForceForAngle } from './ai.js?v=27';
+import { solveForceForAngle } from './ai.js?v=28';
 
 let terrain = null;
 let applied = 0;

@@ -3,10 +3,12 @@
  * Requires Chrome + puppeteer-core and `GUNNY_DEBUG=1 npm start`.
  *
  * Outputs screenshots to tests/screenshots/ and asserts:
- *  - 844x390 / 667x375 both-player aim framing without spawn changes
+ *  - 844x390 / 667x375 aim framing without spawn changes: the actor in control
+ *    is fully on screen and clear of the HUD; an off-screen opponent carries
+ *    exactly one correctly-sided edge hint (VIEW.defaultMode = 'player')
  *  - charge HUD with current / recommended / previous force
  *  - flight camera + fixed HUD + relaunch lock
- *  - landing returns to both-player view
+ *  - landing leaves the follow camera and settles back on the active actor
  *  - scatter waits for every shell before the AI turn
  *  - real Web Audio graphs for fire / explosion / hit / POW
  */
@@ -85,14 +87,51 @@ async function state(page) {
   }));
 }
 
+const ACTOR_BLOCKERS = ['.battle-hud', '.minimap-panel', '.utilities', '.skill-rail', '.power-panel', '.fire-cluster', '#joystick'];
+
+function assertActorClear(rects, index, width, height, label) {
+  const actor = rects.actors?.[index];
+  assert.ok(actor, `${label}: actor ${index} rect missing`);
+  assert.ok(insideViewport(actor, width, height), `${label}: actor ${index} must be fully on screen`);
+  for (const selector of ACTOR_BLOCKERS) {
+    assert.equal(intersects(actor, rects[selector]), false, `${label}: actor ${index} must not be covered by ${selector}`);
+  }
+}
+
 function assertActorsClear(rects, width, height, label) {
   assert.equal(rects.actors?.length, 2, `${label}: two actors expected`);
-  const blockers = ['.battle-hud', '.minimap-panel', '.utilities', '.skill-rail', '.power-panel', '.fire-cluster', '#joystick'];
-  for (const [index, actor] of rects.actors.entries()) {
-    assert.ok(insideViewport(actor, width, height), `${label}: actor ${index} must be fully on screen`);
-    for (const selector of blockers) {
-      assert.equal(intersects(actor, rects[selector]), false, `${label}: actor ${index} must not be covered by ${selector}`);
-    }
+  for (const index of [0, 1]) assertActorClear(rects, index, width, height, label);
+}
+
+// Aim framing is mode-aware. VIEW.defaultMode is 'player': the actor in
+// control is centred at the base zoom and a far opponent is represented by one
+// edge hint. 'both' remains the game-over framing, where every actor must be
+// fully in frame with no hints. What must hold in either mode is that the actor
+// being controlled is always usable, and the opponent can be located either on
+// screen or through a correctly-sided hint.
+function assertAimFraming(snapshot, rects, width, height, label) {
+  const mode = snapshot.effectiveCameraMode;
+  if (mode === 'both') {
+    assert.equal(snapshot.hints.length, 0, `${label}: both-framed view must not need edge hints`);
+    assertActorsClear(rects, width, height, label);
+    return;
+  }
+  assert.equal(mode, 'player', `${label}: unexpected aim camera mode ${mode}`);
+  const active = snapshot.turn === 1 ? 1 : 0;
+  const other = 1 - active;
+  assertActorClear(rects, active, width, height, `${label} active`);
+  // The renderer suppresses edge hints during flight, resolution and game over
+  // (the minimap carries the off-screen actors then), so the hint/locate
+  // contract only applies to phases where the player can actually aim.
+  if (['flight', 'resolve', 'over'].includes(snapshot.phase)) return;
+  const otherRect = rects.actors[other];
+  const hints = snapshot.hints.filter((hint) => hint.kind === (other === 1 ? 'enemy' : 'player'));
+  assert.ok(hints.length <= 1, `${label}: at most one hint per off-screen actor`);
+  if (hints.length === 1) {
+    const side = otherRect.x + otherRect.width / 2 < width / 2 ? 'left' : 'right';
+    assert.equal(hints[0].side, side, `${label}: hint must point at the off-screen opponent`);
+  } else {
+    assert.ok(insideViewport(otherRect, width, height), `${label}: opponent must be on screen when no edge hint is shown`);
   }
 }
 
@@ -165,8 +204,7 @@ async function runViewport(browser, width, height) {
   assert.equal(s0.phase, 'player');
   assert.equal(s0.showCountdown, false, 'practice countdown must default off');
   assert.equal(initial.ui.countdownHidden, true);
-  assert.equal(s0.hints.length, 0, 'both actors should be in frame, not edge hints');
-  assertActorsClear(r0, width, height, `${width}x${height} initial`);
+  assertAimFraming(s0, r0, width, height, `${width}x${height} initial`);
 
   const layoutChecks = await page.evaluate(() => {
     const ids = ['fire', 'pow', 'heal', 'skillExtra2', 'skillScatter', 'skillExtra1', 'skillBoost50', 'skillBoost40', 'skillBoost30', 'skillBoost20', 'skillBoost10', 'left', 'right', 'up', 'down'];
@@ -268,7 +306,16 @@ async function runViewport(browser, width, height) {
   assert.deepEqual(back.snapshot.playerVolley.from, volleyFrom, 'player launch record must persist');
   assert.ok(back.snapshot.playerVolley.impacts.length >= 1);
   assert.equal(back.record.world.from.x, volleyFrom.x);
-  assert.ok(back.record.screen.from.x >= 0 && back.record.screen.from.x <= width);
+  // The aim camera now centres the actor whose turn it is, so the player's
+  // launch point can legitimately be off screen during the AI turn. Assert the
+  // record marker is still projected from its world coordinate instead of
+  // assuming it happens to land inside the viewport.
+  const fromProjected = {
+    x: (back.record.world.from.x - back.snapshot.camera.worldLeft) * back.snapshot.camera.zoom,
+    y: (back.record.world.from.y - back.snapshot.camera.worldTop) * back.snapshot.camera.zoom,
+  };
+  assert.ok(Math.abs(back.record.screen.from.x - fromProjected.x) < 1.5, 'launch marker must follow its world coordinate');
+  assert.ok(Math.abs(back.record.screen.from.y - fromProjected.y) < 1.5, 'launch marker must stay on the terrain plane');
   assert.ok(back.snapshot.lastPower > 0);
   assert.match(back.ui.powerText, /^推荐 (—|\d+(?: · (?:直击|溅射))?) \/ 上一发 \d+$/);
 
@@ -354,7 +401,7 @@ async function runViewport(browser, width, height) {
   assert.match(ready.ui.recommendText, /^推荐 \d+(?: · (?:直击|溅射))?$/);
   assert.match(ready.ui.lastPowerText, /^上一发 (—|\d+)$/);
   assert.ok(ready.ui.powerOverflow <= 1, 'current/recommended/last numbers must not be clipped');
-  assertActorsClear(ready.rects, width, height, `${width}x${height} before charge`);
+  assertAimFraming(ready.snapshot, ready.rects, width, height, `${width}x${height} before charge`);
   await sleep(2400); // let the countdown toast fade before the deliverable shot
 
   const fireRect = ready.rects['#fire'];
@@ -367,7 +414,7 @@ async function runViewport(browser, width, height) {
   assert.ok(Number(charging.ui.fireLabel.replace('%', '')) > 0);
   assert.equal(charging.ui.recommendHidden, false, 'recommended force marker must be visible');
   assert.equal(charging.ui.lastPowerHidden, true, 'fresh match has no previous force marker');
-  assertActorsClear(charging.rects, width, height, `${width}x${height} charging`);
+  assertAimFraming(charging.snapshot, charging.rects, width, height, `${width}x${height} charging`);
   const chargeShot = path.join(SHOTS, `charge-${width}x${height}.png`);
   await page.screenshot({ path: chargeShot });
   const fixedSelectors = ['#topbar', '#controls', '#fire', '#pow', '#chargeTrack', '#minimap', '#joystick', '#skillScatter', '#recenter', '.power-panel', '.skill-rail', '.battle-hud', '.minimap-panel'];
@@ -430,17 +477,21 @@ async function runViewport(browser, width, height) {
   await page.waitForFunction(() => {
     const api = window.__GUNNY_TEST__;
     const snapshot = api?.snapshot?.();
+    const mode = snapshot?.effectiveCameraMode;
+    if (mode !== 'player' && mode !== 'both') return false;
     const actors = api?.controlRects?.().actors ?? [];
-    return snapshot?.effectiveCameraMode === 'both' && actors.length === 2 &&
-      actors.every((rect) => rect.x >= 0 && rect.y >= 0 && rect.x + rect.width <= innerWidth && rect.y + rect.height <= innerHeight);
-  }, { timeout: 4000 });
-  // The camera smooths back from shot mode; wait for the both-player framing
+    if (actors.length !== 2) return false;
+    const active = actors[snapshot.turn === 1 ? 1 : 0];
+    return active && active.x >= 0 && active.y >= 0
+      && active.x + active.width <= innerWidth && active.y + active.height <= innerHeight;
+  }, { timeout: 8000 });
+  // The camera smooths back from shot mode; wait for the resting aim framing
   // to settle so this assertion measures the resting HUD, not a transition.
   await sleep(900);
   const landed = await state(page);
   assert.ok(['resolve', 'enemy_move', 'enemy_think', 'enemy_aim', 'player', 'over'].includes(landed.snapshot.phase));
-  assert.equal(landed.snapshot.effectiveCameraMode, 'both');
-  assertActorsClear(landed.rects, width, height, `${width}x${height} landing`);
+  assert.ok(['player', 'both'].includes(landed.snapshot.effectiveCameraMode), 'landing must leave the follow camera');
+  assertAimFraming(landed.snapshot, landed.rects, width, height, `${width}x${height} landing`);
   assert.equal(logs.filter((line) => !line.includes('favicon')).length, 0, `${width}x${height}: console must be clean`);
   await page.close();
   return {
