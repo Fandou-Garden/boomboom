@@ -1,11 +1,11 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=22';
-import { loadImage, Terrain } from './terrain.js?v=22';
-import { RemoteMatch } from './net-client.js?v=22';
-import { Renderer } from './renderer.js?v=22';
-import { Camera, projectPoint } from './camera.js?v=22';
-import { InputController } from './input.js?v=22';
-import { solvePerfect } from './ai.js?v=22';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=22';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, MAP_PROFILES, activateMapProfile, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=23';
+import { loadImage, Terrain } from './terrain.js?v=23';
+import { RemoteMatch } from './net-client.js?v=23';
+import { Renderer } from './renderer.js?v=23';
+import { Camera, projectPoint } from './camera.js?v=23';
+import { InputController } from './input.js?v=23';
+import { solvePerfect } from './ai.js?v=23';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=23';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -17,6 +17,9 @@ const els = {
   playerCard: document.querySelector('.player-card'), enemyCard: document.querySelector('.enemy-card'),
   round: $('round'), turn: $('turn'), countdown: $('countdown'),
   buildVersion: $('buildVersion'),
+  mapTitle: document.querySelector('.minimap-title'),
+  mapSwitch: document.querySelector('.map-switch'),
+  loadingTitle: $('loadingTitle'), loadingMeta: $('loadingMeta'),
   windArrow: $('windArrow'), windValue: $('windValue'), windDir: $('windDir'), windBars: $('windBars'),
   minimap: $('minimap'), minimapWrap: $('minimapWrap'), minimapDistance: $('minimapDistance'),
   recenter: $('recenter'), elevationNote: $('elevationNote'), lastShot: $('lastShot'),
@@ -57,6 +60,11 @@ const isStandalone = window.navigator.standalone === true
 const SKILL_SLOTS = ['extra2', 'scatter', 'extra1', 'boost50', 'boost40', 'boost30', 'boost20', 'boost10'];
 const SKILL_BUTTONS = [...document.querySelectorAll('.skill-button')];
 const WIND_BARS = [...(els.windBars?.children || [])];
+const CRATER_ART_URLS = {
+  50: { shape: 'assets/crater-50.png', brink: 'assets/craterbrink-50.png' },
+  401: { shape: 'assets/crater-401.png', brink: 'assets/craterbrink-401.png' },
+  4: { shape: 'assets/crater-4.png', brink: 'assets/craterbrink-4.png' },
+};
 
 let terrain = null;
 let renderer = null;
@@ -84,6 +92,8 @@ let lastRecommendation = null;
 let lastRecommendationMode = '';
 let selectedWeaponId = 'fruit';
 let weaponPickerBuilt = false;
+const mapAssetPromises = new Map();
+let mapSwitching = false;
 
 const uiCache = {
   phase: '', angle: null, forcePct: null, wind: null, hp: [null, null], distance: null,
@@ -1025,7 +1035,7 @@ function openHelp() {
     <dl class="help-grid">
       <dt>镜头</dt><dd>瞄准时用同一比例缩放把双方装进画面，角色与脚下地形位于中下部，上方保留抛射空间。左上小地图显示双方和镜头框；拖动小地图只移动镜头，点“回战场”立即回到自动构图。距离过大时以小地图辅助，不挪近出生点。</dd>
       <dt>飞行</dt><dd>炮弹出手后镜头跟随炮弹，允许飞入天空，双方可能暂时离屏。小地图、风向、力度尺、转盘、技能和发射键始终固定在屏幕原位；飞行中不能再次发射。最后一发爆炸并结算后，镜头平滑回到下一回合双方视角，不会在飞行中反复缩放。</dd>
-      <dt>移动</dt><dd>按住左下转盘左右键，或键盘 A / D、← / →。角色在 ${WORLD.width} px 的亚特兰蒂斯地图上真实行走；本版本体力无限，移动不会耗尽体力。陡坎会挡住，脚下被炸空会受重力下落。</dd>
+      <dt>移动</dt><dd>按住左下转盘左右键，或键盘 A / D、← / →。角色在 ${WORLD.width} px 的${WORLD.name}地图上真实行走；本版本体力无限，移动不会耗尽体力。陡坎会挡住，脚下被炸空会受重力下落。</dd>
       <dt>角度</dt><dd>按住转盘上下键，或 W / S、↑ / ↓；桌面也可在中心角度数字上上下拖动。当前武器 <strong>${weaponLabel}</strong> 的范围是 ${weaponRange}。角色旁只显示一小段方向虚线与角度扇形，不预测整条弹道。</dd>
       <dt>力度</dt><dd>按住右下蓝色主键或空格蓄力，松手发射。力度从 5% 连续升到 100% 后立即回弹，不自动开炮；松手那一帧的实际力度就是出手力度。底部细尺显示当前值、蓝色实测推荐三角和白色上一发竖线；连续可命中时另显示蓝色区间。推荐值按当前角度、当前技能、POW 和同一套风力/碰撞逻辑逐发复算，打不到时只提示调角，不会自动调角或发射。</dd>
       <dt>战斗道具</dt><dd>右侧 1–8 格对应原版 10001–10008：<strong>1 攻击 +2</strong>（同轨迹连续 3 发，每发伤害 60%）、<strong>2 三向散射</strong>（0°、-5°、+5° 同时各一发，每发伤害 50%）、<strong>3 攻击 +1</strong>（同轨迹连续 2 发，每发伤害 90%）、<strong>4–8 伤害增幅 50/40/30/20/10%</strong>。1–3 攻击格也可互相叠加：先选连击再选散弹，会连续多轮散射；4–8 增幅全部相加；每格每回合 1 次。选中后仍由蓝色主键或空格发射。治疗移到顶部心形按钮，快捷键 H，恢复 ${BATTLE.healAmount} 点并消耗本回合。</dd>
@@ -1038,7 +1048,7 @@ function openHelp() {
     </dl>
     <p><strong>物理来源：</strong> 重力、空气阻力与风力来自 <code>BombObject.UpdateAGW()</code> 与 <code>EulerVector.ComputeOneEulerStep()</code>；开炮速度使用 <code>Living.ShootImp()</code>；风每回合按 <code>BaseGame.GetNextWind()</code> 变化。</p>
     <p><strong>音效来源：</strong> 原版 <code>SoundManager.as</code> 的 SoundID 经 <code>audio.swf</code> 离线解码为 MP3，不运行 Flash；触发点按 <code>ShootBombAction.executeImp()</code>、<code>SimpleBomb.bomb()</code>、<code>doUseItemAnimation()</code> 与 <code>die()</code> 对齐。</p>
-    <p class="source-note">原仓库：<a href="${SOURCE_REPO}" target="_blank" rel="noopener">github.com/phucdz2kk4/Gunny</a> · 提交 <code>${SOURCE_COMMIT.slice(0, 7)}</code><br>地图 1156（亚特兰蒂斯）、13 件原版经典武器素材、角色素材与单机规则保持不变；手机 HUD、双方广角构图、多弹技能、推荐力度与音效为网页新增实现。</p>
+    <p class="source-note">原仓库：<a href="${SOURCE_REPO}" target="_blank" rel="noopener">github.com/phucdz2kk4/Gunny</a> · 提交 <code>${SOURCE_COMMIT.slice(0, 7)}</code><br>地图 ${WORLD.mapId}（${WORLD.name}）、13 件原版经典武器素材、角色素材与单机规则保持不变；手机 HUD、双方广角构图、多弹技能、推荐力度与音效为网页新增实现。</p>
   `;
   els.modalAction.textContent = '回到对战';
   els.modal.hidden = false;
@@ -2057,25 +2067,153 @@ function setupCheatPanel() {
   }
 }
 
+async function loadMapAssets(profile) {
+  const [back, loadedTerrain] = await Promise.all([
+    loadImage(profile.backImage),
+    Terrain.load({
+      foregroundUrl: profile.foregroundImage,
+      width: profile.width,
+      height: profile.height,
+      sourceWidth: profile.sourceWidth,
+      craterArtUrls: CRATER_ART_URLS,
+    }),
+  ]);
+  return { back, terrain: loadedTerrain };
+}
+
+function getMapAssets(profile) {
+  const id = profile.mapId;
+  if (!mapAssetPromises.has(id)) {
+    const pending = loadMapAssets(profile).catch((error) => {
+      mapAssetPromises.delete(id);
+      throw error;
+    });
+    mapAssetPromises.set(id, pending);
+  }
+  return mapAssetPromises.get(id);
+}
+
+function warmAlternateMap() {
+  if (window.__GUNNY_BACKEND__ !== 'wasm' || !window.GunnyOffline) return;
+  const alternate = Object.values(MAP_PROFILES).find((profile) => profile.mapId !== WORLD.mapId);
+  if (!alternate) return;
+  Promise.all([
+    getMapAssets(alternate),
+    window.GunnyOffline.prepareMap(alternate.mapId),
+  ]).catch((error) => console.warn('map preload failed', error));
+}
+
+function syncMapSwitch() {
+  if (!els.mapSwitch) return;
+  els.mapSwitch.classList.toggle('is-busy', mapSwitching);
+  for (const button of els.mapSwitch.querySelectorAll('[data-map]')) {
+    const id = Number(button.dataset.map);
+    const active = id === WORLD.mapId;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', String(active));
+    button.disabled = active || mapSwitching;
+  }
+}
+
+async function switchMap(mapId) {
+  const target = MAP_PROFILES[Number(mapId)];
+  if (!target || target.mapId === WORLD.mapId || mapSwitching) return;
+  if (window.__GUNNY_BACKEND__ === 'go') {
+    showToast('本地 HTTP 模式请用 -map 指定地图；线上静态版可直接切换。', { alert: true, duration: 3800 });
+    return;
+  }
+  if (!window.GunnyOffline?.activateMap) {
+    showToast('静态引擎尚未就绪，请稍后再切换。', { alert: true, duration: 2600 });
+    return;
+  }
+  mapSwitching = true;
+  syncMapSwitch();
+  game?.cancelCharge();
+  game?.stopMoving();
+  const previousWeapon = game?.weapon || selectedWeaponId;
+  showToast(`正在切换到${target.name}…`, { duration: 2600 });
+  try {
+    // Both the visual terrain and the WASM bitmap are normally warm by now.
+    // Awaiting the same cached promises keeps the first click fast without a
+    // page reload or a second WASM download.
+    const [assets] = await Promise.all([
+      getMapAssets(target),
+      window.GunnyOffline.prepareMap(target.mapId),
+    ]);
+    activateMapProfile(target.mapId);
+    terrain = assets.terrain;
+    if (game) {
+      game.terrain = terrain;
+      game._appliedCraters = 0;
+      game.recommendationCache = null;
+    }
+    renderer.terrain = terrain;
+    renderer.images.back = assets.back;
+    minimapBase = buildMinimapBase(assets.back, terrain.sourceImage);
+    camera = new Camera();
+    view = null;
+    lastRecommendation = null;
+    lastRecommendationMode = '';
+    lastRecommendationAt = 0;
+    uiCache.phase = '';
+    uiCache.distance = null;
+    uiCache.elevation = null;
+    uiCache.manualPan = null;
+    uiCache.recommendKey = '';
+    uiCache.aimStatus = '';
+    await window.GunnyOffline.activateMap(target.mapId);
+    if (previousWeapon && game && game.weapon !== previousWeapon) {
+      game.selectWeapon(previousWeapon);
+      selectedWeaponId = previousWeapon;
+    }
+    applyMapIdentity();
+    const url = new URL(location.href);
+    if (target.mapId === 1156) url.searchParams.delete('map');
+    else url.searchParams.set('map', String(target.mapId));
+    history.replaceState({ mapId: target.mapId }, '', url);
+    showToast(`已切换到${target.name}`, { duration: 1800 });
+  } catch (error) {
+    console.error('map switch failed', error);
+    showToast(`切换地图失败：${error.message || error}`, { alert: true, duration: 4500 });
+  } finally {
+    mapSwitching = false;
+    syncMapSwitch();
+  }
+}
+
+function applyMapIdentity() {
+  if (els.mapTitle) els.mapTitle.textContent = WORLD.name;
+  if (els.loadingTitle) els.loadingTitle.textContent = `正在装载${WORLD.name}战场`;
+  if (els.loadingMeta) {
+    els.loadingMeta.textContent = `原版地图 ${WORLD.mapId} · ${WORLD.width}×${WORLD.height} · 可破坏地形`;
+  }
+  document.title = `风场弹道 · ${WORLD.name}`;
+  const description = document.querySelector('meta[name="description"]');
+  if (description) {
+    description.content = `移植自 Gunny 源码的单机横屏弹道对战：亚特兰蒂斯与彩虹云海两张原版地图可切换，可破坏地形、风向、十三种经典武器与 1–8 战斗道具栏。`;
+  }
+}
+
+function setupMapSwitch() {
+  if (!els.mapSwitch) return;
+  for (const button of els.mapSwitch.querySelectorAll('[data-map]')) {
+    button.addEventListener('click', () => switchMap(Number(button.dataset.map)));
+  }
+  syncMapSwitch();
+}
+
 async function boot() {
   try {
+    applyMapIdentity();
+    setupMapSwitch();
     setViewportVariables();
     if (els.buildVersion) els.buildVersion.textContent = `v${BUILD_VERSION}`;
-    const craterArtUrls = {
-      50: { shape: 'assets/crater-50.png', brink: 'assets/craterbrink-50.png' },
-      401: { shape: 'assets/crater-401.png', brink: 'assets/craterbrink-401.png' },
-      4: { shape: 'assets/crater-4.png', brink: 'assets/craterbrink-4.png' },
-    };
     const weaponIds = ['axe', 'bow', 'gun', 'goldgun', 'fire', 'cannon', 'wind', 'thunder', 'brick', 'fruit', 'scalpel', 'toilet', 'appliance'];
-    const [back, playerSheet, enemySheet, shell, loadedTerrain, weaponImages, projectileImages, fruitPowImage] = await Promise.all([
-      loadImage('assets/map-1156-back.jpg'),
+    const [mapAssets, playerSheet, enemySheet, shell, weaponImages, projectileImages, fruitPowImage] = await Promise.all([
+      getMapAssets(WORLD),
       loadImage('assets/character-player-sheet.png'),
       loadImage('assets/character-enemy-sheet.png'),
       loadImage('assets/shell-bomb.png'),
-      Terrain.load({
-        foregroundUrl: 'assets/map-1156-fore.png',
-        craterArtUrls,
-      }),
       Promise.all(weaponIds.map(async (id) => [id, await loadImage(`assets/weapon-${id}.png`)])).then(Object.fromEntries),
       Promise.all(weaponIds.map(async (id) => [id, await loadImage(`assets/projectile-${id}.png`)])).then(Object.fromEntries),
       loadImage('assets/projectile-fruit-pow.png'),
@@ -2083,6 +2221,7 @@ async function boot() {
     // POW ammo visual: original durian item art replaces the tomato on a
     // fruit-basket POWER shot (browser-only, see README).
     projectileImages['fruit-pow'] = fruitPowImage;
+    const { back, terrain: loadedTerrain } = mapAssets;
     terrain = loadedTerrain;
     renderer = new Renderer({
       canvas: els.canvas,
@@ -2111,6 +2250,9 @@ async function boot() {
     syncOrientationNotice();
     els.loading.classList.add('is-hidden');
     showToast('开局先选武器 · 1–8 选战斗道具 · 右下按住蓄力并松手发射', { duration: 5200 });
+    const warm = () => warmAlternateMap();
+    if ('requestIdleCallback' in window) requestIdleCallback(warm, { timeout: 2200 });
+    else window.setTimeout(warm, 900);
     requestAnimationFrame(frame);
   } catch (error) {
     window.__GUNNY_BOOT_ERROR__ = error?.stack || String(error);

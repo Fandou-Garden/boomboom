@@ -37,6 +37,26 @@ type Terrain struct {
 	Base          []uint8
 	Craters       []Crater
 	Art           map[string]*CraterArt
+	World         MapProfile
+}
+
+// Profile returns the world values belonging to this bitmap. Tests may build a
+// Terrain literal without World; dimensions then select a known map profile.
+func (t *Terrain) Profile() MapProfile {
+	if t.World.ID != 0 || t.World.Width != 0 {
+		return t.World
+	}
+	return MapProfileForSize(t.Width, t.Height)
+}
+
+func (t *Terrain) bedrockY() int {
+	if y := t.World.BedrockY; y > 0 {
+		return y
+	}
+	if y := t.Profile().BedrockY; y > 0 {
+		return y
+	}
+	return BedrockY
 }
 
 func LoadTerrain(mapPath, assetsDir string) (*Terrain, error) {
@@ -81,7 +101,8 @@ func LoadTerrainFromBytes(data []byte, arts map[string][]byte) (*Terrain, error)
 	t := &Terrain{
 		Width: w, Height: h,
 		Mask: mask, Base: append([]uint8(nil), mask...),
-		Art: map[string]*CraterArt{},
+		Art:   map[string]*CraterArt{},
+		World: MapProfileForSize(w, h),
 	}
 	for _, id := range []string{"50", "401", "4"} {
 		raw, ok := arts[id]
@@ -247,7 +268,7 @@ func (t *Terrain) Carve(cx, cy int, artID, kind string) (removed int, bounds [4]
 		wy := y0 + ay
 		// Keep the source bedrock floor intact: craters may never dig into
 		// the fully-solid base rows at y >= BedrockY.
-		if wy < 0 || wy >= t.Height || wy >= BedrockY {
+		if wy < 0 || wy >= t.Height || wy >= t.bedrockY() {
 			continue
 		}
 		row := wy * t.Width

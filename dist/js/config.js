@@ -7,32 +7,77 @@
  * rows or art assets are not readable in this checkout. Never scatter tuning
  * constants through gameplay code — change them here.
  */
-export const BUILD_VERSION = '2.0.0';
+export const BUILD_VERSION = '2.1.0';
 export const SOURCE_COMMIT = '057c71aab877b42ebf08258aa5c642adc6a039ec';
 export const SOURCE_REPO = 'https://github.com/phucdz2kk4/Gunny';
 
-export const WORLD = Object.freeze({
-  // SOURCE: LoadMapsItems.xml ID=1156 ForegroundWidth/Height = 1843×1020.
-  // The shipped back.jpg is 1447×1020 and is tiled horizontally at native
-  // resolution. The Go server, renderer and minimap share this one size.
-  mapId: 1156,
-  name: '亚特兰蒂斯',
-  width: 1843,
-  height: 1020,
-  sourceWidth: 1843,
-  mirrorAxis: 1843,
-  backgroundTileWidth: 1447,
-  // Keep the bottom rows uncarved; 1156 has no source bedrock row.
-  bedrockY: 1015,
-  // PORT: source MapInfo PosX/PosX1 are not in the readable XML export.
-  // These two flat Atlantis ledges keep the original 1400 px / 70 m distance.
-  spawnX: [240, 1640],
-  spawnProbeY: 200,
-  pixelsPerMetre: 20, // NEW: display-only conversion for distance/elevation.
-  groundBottom: 1000,
-  // Foreground/collision updates are local to 256×256 chunks.
-  chunkSize: 256,
+// Both maps ship in dist/data and share the same Go rules. The page chooses a
+// profile at module load, so a map switch is a clean reload into a new match.
+export const MAP_PROFILES = Object.freeze({
+  1156: Object.freeze({
+    // SOURCE: LoadMapsItems.xml ID=1156 ForegroundWidth/Height = 1843×1020.
+    // The shipped back.jpg is 1447×1020 and is tiled horizontally at native
+    // resolution. The Go server, renderer and minimap share this one size.
+    mapId: 1156,
+    name: '亚特兰蒂斯',
+    width: 1843,
+    height: 1020,
+    sourceWidth: 1843,
+    mirrorAxis: 1843,
+    backgroundTileWidth: 1447,
+    // Keep the bottom rows uncarved; 1156 has no source bedrock row.
+    bedrockY: 1015,
+    // PORT: source MapInfo PosX/PosX1 are not in the readable XML export.
+    // These two flat Atlantis ledges keep the original 1400 px / 70 m distance.
+    spawnX: Object.freeze([240, 1640]),
+    spawnProbeY: 200,
+    pixelsPerMetre: 20, // NEW: display-only conversion for distance/elevation.
+    groundBottom: 1000,
+    backImage: 'assets/map-1156-back.jpg',
+    foregroundImage: 'assets/map-1156-fore.png',
+    // Foreground/collision updates are local to 256×256 chunks.
+    chunkSize: 256,
+  }),
+  1001: Object.freeze({
+    // SOURCE: LoadMapsItems.xml ID=1001 (Cầu vồng) 2000×1425;
+    // BackroundWidht=1526. The low cloud shelves are the two duel spawns.
+    mapId: 1001,
+    name: '彩虹云海',
+    width: 2000,
+    height: 1425,
+    sourceWidth: 2000,
+    mirrorAxis: 2000,
+    backgroundTileWidth: 1526,
+    bedrockY: 1282,
+    spawnX: Object.freeze([300, 1700]),
+    spawnProbeY: 700,
+    pixelsPerMetre: 20,
+    groundBottom: 1410,
+    backImage: 'assets/map-1001-back.jpg',
+    foregroundImage: 'assets/map-1001-fore.png',
+    chunkSize: 256,
+  }),
 });
+
+export function mapProfileFor(mapId) {
+  return MAP_PROFILES[Number(mapId)] || MAP_PROFILES[1156];
+}
+
+function selectedMapProfile() {
+  if (typeof location === 'undefined') return MAP_PROFILES[1156];
+  return mapProfileFor(new URLSearchParams(location.search).get('map'));
+}
+
+// WORLD is intentionally mutable: the renderer, camera, HUD and terrain all
+// share this object, so an in-place map switch only has to update these fields.
+export const WORLD = { ...selectedMapProfile() };
+
+export function activateMapProfile(mapId) {
+  const profile = mapProfileFor(mapId);
+  if (!profile) return null;
+  Object.assign(WORLD, profile);
+  return profile;
+}
 
 export const PHYSICS = Object.freeze({
   // SOURCE: SimpleBomb.StartMoving() advances in 0.04 s steps.

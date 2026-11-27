@@ -475,3 +475,36 @@ func TestFixedWindTrajectoryIsDeterministic(t *testing.T) {
 }
 
 func mathRand() *rand.Rand { return rand.New(rand.NewSource(7)) }
+
+// The static build ships two selectable collision maps. Loading the 1001
+// bitmap must select its own world size, spawn columns and bedrock floor; a
+// 1156 match must remain unchanged.
+func TestMap1001ProfileAndSpawns(t *testing.T) {
+	root := filepath.Join("..", "..")
+	tr, err := LoadTerrain(filepath.Join(root, "dist/data/1001.fore.map"), filepath.Join(root, "dist/assets"))
+	if err != nil {
+		t.Fatalf("LoadTerrain(1001): %v", err)
+	}
+	if tr.Width != 2000 || tr.Height != 1425 {
+		t.Fatalf("map 1001 = %dx%d, want 2000x1425", tr.Width, tr.Height)
+	}
+	if tr.Profile().ID != 1001 || tr.Profile().BedrockY != 1282 {
+		t.Fatalf("map 1001 profile = %+v", tr.Profile())
+	}
+	m := NewMatch(tr, 7, false)
+	if m.World.ID != 1001 || m.World.Width != 2000 || m.World.Height != 1425 {
+		t.Fatalf("match world = %+v", m.World)
+	}
+	if m.Actors[0].X != 300 || m.Actors[1].X != 1700 {
+		t.Fatalf("spawn x = %v/%v, want 300/1700", m.Actors[0].X, m.Actors[1].X)
+	}
+	if !tr.IsSolid(300, int(m.Actors[0].Y)) || !tr.IsSolid(1700, int(m.Actors[1].Y)) {
+		t.Fatalf("actors not grounded: %+v %+v", *m.Actors[0], *m.Actors[1])
+	}
+	tr.Carve(300, 1282-10, "4", "large")
+	for _, y := range []int{1282, 1283, tr.Height - 1} {
+		if !tr.IsSolid(300, y) {
+			t.Fatalf("1001 bedrock breached at y=%d", y)
+		}
+	}
+}

@@ -63,8 +63,9 @@ func main() {
 	mux.HandleFunc("/api/command", s.handleCommand)
 	mux.Handle("/", noStore(http.FileServer(http.Dir(*root))))
 
-	log.Printf("Gunny Go server: http://127.0.0.1%s/  map=%dx%d spawns=%.0f/%.0f debug=%v",
-		*addr, terrain.Width, terrain.Height, game.SpawnX[0], game.SpawnX[1], *debug)
+	profile := terrain.Profile()
+	log.Printf("Gunny Go server: http://127.0.0.1%s/  map=%d %dx%d spawns=%.0f/%.0f debug=%v",
+		*addr, profile.ID, terrain.Width, terrain.Height, profile.SpawnX[0], profile.SpawnX[1], *debug)
 	if err := http.ListenAndServe(*addr, mux); err != nil {
 		log.Fatal(err)
 	}

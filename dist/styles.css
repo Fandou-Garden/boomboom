@@ -319,6 +319,35 @@ svg { display: block; }
 .dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
 .dot.player { background: var(--teal); box-shadow: 0 0 4px var(--teal); }
 .dot.enemy { background: #ffad66; box-shadow: 0 0 4px #ffad66; }
+.map-switch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 3px;
+  margin-top: 3px;
+}
+.map-switch button {
+  min-width: 0;
+  padding: 3px 2px;
+  border: 1px solid rgba(146, 220, 232, 0.22);
+  border-radius: 5px;
+  background: rgba(16, 78, 92, 0.32);
+  color: #9acbd3;
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.map-switch button:hover { border-color: rgba(146, 230, 244, 0.46); color: #e8fbff; }
+.map-switch button.is-active {
+  border-color: rgba(255, 211, 106, 0.58);
+  background: rgba(126, 83, 16, 0.42);
+  color: #ffe19b;
+  cursor: default;
+}
+.map-switch button:disabled { opacity: 1; }
 
 /* ---------- Toast / turn flash ---------- */
 .toast {
@@ -966,7 +995,7 @@ svg { display: block; }
 .fire-button.is-charging .fire-copy b { font-size: clamp(16px, 2.3vw, 21px); font-variant-numeric: tabular-nums; }
 .fire-button:disabled { filter: grayscale(0.58) brightness(0.72); opacity: 0.58; transform: none; animation: none; }
 .fire-button:disabled::before { opacity: 0.35; }
-.fire-button:focus-visible, .icon-button:focus-visible, .skill-button:focus-visible, .pow-button:focus-visible, .recenter:focus-visible {
+.fire-button:focus-visible, .icon-button:focus-visible, .skill-button:focus-visible, .pow-button:focus-visible, .recenter:focus-visible, .map-switch button:focus-visible {
   outline: 2px solid #ffe49a;
   outline-offset: 2px;
 }
@@ -1079,6 +1108,7 @@ svg { display: block; }
   .minimap-panel { width: 120px; }
   .minimap-title { font-size: 7px; }
   .minimap-distance { display: none; }
+  .map-switch button { font-size: 6.5px; padding-block: 2.5px; }
   .power-panel { width: clamp(254px, 42vw, 286px); padding-inline: 8px; }
   .power-recommend { font-size: 9.5px; }
   .power-foot { font-size: 8px; }

@@ -165,7 +165,7 @@ func StepProjectile(p *Projectile, target *Actor, terrain *Terrain, wind float64
 			p.Alive = false
 			return
 		}
-		if IsProjectileOut(x, y) {
+		if isProjectileOut(x, y, terrain.Width, terrain.Height) {
 			p.X, p.Y = x, y
 			p.Impact = "out"
 			p.Alive = false
@@ -176,8 +176,13 @@ func StepProjectile(p *Projectile, target *Actor, terrain *Terrain, wind float64
 	p.Y = startY + dy
 }
 
+func isProjectileOut(x, y float64, width, height int) bool {
+	return x < -60 || x > float64(width)+60 || y > float64(height)+80 || y < -float64(height)*2
+}
+
+// IsProjectileOut keeps the original 1156 helper for callers outside Match.
 func IsProjectileOut(x, y float64) bool {
-	return x < -60 || x > WorldWidth+60 || y > WorldHeight+80 || y < -WorldHeight*2
+	return isProjectileOut(x, y, WorldWidth, WorldHeight)
 }
 
 // SimulateShot is the deterministic AI/acceptance simulator. It uses the same

@@ -138,6 +138,71 @@ const (
 // they keep the original 1400 px / 70 m duel distance.
 var SpawnX = [2]float64{240, 1640}
 
+// MapProfile carries the per-map world values that cannot be inferred from the
+// collision bitmap alone. The browser can switch maps by reloading with
+// ?map=1001 or ?map=1156; the WASM constructor selects the matching profile
+// from the bitmap header.
+type MapProfile struct {
+	ID                  int
+	Name                string
+	Width               int
+	Height              int
+	SourceWidth         int
+	BackgroundTileWidth int
+	GroundBottom        int
+	SpawnProbeY         int
+	BedrockY            int
+	SpawnX              [2]float64
+}
+
+var MapProfiles = map[int]MapProfile{
+	1156: {
+		ID: 1156, Name: "Atlantis",
+		Width: WorldWidth, Height: WorldHeight,
+		SourceWidth: SourceWidth, BackgroundTileWidth: BackgroundTileWidth,
+		GroundBottom: GroundBottom, SpawnProbeY: SpawnProbeY,
+		BedrockY: BedrockY, SpawnX: SpawnX,
+	},
+	// SOURCE: LoadMapsItems.xml ID=1001 (Cầu vồng), Foreground 2000×1425;
+	// BackroundWidht=1526, Weight=10, DragIndex=2. Spawn/probe values match
+	// the pre-Atlantis browser port and land on the two low cloud shelves.
+	1001: {
+		ID: 1001, Name: "Rainbow",
+		Width: 2000, Height: 1425,
+		SourceWidth: 2000, BackgroundTileWidth: 1526,
+		GroundBottom: 1410, SpawnProbeY: 700,
+		BedrockY: 1282, SpawnX: [2]float64{300, 1700},
+	},
+}
+
+func MapProfileFor(id int) MapProfile {
+	if profile, ok := MapProfiles[id]; ok {
+		return profile
+	}
+	return MapProfiles[MapID]
+}
+
+func MapProfileForSize(width, height int) MapProfile {
+	for _, id := range []int{MapID, 1001} {
+		profile := MapProfiles[id]
+		if profile.Width == width && profile.Height == height {
+			return profile
+		}
+	}
+	// Unknown maps remain usable for tests and future art: keep the Atlantis
+	// gameplay constants but use the real bitmap dimensions.
+	profile := MapProfiles[MapID]
+	profile.ID = 0
+	profile.Name = "Custom"
+	profile.Width = width
+	profile.Height = height
+	profile.SourceWidth = width
+	profile.GroundBottom = height - 20
+	profile.BedrockY = height - 5
+	profile.SpawnX = [2]float64{float64(width) * 0.13, float64(width) * 0.87}
+	return profile
+}
+
 // WeaponDef is the browser's authoritative projection of one classic Gunny
 // weapon. Every visual/geometry field is traceable to the original XML/SWF:
 //

@@ -103,6 +103,7 @@ type Match struct {
 	mu sync.Mutex
 
 	Terrain *Terrain
+	World   MapProfile
 	Actors  [2]*Actor
 
 	Turn  int
@@ -166,6 +167,7 @@ type Match struct {
 func NewMatch(terrain *Terrain, seed int64, lowPower bool) *Match {
 	m := &Match{
 		Terrain:     terrain,
+		World:       terrain.Profile(),
 		Subscribers: map[chan Event]struct{}{},
 		RNG:         rand.New(rand.NewSource(seed)),
 		LowPower:    lowPower,
@@ -238,17 +240,17 @@ func (m *Match) resetLocked() {
 	m.EnemyAimElapsed = 0
 
 	spawnY := [2]float64{}
-	for i, x := range SpawnX {
-		if gy, ok := m.Terrain.FindGroundY(int(x), SpawnProbeY, GroundBottom); ok {
+	for i, x := range m.World.SpawnX {
+		if gy, ok := m.Terrain.FindGroundY(int(x), m.World.SpawnProbeY, m.World.GroundBottom); ok {
 			spawnY[i] = float64(gy)
 		} else {
-			spawnY[i] = WorldHeight - 60
+			spawnY[i] = float64(m.World.Height - 60)
 		}
 	}
 	m.Actors = [2]*Actor{
 		{
 			Index: 0, ID: "player", Name: "蓝波", Subtitle: "你",
-			X: SpawnX[0], Y: spawnY[0], HP: PlayerMaxHP, MaxHP: PlayerMaxHP,
+			X: m.World.SpawnX[0], Y: spawnY[0], HP: PlayerMaxHP, MaxHP: PlayerMaxHP,
 			Facing: 1, Alive: true, Grounded: true, AimAngle: playerWeapon.StartAngle, Weapon: playerWeapon.ID,
 			BaseDamage: BaseDamage, Attack: Attack, BaseGuard: BaseGuard,
 			Defence: Defence, Grade: Grade, Lucky: Lucky,
@@ -256,7 +258,7 @@ func (m *Match) resetLocked() {
 		},
 		{
 			Index: 1, ID: "enemy", Name: "芽芽", Subtitle: "电脑",
-			X: SpawnX[1], Y: spawnY[1], HP: EnemyMaxHP, MaxHP: EnemyMaxHP,
+			X: m.World.SpawnX[1], Y: spawnY[1], HP: EnemyMaxHP, MaxHP: EnemyMaxHP,
 			Facing: -1, Alive: true, Grounded: true, AimAngle: enemyWeapon.StartAngle, Weapon: enemyWeapon.ID,
 			BaseDamage: BaseDamage, Attack: Attack, BaseGuard: BaseGuard,
 			Defence: Defence, Grade: Grade, Lucky: Lucky,
@@ -505,8 +507,8 @@ func (m *Match) Command(c Command) error {
 		}
 		if c.Dir >= 0 && c.Dir < len(m.Actors) {
 			a := m.Actors[c.Dir]
-			a.X = Clamp(c.X, 70, WorldWidth-70)
-			if gy, ok := m.Terrain.FindGroundY(int(a.X), SpawnProbeY, GroundBottom); ok {
+			a.X = Clamp(c.X, 70, float64(m.World.Width)-70)
+			if gy, ok := m.Terrain.FindGroundY(int(a.X), m.World.SpawnProbeY, m.World.GroundBottom); ok {
 				a.Y = float64(gy)
 			}
 			a.VY = 0
@@ -707,7 +709,7 @@ func (m *Match) moveActorLocked(index, direction int, distance float64) bool {
 }
 
 func (m *Match) stepActorLocked(a, other *Actor, direction int) bool {
-	nextX := Clamp(a.X+float64(direction*MoveStepX), 70, WorldWidth-70)
+	nextX := Clamp(a.X+float64(direction*MoveStepX), 70, float64(m.World.Width)-70)
 	if math.Abs(nextX-other.X) < ActorWidth*0.72 {
 		a.WalkDirection = 0
 		a.Facing = direction
@@ -799,7 +801,7 @@ func (m *Match) updateFallingLocked(dt float64) {
 		}
 		a.Y = nextY
 		a.Slope = 0
-		if a.Y > WorldHeight+70 {
+		if a.Y > float64(m.World.Height)+70 {
 			m.fallOutLocked(a)
 		}
 	}
@@ -870,9 +872,9 @@ func (m *Match) chooseEnemyMoveTargetLocked() float64 {
 	for attempt := 0; attempt < 10; attempt++ {
 		toward := m.RNG.Float64() < 0.65
 		distance := 50 + m.RNG.Float64()*220
-		candidate := Clamp(e.X+float64(sign)*distance, 110, WorldWidth-110)
+		candidate := Clamp(e.X+float64(sign)*distance, 110, float64(m.World.Width)-110)
 		if !toward {
-			candidate = Clamp(e.X-float64(sign)*distance, 110, WorldWidth-110)
+			candidate = Clamp(e.X-float64(sign)*distance, 110, float64(m.World.Width)-110)
 		}
 		if _, ok := m.Terrain.FindGroundY(int(candidate), int(e.Y)-36, int(e.Y)+36); ok {
 			return candidate
