@@ -201,7 +201,12 @@ export class Renderer {
     const edgeH = Math.min(tileH, WORLD.height);
     const leftGap = Math.max(0, -view.worldLeft);
     if (leftGap > 0) {
-      ctx.drawImage(back, 0, 0, 1, edgeH, view.worldLeft, 0, leftGap, edgeH);
+      // Blur the stretched column so the artwork's horizontal bands do not
+      // read as stripes on the exposed margin.
+      ctx.save();
+      ctx.filter = 'blur(14px)';
+      ctx.drawImage(back, 0, 0, Math.max(2, Math.round(tileW * 0.02)), edgeH, view.worldLeft - 8, 0, leftGap + 16, edgeH);
+      ctx.restore();
       const fade = ctx.createLinearGradient(view.worldLeft, 0, view.worldLeft + leftGap, 0);
       fade.addColorStop(0, 'rgba(2,18,28,0.04)');
       fade.addColorStop(1, 'rgba(2,18,28,0.62)');
@@ -226,7 +231,10 @@ export class Renderer {
     }
     const rightGap = Math.max(0, view.worldLeft + view.viewW - WORLD.width);
     if (rightGap > 0) {
-      ctx.drawImage(back, tileW - 1, 0, 1, edgeH, WORLD.width, 0, rightGap, edgeH);
+      ctx.save();
+      ctx.filter = 'blur(14px)';
+      ctx.drawImage(back, tileW - Math.max(2, Math.round(tileW * 0.02)), 0, Math.max(2, Math.round(tileW * 0.02)), edgeH, WORLD.width - 8, 0, rightGap + 16, edgeH);
+      ctx.restore();
       const fade = ctx.createLinearGradient(WORLD.width, 0, WORLD.width + rightGap, 0);
       fade.addColorStop(0, 'rgba(2,18,28,0.04)');
       fade.addColorStop(1, 'rgba(2,18,28,0.62)');
