@@ -50,7 +50,7 @@
     bootPromise = (async () => {
       if (typeof window.Go !== 'function') throw new Error('wasm_exec.js 未加载');
       const go = new window.Go();
-      const response = await fetch('wasm/gunny.wasm?v=19', { cache: 'force-cache' });
+      const response = await fetch('wasm/gunny.wasm?v=20', { cache: 'force-cache' });
       if (!response.ok) throw new Error(`gunny.wasm: HTTP ${response.status}`);
       const bytes = await response.arrayBuffer();
       let instantiated;
@@ -65,15 +65,17 @@
       });
       for (let i = 0; i < 200 && !window.GunnyWasm; i += 1) await sleep(10);
       if (!window.GunnyWasm) throw new Error('WASM 引擎未挂载 GunnyWasm');
-      const [map, crater50, crater401, crater4] = await Promise.all([
-        loadBytes('data/1156.fore.map?v=19'),
-        loadBytes('assets/crater-50.png?v=19'),
-        loadBytes('assets/crater-401.png?v=19'),
-        loadBytes('assets/crater-4.png?v=19'),
-      ]);
       const params = new URLSearchParams(location.search);
+      const requestedMap = Number(params.get('map'));
+      const mapId = [1001, 1156].includes(requestedMap) ? requestedMap : 1156;
+      const [map, crater50, crater401, crater4] = await Promise.all([
+        loadBytes(`data/${mapId}.fore.map?v=20`),
+        loadBytes('assets/crater-50.png?v=20'),
+        loadBytes('assets/crater-401.png?v=20'),
+        loadBytes('assets/crater-4.png?v=20'),
+      ]);
       const debug = params.get('test') === '1' || params.get('cheat') === '1';
-      const error = window.GunnyWasm.init(map, crater50, crater401, crater4, debug);
+      const error = window.GunnyWasm.init(map, crater50, crater401, crater4, debug, mapId);
       if (error) throw new Error(error);
       lastSeq = 0;
     })();

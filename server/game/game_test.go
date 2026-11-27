@@ -1,20 +1,52 @@
 package game
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"path/filepath"
 	"testing"
 )
 
-func testTerrain(t *testing.T) *Terrain {
+func testTerrainForMap(t *testing.T, mapID int) *Terrain {
 	t.Helper()
+	if err := UseMap(mapID); err != nil {
+		t.Fatalf("UseMap(%d): %v", mapID, err)
+	}
 	root := filepath.Join("..", "..")
-	tr, err := LoadTerrain(filepath.Join(root, "reference/map/1156/fore.map"), filepath.Join(root, "dist/assets"))
+	tr, err := LoadTerrain(filepath.Join(root, "reference/map", fmt.Sprintf("%d", mapID), "fore.map"), filepath.Join(root, "dist/assets"))
 	if err != nil {
-		t.Fatalf("LoadTerrain: %v", err)
+		t.Fatalf("LoadTerrain(%d): %v", mapID, err)
 	}
 	return tr
+}
+
+func testTerrain(t *testing.T) *Terrain {
+	return testTerrainForMap(t, 1156)
+}
+
+func TestSelectableMap1001SpawnsAndBedrock(t *testing.T) {
+	tr := testTerrainForMap(t, 1001)
+	defer func() { _ = UseMap(1156) }()
+	if tr.Width != 2000 || tr.Height != 1425 || WorldWidth != 2000 || WorldHeight != 1425 {
+		t.Fatalf("map 1001 dimensions = terrain %dx%d, world %dx%d", tr.Width, tr.Height, WorldWidth, WorldHeight)
+	}
+	if SpawnX != [2]float64{300, 1700} {
+		t.Fatalf("map 1001 spawns = %v", SpawnX)
+	}
+	if !tr.IsSolid(300, 1186) || tr.IsSolid(300, 1185) || !tr.IsSolid(1700, 1193) || tr.IsSolid(1700, 1192) {
+		t.Fatalf("map 1001 spawn ground mismatch")
+	}
+	tr.Carve(300, BedrockY-10, "4", "large")
+	for _, y := range []int{BedrockY, tr.Height - 1} {
+		if !tr.IsSolid(300, y) {
+			t.Fatalf("map 1001 bedrock breached at y=%d", y)
+		}
+	}
+	m := NewMatch(tr, 7, false)
+	if m.Actors[0].X != 300 || m.Actors[1].X != 1700 {
+		t.Fatalf("match spawns = %v / %v", m.Actors[0].X, m.Actors[1].X)
+	}
 }
 
 func TestTerrainHeaderMatchesSource(t *testing.T) {

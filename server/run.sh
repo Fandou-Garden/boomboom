@@ -11,10 +11,12 @@ if [ -z "$GO_BIN" ]; then
   echo "Go 1.21+ is required. Install Go or set GO_BIN=/path/to/go." >&2
   exit 1
 fi
+MAP_ID="${GUNNY_MAP_ID:-1156}"
 exec "$GO_BIN" run . \
   -addr "${ADDR:-:8000}" \
   -root ../dist \
-  -map ../reference/map/1156/fore.map \
+  -map-id "$MAP_ID" \
+  -map "../reference/map/$MAP_ID/fore.map" \
   -assets ../dist/assets \
   ${GUNNY_DEBUG:+-debug} \
   "$@"

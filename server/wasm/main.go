@@ -36,6 +36,13 @@ func initMatch(this js.Value, args []js.Value) any {
 	if len(args) < 4 {
 		return "gunnyInit requires map + three crater PNG buffers"
 	}
+	mapID := 1156
+	if len(args) > 5 && args[5].Truthy() {
+		mapID = args[5].Int()
+	}
+	if err := game.UseMap(mapID); err != nil {
+		return err.Error()
+	}
 	arts := map[string][]byte{
 		"50":  bytesFromJS(args[1]),
 		"401": bytesFromJS(args[2]),

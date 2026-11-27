@@ -23,7 +23,8 @@ type app struct {
 func main() {
 	addr := flag.String("addr", ":8000", "HTTP listen address")
 	root := flag.String("root", "./dist", "static web root (contains index.html)")
-	mapPath := flag.String("map", "./reference/map/1156/fore.map", "original fore.map collision bitmap")
+	mapID := flag.Int("map-id", 1156, "map id (1001 or 1156)")
+	mapPath := flag.String("map", "", "original fore.map collision bitmap; defaults to the selected map id")
 	assets := flag.String("assets", "./dist/assets", "directory containing crater-*.png")
 	seed := flag.Int64("seed", time.Now().UnixNano(), "RNG seed for wind and AI")
 	lowPower := flag.Bool("low-power", false, "reduce AI search cost")
@@ -32,6 +33,12 @@ func main() {
 
 	if _, err := os.Stat(filepath.Join(*root, "index.html")); err != nil {
 		log.Fatalf("missing %s/index.html: %v", *root, err)
+	}
+	if err := game.UseMap(*mapID); err != nil {
+		log.Fatalf("map: %v", err)
+	}
+	if *mapPath == "" {
+		*mapPath = fmt.Sprintf("./reference/map/%d/fore.map", *mapID)
 	}
 	terrain, err := game.LoadTerrain(*mapPath, *assets)
 	if err != nil {
@@ -63,8 +70,8 @@ func main() {
 	mux.HandleFunc("/api/command", s.handleCommand)
 	mux.Handle("/", noStore(http.FileServer(http.Dir(*root))))
 
-	log.Printf("Gunny Go server: http://127.0.0.1%s/  map=%dx%d spawns=%.0f/%.0f debug=%v",
-		*addr, terrain.Width, terrain.Height, game.SpawnX[0], game.SpawnX[1], *debug)
+	log.Printf("Gunny Go server: http://127.0.0.1%s/  map=%d %s %dx%d spawns=%.0f/%.0f debug=%v",
+		*addr, game.MapID, game.MapName, terrain.Width, terrain.Height, game.SpawnX[0], game.SpawnX[1], *debug)
 	if err := http.ListenAndServe(*addr, mux); err != nil {
 		log.Fatal(err)
 	}

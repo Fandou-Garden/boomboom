@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#061f2c">
-  <meta name="description" content="移植自 Gunny 源码的单机横屏弹道对战：1843×1020 亚特兰蒂斯地图、可破坏地形、风向、十三种经典武器与 1–8 战斗道具栏。">
+  <meta name="description" content="移植自 Gunny 源码的单机横屏弹道对战：亚特兰蒂斯 1156 与彩虹岛 1001 双地图可选、可破坏地形、风向、十三种经典武器与 1–8 战斗道具栏。">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="风场弹道">
   <title>风场弹道 · Gunny Wind Arena</title>
-  <link rel="icon" href="assets/favicon.svg?v=19" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=19">
-  <link rel="manifest" href="manifest.webmanifest?v=19">
-  <link rel="stylesheet" href="styles.css?v=19">
+  <link rel="icon" href="assets/favicon.svg?v=20" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=20">
+  <link rel="manifest" href="manifest.webmanifest?v=20">
+  <link rel="stylesheet" href="styles.css?v=20">
 </head>
 <body>
   <div id="app" class="app">
@@ -22,7 +22,7 @@
     <header id="topbar" class="topbar">
       <section class="battle-hud" aria-label="双方状态与风力">
         <article class="combatant player-card" aria-label="玩家状态">
-          <span class="portrait"><img src="assets/portrait-player.png?v=19" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-player.png?v=20" alt=""></span>
           <div class="combatant-copy">
             <div class="name-row"><span class="team-dot"></span><strong>蓝波</strong><span class="role">你</span></div>
             <div class="hp-track"><i id="hpBar0"></i></div>
@@ -48,7 +48,7 @@
             <div class="hp-track"><i id="hpBar1"></i></div>
             <div class="hp-number" id="hp1">2000</div>
           </div>
-          <span class="portrait"><img src="assets/portrait-enemy.png?v=19" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-enemy.png?v=20" alt=""></span>
         </article>
       </section>
 
@@ -81,8 +81,8 @@
 
     <aside class="minimap-panel" aria-label="小地图与视野">
       <div class="minimap-head">
-        <span class="minimap-title">亚特兰蒂斯</span>
-        <span id="buildVersion" class="build-version" title="客户端版本">v2.0.0</span>
+        <span id="minimapTitle" class="minimap-title">亚特兰蒂斯</span>
+        <span id="buildVersion" class="build-version" title="客户端版本">v2.1.0</span>
         <span id="minimapDistance" class="minimap-distance">170m</span>
         <button id="recenter" class="recenter" type="button" title="一键回到战场">回战场</button>
       </div>
@@ -214,8 +214,10 @@
 
     <section id="weaponPicker" class="weapon-picker" role="dialog" aria-modal="true" aria-labelledby="weaponPickerTitle" hidden>
       <div class="weapon-dialog">
-        <span class="weapon-kicker">GUNNY · CLASSIC ARSENAL</span>
-        <h1 id="weaponPickerTitle">选择主武器</h1>
+        <span class="weapon-kicker">GUNNY · BATTLE SETUP</span>
+        <h1 id="weaponPickerTitle">选择战场与主武器</h1>
+        <div class="map-head"><span>战场地图</span><small id="mapNote">开局选择战场；切换地图会重新载入页面，武器选择会保留。</small></div>
+        <div id="mapGrid" class="map-grid" role="radiogroup" aria-label="选择战场地图"></div>
         <p class="weapon-lead">开局可自由更换，第一发炮弹出手后本局锁定。十三件武器均按原版炮塔与炮弹资源重制。</p>
         <div id="weaponGrid" class="weapon-grid" role="radiogroup" aria-label="十三种经典武器"></div>
         <div class="weapon-dialog-foot">
@@ -280,7 +282,7 @@
         preload.rel = 'preload';
         preload.as = 'fetch';
         preload.type = 'application/wasm';
-        preload.href = 'wasm/gunny.wasm?v=19';
+        preload.href = 'wasm/gunny.wasm?v=20';
         document.head.appendChild(preload);
         const loadScript = (src) => new Promise((resolve, reject) => {
           const script = document.createElement('script');
@@ -290,14 +292,14 @@
           document.head.appendChild(script);
         });
         try {
-          await loadScript('wasm/wasm_exec.js?v=19');
-          await loadScript('offline-api.js?v=19');
+          await loadScript('wasm/wasm_exec.js?v=20');
+          await loadScript('offline-api.js?v=20');
         } catch (error) {
           console.error('离线引擎加载失败', error);
         }
       }
       try {
-        await import('./js/main.js?v=19');
+        await import('./js/main.js?v=20');
       } catch (error) {
         console.error('前端入口加载失败', error);
         const fatal = document.getElementById('fatal');

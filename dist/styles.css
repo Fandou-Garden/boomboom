@@ -773,6 +773,33 @@ svg { display: block; }
 .heal-button { color: #b8f7c6; }
 .heal-button.is-healing { border-color: rgba(132, 255, 158, 0.9); box-shadow: 0 0 14px rgba(92, 255, 137, 0.4); }
 
+/* Opening map + weapon picker. */
+.map-head { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 6px; color: #dff9ff; }
+.map-head > span { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; }
+.map-head > small { min-width: 0; overflow: hidden; color: #86aeb9; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.map-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 12px; }
+.map-grid.single { grid-template-columns: minmax(0, 1fr); }
+.map-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid rgba(142, 220, 237, 0.22);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(12, 50, 61, 0.84), rgba(4, 24, 33, 0.88));
+  color: #dff5f9;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+.map-option:hover { transform: translateY(-1px); border-color: rgba(157, 237, 253, 0.55); background: linear-gradient(180deg, rgba(18, 72, 84, 0.92), rgba(6, 32, 41, 0.92)); }
+.map-option.is-selected { border-color: rgba(255, 209, 103, 0.95); background: linear-gradient(180deg, rgba(98, 68, 17, 0.9), rgba(37, 31, 15, 0.94)); box-shadow: 0 0 18px rgba(255, 194, 74, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.16); }
+.map-option img { flex: 0 0 auto; width: 84px; height: 46px; border-radius: 7px; object-fit: cover; image-rendering: auto; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28); }
+.map-option > span { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.map-option strong { font-size: clamp(12px, 1.3vw, 15px); white-space: nowrap; }
+.map-option small { color: #9bcbd5; font-size: 9px; white-space: nowrap; }
+.map-option em { overflow: hidden; color: #f5d47a; font-size: 9px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
 /* Opening weapon picker. */
 .weapon-picker {
   position: fixed;
@@ -1165,5 +1192,11 @@ svg { display: block; }
   .weapon-dialog h1 { margin: 3px 0; font-size: 20px; }
   .weapon-lead { margin-bottom: 8px; font-size: 10px; }
   .weapon-dialog-foot { margin-top: 8px; }
+  .map-head { margin: 5px 0 4px; }
+  .map-head > small { display: none; }
+  .map-grid { gap: 6px; margin-bottom: 7px; }
+  .map-option { padding: 4px; }
+  .map-option img { width: 60px; height: 34px; }
+  .map-option em { display: none; }
 }
 

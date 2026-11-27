@@ -2,6 +2,8 @@ package game
 
 type Snapshot struct {
 	Seq           uint64      `json:"seq"`
+	MapID         int         `json:"mapId"`
+	MapName       string      `json:"mapName"`
 	Phase         string      `json:"phase"`
 	Turn          int         `json:"turn"`
 	Round         int         `json:"round"`
@@ -58,7 +60,8 @@ func (m *Match) Snapshot() Snapshot {
 func (m *Match) snapshotLocked() Snapshot {
 	weapon := m.playerWeapon()
 	s := Snapshot{
-		Seq: m.Seq, Phase: m.Phase, Turn: m.Turn, Round: m.Round,
+		Seq: m.Seq, MapID: MapID, MapName: MapName,
+		Phase: m.Phase, Turn: m.Turn, Round: m.Round,
 		Wind: m.Wind, WindTarget: m.WindTarget, WindLabel: m.WindLabelLocked(),
 		Angle: m.Angle, AngleMin: weapon.AngleMin, AngleMax: weapon.AngleMax,
 		Force: m.Force, Charging: m.Charging, ChargeElapsed: m.ChargeElapsed,

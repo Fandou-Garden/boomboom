@@ -174,7 +174,7 @@ func StepProjectile(p *Projectile, target *Actor, terrain *Terrain, wind float64
 }
 
 func IsProjectileOut(x, y float64) bool {
-	return x < -60 || x > WorldWidth+60 || y > WorldHeight+80 || y < -WorldHeight*2
+	return x < -60 || x > float64(WorldWidth)+60 || y > float64(WorldHeight)+80 || y < -float64(WorldHeight)*2
 }
 
 // SimulateShot is the deterministic AI/acceptance simulator. It uses the same

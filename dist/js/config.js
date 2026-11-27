@@ -7,32 +7,64 @@
  * rows or art assets are not readable in this checkout. Never scatter tuning
  * constants through gameplay code — change them here.
  */
-export const BUILD_VERSION = '2.0.0';
+export const BUILD_VERSION = '2.1.0';
 export const SOURCE_COMMIT = '057c71aab877b42ebf08258aa5c642adc6a039ec';
 export const SOURCE_REPO = 'https://github.com/phucdz2kk4/Gunny';
 
-export const WORLD = Object.freeze({
-  // SOURCE: LoadMapsItems.xml ID=1156 ForegroundWidth/Height = 1843×1020.
-  // The shipped back.jpg is 1447×1020 and is tiled horizontally at native
-  // resolution. The Go server, renderer and minimap share this one size.
-  mapId: 1156,
-  name: '亚特兰蒂斯',
-  width: 1843,
-  height: 1020,
-  sourceWidth: 1843,
-  mirrorAxis: 1843,
-  backgroundTileWidth: 1447,
-  // Keep the bottom rows uncarved; 1156 has no source bedrock row.
-  bedrockY: 1015,
-  // PORT: source MapInfo PosX/PosX1 are not in the readable XML export.
-  // These two flat Atlantis ledges keep the original 1400 px / 70 m distance.
-  spawnX: [240, 1640],
-  spawnProbeY: 200,
-  pixelsPerMetre: 20, // NEW: display-only conversion for distance/elevation.
-  groundBottom: 1000,
-  // Foreground/collision updates are local to 256×256 chunks.
-  chunkSize: 256,
+// SOURCE map rows: LoadMapsItems.xml ID=1156 (Atlantis) and ID=1001
+// (Cầu vồng). Each preserves its own foreground/collision size, background
+// tile width, spawn columns and protected bottom rows.
+export const MAPS = Object.freeze({
+  1156: Object.freeze({
+    mapId: 1156,
+    name: '亚特兰蒂斯',
+    tagline: '紧凑高低差 · 经典 70m 对决',
+    description: '亚特兰蒂斯 · 1843×1020',
+    width: 1843,
+    height: 1020,
+    sourceWidth: 1843,
+    mirrorAxis: 1843,
+    backgroundTileWidth: 1447,
+    bedrockY: 1015,
+    spawnX: [240, 1640],
+    spawnProbeY: 200,
+    pixelsPerMetre: 20,
+    groundBottom: 1000,
+    chunkSize: 256,
+    backgroundUrl: 'assets/map-1156-back.jpg',
+    foregroundUrl: 'assets/map-1156-fore.png',
+    mapDataUrl: 'data/1156.fore.map',
+    thumbUrl: 'assets/map-1156-thumb.jpg',
+  }),
+  1001: Object.freeze({
+    mapId: 1001,
+    name: '彩虹岛',
+    tagline: '远距离大战场 · 2000×1425',
+    description: '彩虹岛 · 2000×1425',
+    width: 2000,
+    height: 1425,
+    sourceWidth: 2000,
+    mirrorAxis: 2000,
+    backgroundTileWidth: 1526,
+    // The source 1001 foreground already has a fully-solid bottom platform;
+    // keep it intact while allowing the rest of the map to be carved.
+    bedrockY: 1406,
+    spawnX: [300, 1700],
+    spawnProbeY: 200,
+    pixelsPerMetre: 20,
+    groundBottom: 1400,
+    chunkSize: 256,
+    backgroundUrl: 'assets/map-1001-back.jpg',
+    foregroundUrl: 'assets/map-1001-fore.png',
+    mapDataUrl: 'data/1001.fore.map',
+    thumbUrl: 'assets/map-1001-thumb.jpg',
+  }),
 });
+
+const queryParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+const requestedMap = Number(queryParams?.get('map'));
+export const MAP_ID = MAPS[requestedMap] ? requestedMap : 1156;
+export const WORLD = MAPS[MAP_ID];
 
 export const PHYSICS = Object.freeze({
   // SOURCE: SimpleBomb.StartMoving() advances in 0.04 s steps.

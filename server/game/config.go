@@ -11,28 +11,75 @@
 // same explicit names so the UI can label them honestly.
 package game
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
+
+// MapDef is one selectable source map. The client passes the id to the WASM
+// engine before loading the matching .fore.map, so a page reload selects a
+// different battlefield without mixing collision masks or world bounds.
+type MapDef struct {
+	ID                  int
+	Name                string
+	Width, Height       int
+	SourceWidth         int
+	BackgroundTileWidth int
+	GroundBottom        int
+	BedrockY            int
+	SpawnX              [2]float64
+}
+
+var MapDefs = map[int]MapDef{
+	1156: {
+		ID: 1156, Name: "Atlantis", Width: 1843, Height: 1020,
+		SourceWidth: 1843, BackgroundTileWidth: 1447,
+		GroundBottom: 1000, BedrockY: 1015,
+		SpawnX: [2]float64{240, 1640},
+	},
+	1001: {
+		ID: 1001, Name: "Rainbow", Width: 2000, Height: 1425,
+		SourceWidth: 2000, BackgroundTileWidth: 1526,
+		GroundBottom: 1400, BedrockY: 1406,
+		SpawnX: [2]float64{300, 1700},
+	},
+}
+
+// These values are initialized from the default 1156 map and replaced by
+// UseMap before LoadTerrainFromBytes / NewMatch.
+var (
+	MapID        = 1156
+	MapName      = "Atlantis"
+	WorldWidth   = 1843
+	WorldHeight  = 1020
+	GroundBottom = 1000
+	BedrockY     = 1015
+	SpawnX       = [2]float64{240, 1640}
+)
+
+// UseMap selects a map for the current authoritative match. It must be called
+// before loading terrain and constructing the match. The WASM adapter maps one
+// page load to one match, while the HTTP server is started with -map-id.
+func UseMap(id int) error {
+	def, ok := MapDefs[id]
+	if !ok {
+		return fmt.Errorf("unknown map id %d", id)
+	}
+	MapID = def.ID
+	MapName = def.Name
+	WorldWidth = def.Width
+	WorldHeight = def.Height
+	GroundBottom = def.GroundBottom
+	BedrockY = def.BedrockY
+	SpawnX = def.SpawnX
+	return nil
+}
 
 const (
 	SourceCommit = "057c71aab877b42ebf08258aa5c642adc6a039ec"
 
-	// SOURCE: LoadMapsItems.xml Item ID=1156 (Atlantis).
-	// Foreground 1843×1020; the shipped back.jpg is 1447×1020. The XML's
-	// declared 1100×775 backdrop is the same art at a 1.316× smaller scale.
-	MapID               = 1156
-	MapName             = "Atlantis"
-	WorldWidth          = 1843
-	WorldHeight         = 1020
-	SourceWidth         = 1843
-	BackgroundTileWidth = 1447
-	GroundBottom        = 1000
-	SpawnProbeY         = 200
-	PixelsPerMetre      = 20
-
-	// PORT: 1156 has solid bottom rows but no fully-solid source bedrock row
-	// like 1001. Protect the last five rows so deep or stacked craters cannot
-	// dig through the arena floor.
-	BedrockY = 1015
+	SpawnProbeY    = 200
+	PixelsPerMetre = 20
 
 	// SOURCE: SimpleBomb.StartMoving advances in 0.04 s steps.
 	PhysicsDT = 0.04
@@ -131,12 +178,6 @@ const (
 	FallMaxSpeed       = 1100.0
 	DamageFloatSeconds = 1.15
 )
-
-// SpawnX are the two duel spawn columns. The source server reads PosX/PosX1
-// from its SQL MapInfo row; that row is not in the readable XML export. These
-// two flat Atlantis ledges (left y=389, right y=522) are a documented PORT;
-// they keep the original 1400 px / 70 m duel distance.
-var SpawnX = [2]float64{240, 1640}
 
 // WeaponDef is the browser's authoritative projection of one classic Gunny
 // weapon. Every visual/geometry field is traceable to the original XML/SWF:

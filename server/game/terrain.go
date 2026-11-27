@@ -68,6 +68,9 @@ func LoadTerrainFromBytes(data []byte, arts map[string][]byte) (*Terrain, error)
 	if w <= 0 || h <= 0 || len(data) < 8+bw*h {
 		return nil, fmt.Errorf("invalid map header %dx%d, bytes %d", w, h, len(data))
 	}
+	if w != WorldWidth || h != WorldHeight {
+		return nil, fmt.Errorf("map %dx%d does not match selected map %d (%dx%d)", w, h, MapID, WorldWidth, WorldHeight)
+	}
 	mask := make([]uint8, w*h)
 	raw := data[8:]
 	for y := 0; y < h; y++ {

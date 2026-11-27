@@ -240,7 +240,7 @@ func (m *Match) resetLocked() {
 		if gy, ok := m.Terrain.FindGroundY(int(x), SpawnProbeY, GroundBottom); ok {
 			spawnY[i] = float64(gy)
 		} else {
-			spawnY[i] = WorldHeight - 60
+			spawnY[i] = float64(WorldHeight) - 60
 		}
 	}
 	m.Actors = [2]*Actor{
@@ -477,7 +477,7 @@ func (m *Match) Command(c Command) error {
 		}
 		if c.Dir >= 0 && c.Dir < len(m.Actors) {
 			a := m.Actors[c.Dir]
-			a.X = Clamp(c.X, 70, WorldWidth-70)
+			a.X = Clamp(c.X, 70, float64(WorldWidth)-70)
 			if gy, ok := m.Terrain.FindGroundY(int(a.X), SpawnProbeY, GroundBottom); ok {
 				a.Y = float64(gy)
 			}
@@ -679,7 +679,7 @@ func (m *Match) moveActorLocked(index, direction int, distance float64) bool {
 }
 
 func (m *Match) stepActorLocked(a, other *Actor, direction int) bool {
-	nextX := Clamp(a.X+float64(direction*MoveStepX), 70, WorldWidth-70)
+	nextX := Clamp(a.X+float64(direction*MoveStepX), 70, float64(WorldWidth)-70)
 	if math.Abs(nextX-other.X) < ActorWidth*0.72 {
 		a.WalkDirection = 0
 		a.Facing = direction
@@ -771,7 +771,7 @@ func (m *Match) updateFallingLocked(dt float64) {
 		}
 		a.Y = nextY
 		a.Slope = 0
-		if a.Y > WorldHeight+70 {
+		if a.Y > float64(WorldHeight)+70 {
 			m.fallOutLocked(a)
 		}
 	}
@@ -842,9 +842,9 @@ func (m *Match) chooseEnemyMoveTargetLocked() float64 {
 	for attempt := 0; attempt < 10; attempt++ {
 		toward := m.RNG.Float64() < 0.65
 		distance := 50 + m.RNG.Float64()*220
-		candidate := Clamp(e.X+float64(sign)*distance, 110, WorldWidth-110)
+		candidate := Clamp(e.X+float64(sign)*distance, 110, float64(WorldWidth)-110)
 		if !toward {
-			candidate = Clamp(e.X-float64(sign)*distance, 110, WorldWidth-110)
+			candidate = Clamp(e.X-float64(sign)*distance, 110, float64(WorldWidth)-110)
 		}
 		if _, ok := m.Terrain.FindGroundY(int(candidate), int(e.Y)-36, int(e.Y)+36); ok {
 			return candidate

@@ -5,9 +5,9 @@
  * snapshot and sends intent commands over HTTP; server events arrive through
  * SSE. Local physics remains only for the non-firing aim recommendation.
  */
-import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=19';
-import { solveForceForAngle } from './ai.js?v=19';
-import { muzzlePoint } from './physics.js?v=19';
+import { WORLD, PHYSICS, CONTROLS, BATTLE } from './config.js?v=20';
+import { solveForceForAngle } from './ai.js?v=20';
+import { muzzlePoint } from './physics.js?v=20';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const FIRE_ANIM_SECONDS = 0.28;
@@ -42,6 +42,8 @@ export class RemoteMatch {
     this.weapon = null;
     this.enemyWeapon = null;
     this.weapons = [];
+    this.mapId = null;
+    this.mapName = '';
     // Locally chosen weapon awaiting server confirmation. A snapshot captured
     // before the select_weapon command was processed must not revert the HUD
     // back to the previous (default "fruit") weapon. Cleared once a snapshot
@@ -152,6 +154,8 @@ export class RemoteMatch {
     if (!s || !Array.isArray(s.actors) || s.actors.length < 2) return;
     const now = performance.now();
     this.phase = s.phase;
+    this.mapId = s.mapId || this.mapId;
+    this.mapName = s.mapName || this.mapName;
     this.turn = s.turn;
     this.round = s.round;
     const nowMs = performance.now();

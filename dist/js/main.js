@@ -1,11 +1,11 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=19';
-import { loadImage, Terrain } from './terrain.js?v=19';
-import { RemoteMatch } from './net-client.js?v=19';
-import { Renderer } from './renderer.js?v=19';
-import { Camera, projectPoint } from './camera.js?v=19';
-import { InputController } from './input.js?v=19';
-import { solvePerfect } from './ai.js?v=19';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=19';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, MAPS, MAP_ID, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=20';
+import { loadImage, Terrain } from './terrain.js?v=20';
+import { RemoteMatch } from './net-client.js?v=20';
+import { Renderer } from './renderer.js?v=20';
+import { Camera, projectPoint } from './camera.js?v=20';
+import { InputController } from './input.js?v=20';
+import { solvePerfect } from './ai.js?v=20';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=20';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -18,7 +18,7 @@ const els = {
   round: $('round'), turn: $('turn'), countdown: $('countdown'),
   buildVersion: $('buildVersion'),
   windArrow: $('windArrow'), windValue: $('windValue'), windDir: $('windDir'), windBars: $('windBars'),
-  minimap: $('minimap'), minimapWrap: $('minimapWrap'), minimapDistance: $('minimapDistance'),
+  minimap: $('minimap'), minimapWrap: $('minimapWrap'), minimapDistance: $('minimapDistance'), minimapTitle: $('minimapTitle'),
   recenter: $('recenter'), elevationNote: $('elevationNote'), lastShot: $('lastShot'),
   angle: $('angle'), angleNote: $('angleNote'),
   forcePct: $('forcePct'), forceRaw: $('forceRaw'), chargeTrack: $('chargeTrack'),
@@ -30,6 +30,7 @@ const els = {
   heal: $('heal'), healCount: $('healCount'),
   weaponButton: $('weaponButton'), weaponPicker: $('weaponPicker'), weaponGrid: $('weaponGrid'),
   weaponConfirm: $('weaponConfirm'), weaponSource: $('weaponSource'),
+  mapGrid: $('mapGrid'), mapNote: $('mapNote'),
   skillExtra2: $('skillExtra2'), skillScatter: $('skillScatter'), skillExtra1: $('skillExtra1'),
   skillBoost50: $('skillBoost50'), skillBoost40: $('skillBoost40'), skillBoost30: $('skillBoost30'),
   skillBoost20: $('skillBoost20'), skillBoost10: $('skillBoost10'),
@@ -83,6 +84,7 @@ let lastRecommendationAt = 0;
 let lastRecommendation = null;
 let lastRecommendationMode = '';
 let selectedWeaponId = 'fruit';
+let selectedMapId = MAP_ID;
 let weaponPickerBuilt = false;
 
 const uiCache = {
@@ -1214,6 +1216,39 @@ function canUsePlayerUi() {
     && !game.charging;
 }
 
+function availableMapChoices() {
+  // A Go HTTP process owns one map; only the static WASM build can reload
+  // into a different map. Keep the current map visible in local HTTP mode.
+  return window.__GUNNY_BACKEND__ === 'go' ? [MAPS[MAP_ID]] : Object.values(MAPS);
+}
+
+function buildMapPicker() {
+  if (!els.mapGrid) return;
+  const maps = availableMapChoices();
+  els.mapGrid.innerHTML = maps.map((map) => `
+    <button class="map-option" type="button" role="radio" data-map="${map.mapId}" aria-checked="false">
+      <img src="${map.thumbUrl}" alt="">
+      <span><strong>${map.name}</strong><small>${map.description}</small><em>${map.tagline}</em></span>
+    </button>
+  `).join('');
+  els.mapGrid.classList.toggle('single', maps.length === 1);
+  if (els.mapNote) {
+    els.mapNote.textContent = maps.length > 1
+      ? '开局选择战场；切换地图会重新载入页面，武器选择会保留。'
+      : '当前为本地 HTTP 模式，地图由服务端启动参数决定。';
+  }
+}
+
+function paintMapPicker() {
+  if (!els.mapGrid) return;
+  if (!MAPS[selectedMapId]) selectedMapId = MAP_ID;
+  for (const option of els.mapGrid.querySelectorAll('.map-option')) {
+    const active = Number(option.dataset.map) === selectedMapId;
+    option.classList.toggle('is-selected', active);
+    option.setAttribute('aria-checked', String(active));
+  }
+}
+
 function buildWeaponPicker() {
   if (!game?.weapons?.length) return;
   els.weaponGrid.innerHTML = game.weapons.map((weapon) => `
@@ -1246,8 +1281,11 @@ function openWeaponPicker({ force = false } = {}) {
     showToast('第一发炮弹已出手，本局武器已锁定；重开后可再选', { alert: true, duration: 2600 });
     return false;
   }
+  buildMapPicker();
   buildWeaponPicker();
   selectedWeaponId = game.weapon || selectedWeaponId;
+  selectedMapId = MAPS[selectedMapId] ? selectedMapId : MAP_ID;
+  paintMapPicker();
   paintWeaponPicker();
   els.weaponPicker.hidden = false;
   input?.cancelAll('weapon-picker');
@@ -1263,6 +1301,17 @@ function closeWeaponPicker() {
 
 function confirmWeaponChoice() {
   if (!game) return false;
+  if (selectedMapId !== MAP_ID) {
+    const url = new URL(location.href);
+    url.searchParams.set('map', String(selectedMapId));
+    url.searchParams.set('weapon', selectedWeaponId);
+    url.searchParams.set('autostart', '1');
+    if (isTest) url.searchParams.set('test', '1');
+    if (isCheat) url.searchParams.set('cheat', '1');
+    if (params.get('picker') === '1') url.searchParams.set('picker', '1');
+    location.assign(url.toString());
+    return true;
+  }
   const ok = game.selectWeapon(selectedWeaponId);
   closeWeaponPicker();
   if (!ok) {
@@ -1554,6 +1603,13 @@ function setupEvents() {
     selectedWeaponId = option.dataset.weapon;
     paintWeaponPicker();
   });
+  els.mapGrid?.addEventListener('click', (event) => {
+    const option = event.target.closest('.map-option');
+    if (!option) return;
+    if (option.disabled) return;
+    selectedMapId = Number(option.dataset.map);
+    paintMapPicker();
+  });
   els.pow.addEventListener('click', (event) => {
     if (event.detail === 0) return;
     usePowShortcut();
@@ -1736,7 +1792,7 @@ function exposeTestApi() {
         rotateOpen: !els.rotateNotice.hidden,
         paused,
         layout: { ...layout },
-        world: { width: WORLD.width, height: WORLD.height, chunkSize: WORLD.chunkSize },
+        world: { mapId: WORLD.mapId, name: WORLD.name, width: WORLD.width, height: WORLD.height, chunkSize: WORLD.chunkSize },
         terrain: terrain ? { chunks: terrain.chunks.length, craters: terrain.craters.length, dirtyChunks: terrain.dirtyChunks.size } : null,
         camera: view ? {
           left: view.left, top: view.top, scale: view.scale, zoom: view.zoom,
@@ -2054,12 +2110,15 @@ async function boot() {
     };
     const weaponIds = ['axe', 'bow', 'gun', 'goldgun', 'fire', 'cannon', 'wind', 'thunder', 'brick', 'fruit', 'scalpel', 'toilet', 'appliance'];
     const [back, playerSheet, enemySheet, shell, loadedTerrain, weaponImages, projectileImages, fruitPowImage] = await Promise.all([
-      loadImage('assets/map-1156-back.jpg'),
+      loadImage(WORLD.backgroundUrl),
       loadImage('assets/character-player-sheet.png'),
       loadImage('assets/character-enemy-sheet.png'),
       loadImage('assets/shell-bomb.png'),
       Terrain.load({
-        foregroundUrl: 'assets/map-1156-fore.png',
+        foregroundUrl: WORLD.foregroundUrl,
+        width: WORLD.width,
+        height: WORLD.height,
+        sourceWidth: WORLD.sourceWidth,
         craterArtUrls,
       }),
       Promise.all(weaponIds.map(async (id) => [id, await loadImage(`assets/weapon-${id}.png`)])).then(Object.fromEntries),
@@ -2081,6 +2140,17 @@ async function boot() {
       || Math.min(window.innerWidth, window.innerHeight) < 520;
     game = new RemoteMatch({ terrain, onEvent: handleEvent, lowPower });
     await game.ready();
+    if (game.mapId && Number(game.mapId) !== WORLD.mapId) {
+      throw new Error(`战斗引擎地图 ${game.mapId} 与页面地图 ${WORLD.mapId} 不一致；本地 HTTP 请用 GUNNY_MAP_ID=${WORLD.mapId} 启动服务端`);
+    }
+    const requestedWeapon = params.get('weapon');
+    const autoStart = params.get('autostart') === '1';
+    if (requestedWeapon && game.weapons?.some((weapon) => weapon.id === requestedWeapon)) {
+      selectedWeaponId = requestedWeapon;
+    }
+    if (autoStart && game.weapons?.some((weapon) => weapon.id === selectedWeaponId)) {
+      game.selectWeapon(selectedWeaponId);
+    }
     setupInput();
     setupEvents();
     setupMinimap();
@@ -2089,14 +2159,17 @@ async function boot() {
     booted = true;
     measureLayout();
     selectedWeaponId = game.weapon || selectedWeaponId;
-    if (isTest) {
+    if (els.minimapTitle) els.minimapTitle.textContent = WORLD.name;
+    if ((isTest && params.get('picker') !== '1') || (autoStart && game.weapons?.some((weapon) => weapon.id === selectedWeaponId))) {
       els.weaponPicker.hidden = true;
     } else {
       openWeaponPicker({ force: true });
     }
     syncOrientationNotice();
     els.loading.classList.add('is-hidden');
-    showToast('开局先选武器 · 1–8 选战斗道具 · 右下按住蓄力并松手发射', { duration: 5200 });
+    showToast(autoStart
+      ? `${WORLD.name} · ${game.weapons?.find((weapon) => weapon.id === game.weapon)?.label || ''} · 准备开战`
+      : `开局选地图与武器 · ${WORLD.name} · 1–8 选战斗道具`, { duration: 5200 });
     requestAnimationFrame(frame);
   } catch (error) {
     window.__GUNNY_BOOT_ERROR__ = error?.stack || String(error);
