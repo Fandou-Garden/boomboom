@@ -1,14 +1,14 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=30';
-import { loadImage, Terrain } from './terrain.js?v=30';
-import { RemoteMatch } from './net-client.js?v=30';
-import { Renderer, DEATH_SEQUENCE } from './renderer.js?v=30';
-import { Camera, projectPoint } from './camera.js?v=30';
-import { InputController } from './input.js?v=30';
-import { solvePerfect } from './ai.js?v=30';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=30';
-import { MAPS, getMap, resolveMapId } from './maps.js?v=30';
-import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=30';
-import { loadSave, claimReward, hasClaimed, resetSave, formatAmount } from './save.js?v=30';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=31';
+import { loadImage, Terrain } from './terrain.js?v=31';
+import { RemoteMatch } from './net-client.js?v=31';
+import { Renderer, DEATH_SEQUENCE } from './renderer.js?v=31';
+import { Camera, projectPoint } from './camera.js?v=31';
+import { InputController } from './input.js?v=31';
+import { solvePerfect } from './ai.js?v=31';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=31';
+import { MAPS, getMap, resolveMapId } from './maps.js?v=31';
+import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=31';
+import { loadSave, claimReward, hasClaimed, resetSave, formatAmount } from './save.js?v=31';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -189,6 +189,7 @@ class SoundEngine {
       '038': 'assets/audio/sound-038-turn-enemy.mp3',
       '039': 'assets/audio/sound-039-item.mp3',
       '042': 'assets/audio/sound-042-death.mp3',
+      '048': 'assets/audio/sound-048-card-flip.mp3',
       '063': 'assets/audio/sound-063-win.mp3',
       '064': 'assets/audio/sound-064-lose.mp3',
       '087': 'assets/audio/sound-087-boom-flame.mp3',
@@ -968,7 +969,8 @@ function syncUI() {
   const staminaNow = Number.isFinite(game.stamina) ? Math.round(game.stamina) : null;
   if (staminaNow != null && uiCache.stamina !== staminaNow) {
     uiCache.stamina = staminaNow;
-    setText(els.statStamina, staminaNow);
+    // Read as current / max so the fixed 2000 pool is explicit.
+    setText(els.statStamina, `${staminaNow}/${BATTLE.staminaMax}`);
     if (els.statStamina) {
       const pct = Math.max(0, Math.min(100, game.stamina / BATTLE.staminaMax * 100));
       els.statStamina.style.setProperty('--stamina-pct', `${pct}%`);
@@ -1288,7 +1290,11 @@ function setupResultCards(win) {
     <button class="result-card" type="button" data-card="${i}" data-kind="${prize.kind}" data-amount="${prize.amount}" aria-label="第 ${i + 1} 张卡，点击翻开">
       <span class="card-inner">
         <span class="card-back"><img src="assets/ui/card-back.png" alt="" draggable="false"></span>
-        <span class="card-face"><img class="card-icon" src="${rewardIcon(prize.kind)}" alt="" draggable="false"><b>+${prize.amount}</b><small>${rewardLabel(prize.kind)}</small></span>
+        <span class="card-face">
+          <img class="card-frame" src="assets/ui/card-frame.png" alt="" draggable="false">
+          <img class="card-icon" src="${rewardIcon(prize.kind)}" alt="" draggable="false">
+          <b>+${prize.amount}</b><small>${rewardLabel(prize.kind)}</small>
+        </span>
       </span>
     </button>
   `).join('');
@@ -1322,7 +1328,8 @@ function setupResultCards(win) {
   const reveal = (card, silent = false) => {
     if (card.classList.contains('is-flipped')) return false;
     card.classList.add('is-flipped');
-    if (!silent) sound.play('item');
+    // SOURCE LuckyCard.play(): the card flip itself plays 048.
+    if (!silent) sound.play('048');
     return true;
   };
   const bank = (card) => {
@@ -1384,7 +1391,8 @@ function setupResultCards(win) {
     if (!card || finished || claimed || card.classList.contains('is-disabled')) return;
     if (card.classList.contains('is-flipped') || picked.size >= MAX_PICKS) return;
     if (!reveal(card)) return;
-    sound.play(picked.size === 0 && win ? 'win' : 'item');
+    // SOURCE LuckyCard.__onClick(): the click plays 008 before the flip.
+    sound.play('008');
     picked.add(Number(card.dataset.card));
     bank(card);
     refreshSum();
@@ -2587,7 +2595,7 @@ function startMapLoad(id) {
     () => loadImage(urls.thumb),
     () => loadImage(urls.fore),
     () => loadImage(urls.back),
-    () => fetch(`${urls.collision}?v=30`).then((res) => {
+    () => fetch(`${urls.collision}?v=31`).then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.arrayBuffer();
     }),

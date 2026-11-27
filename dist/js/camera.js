@@ -11,8 +11,8 @@
  *
  * UI remains in the DOM outside this transform.
  */
-import { WORLD, VIEW } from './config.js?v=30';
-import { clamp } from './physics.js?v=30';
+import { WORLD, VIEW } from './config.js?v=31';
+import { clamp } from './physics.js?v=31';
 
 export function coverZoom(width, height) {
   return Math.max(1 / WORLD.width, width / WORLD.width, height / WORLD.height);
@@ -238,19 +238,26 @@ export class Camera {
       allowSky = true;
       allowWide = targetZoom < Math.max(coverZoom(width, height), VIEW.minZoomFloor);
     } else {
-      // Turn camera: the active actor sits at the exact screen centre. No
-      // walk-direction lead and no fixed vertical offset — the prompts call
-      // for the shooter itself to be centred, and the HUD is clear at the
-      // middle of the viewport. Horizontal overscan is allowed for the few
-      // frames where a spawn is closer to the edge than half a viewport.
+      // Turn camera: the active actor is centred horizontally and placed at
+      // VIEW.focusBottomFraction of the viewport height (0.62 = slightly below
+      // the middle), so the feet terrain and the throw arc both stay visible.
+      // worldY of the screen centre = actor.y - viewH * (fraction - 0.5).
+      // Horizontal overscan is allowed for the few frames where a spawn is
+      // closer to the edge than half a viewport.
       const actor = actors?.[activeIndex] ?? actors?.[0];
       if (actor) {
+        const viewHAtZoom = height / targetZoom;
         targetX = actor.x;
-        targetY = actor.y;
+        targetY = actor.y - viewHAtZoom * (VIEW.focusBottomFraction - 0.5);
       } else {
         targetY = WORLD.height * 0.62;
       }
       allowSky = true;
+      // Allow at most a 10% overscan beyond the map edge. Fully clamping to the
+      // map pushed a spawn at x=240 to ~16% of the screen, where the mobile
+      // joystick sits on top of the character; fully centring exposed a third of
+      // the screen as background stretch. 10% keeps the actor clear of the HUD
+      // and the margin small enough to read as a shoreline.
       allowOverscanX = true;
     }
 
@@ -266,6 +273,9 @@ export class Camera {
     const viewH = height / actualZoom;
     if (viewW < WORLD.width && !allowWide && !allowOverscanX) {
       targetX = clamp(targetX, viewW / 2, WORLD.width - viewW / 2);
+    } else if (viewW < WORLD.width && allowOverscanX) {
+      const out = viewW * VIEW.edgeOverscanFraction;
+      targetX = clamp(targetX, viewW / 2 - out, WORLD.width - viewW / 2 + out);
     }
     if (viewH < WORLD.height && !allowSky && !allowWide) {
       targetY = clamp(targetY, viewH / 2, WORLD.height - viewH / 2);

@@ -13,16 +13,16 @@ import {
   FORCE_MAX, GRADE, GROUND_BOTTOM, HEAL_AMOUNT, HEALS_PER_ROUND, MIN_CHARGE_SECONDS,
   MIN_FIRE_FORCE, MOVE_SPEED, MOVE_STEP_X, MOVE_STEP_Y, PIXELS_PER_METRE, PLAYER_MAX_HP,
   RESOLVE_DELAY, SHOOT_MINUS, SKILL_DEFS, SKILL_ORDER, SPAWN_PROBE_Y, SPAWN_X,
-  STAMINA_MAX, SKILL_USES_PER_ROUND, WORLD_HEIGHT, WORLD_WIDTH, clamp, weaponFor, WEAPON_DEFS, LUCKY,
-} from './constants.js?v=25';
-import { nextWind } from './physics.js?v=25';
-import { GoRand } from './rng.js?v=25';
-import { chooseShotForWeapon, triangularNoise } from './ai.js?v=25';
+  STAMINA_MAX, STAMINA_MOVE_COST, SKILL_USES_PER_ROUND, WORLD_HEIGHT, WORLD_WIDTH, clamp, weaponFor, WEAPON_DEFS, LUCKY,
+} from './constants.js?v=31';
+import { nextWind } from './physics.js?v=31';
+import { GoRand } from './rng.js?v=31';
+import { chooseShotForWeapon, triangularNoise } from './ai.js?v=31';
 import {
   beginTurnLocked, finishResolveLocked, fireLocked, healLocked, updateFlightLocked,
-} from './actions.js?v=25';
-import { buildSnapshot } from './snapshot.js?v=25';
-import { aiPlanJson } from './json.js?v=25';
+} from './actions.js?v=31';
+import { buildSnapshot } from './snapshot.js?v=31';
+import { aiPlanJson } from './json.js?v=31';
 
 function makeActor(overrides) {
   return {
@@ -538,7 +538,11 @@ export class Match {
       a.walkDirection = 0;
       return;
     }
-    if (this.moveActorLocked(0, this.moveDir, MOVE_SPEED * dt)) this.stamina = Math.max(0, this.stamina);
+    if (this.moveActorLocked(0, this.moveDir, MOVE_SPEED * dt)) {
+      // Walking is the only drain on stamina. Standing still never regenerates
+      // it, so the cost of a reposition is real for the rest of the turn.
+      this.stamina = Math.max(0, this.stamina - STAMINA_MOVE_COST * dt);
+    }
   }
 
   moveActorLocked(index, direction, distance) {

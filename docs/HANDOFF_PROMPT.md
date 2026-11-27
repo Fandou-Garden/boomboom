@@ -29,7 +29,7 @@ tests/                    ← browser_acceptance / browser_controls_audio / brow
                             browser_static（.cjs，Puppeteer）+ engine/（match/parity/embed）
 ```
 
-## 三、当前已完成状态（版本 v=30，含镜头/结算存档/加载过场）
+## 三、当前已完成状态（版本 v=31，含原版素材回填 / 镜头构图 / 体力 2000）
 
 1. **蓄力条照抄原版 EnergyView**：SHOOT_FORCE_STEP=20/30fps，满 2000 后回减、弹回 0 未松手跳回合；回弹中松手按实时力度。时间源一律用引擎累计模拟时钟 `this.time`（帧率无关），**不要用墙钟**。
 2. **飞机（道具 10016）**：底部道具栏 F 键槽，紧邻 POW 的 R 槽；`FlyCommand(40)` → `SetBall(3)` 零伤害不炸坑传送弹，命中沿速度反方向退 5px 瞬移。
@@ -39,12 +39,16 @@ tests/                    ← browser_acceptance / browser_controls_audio / brow
 6. **回合镜头拉远（v30）**：`VIEW.baseZoomFactor` 2.5→1.25，回合视角可见宽约 1450 世界像素；地图外由背景图边缘延展填充。
 7. **战后翻牌 + 本地存档（v30）**：`dist/js/save.js`（键 `gunny-wind-arena.profile.v1`，含 version/coins/stones/claims），9 张卡翻 3（胜）/2（负），领取后入账，每场 `matchId` 只能领一次，损坏存档自动重建，说明面板有重置入口。
 8. **战斗加载过场（v30）**：`boot()` 期间显示地图背景/双方/地图名/真实进度条，淡出后进入战斗；资源失败有重试；加载音用原版 1001 BGM 降音量（原版无加载音，勿伪造）。
-9. 版本参数全站统一 `?v=30`（index.html / js/*.js / standalone-api.js）。
+9. **原版素材回填（v31）**：卡背 = `gameover.swf` 的 `asset.takeoutCard.LuckyCard`(id 122, 249×286)；卡框 = `DefineSprite_115` 第 20 帧（第 1 帧全透明，别用）；加载界面 = `room.swf` 的 `asset.roomLoading.Bg/BattleFieldBg/FieldNameBg/CharacterBg_*`（`game.swf`/`gameii.swf`/`_corei.swf` 都没有，别再说在 game.swf）；翻卡音 008 + 048（`audio.swf` 的 `7_Sound048.flv`）。
+10. **镜头垂直构图（v31）**：`VIEW.focusBottomFraction = 0.62` 已接入 `_desired()`，角色落在 62% 高度；`allowOverscanX = false`，贴边时宁可角色偏也不露地图外空白。
+11. **体力固定 2000（v31）**：`beginTurnLocked()` 直接 `= STAMINA_MAX`（不再累加 500），走路 `60/s` 扣，静止 0 回血，UI 显示 `x/2000`。
+12. 版本参数全站统一 `?v=31`（index.html / js/*.js / standalone-api.js）。
+13. **别再凭印象写素材位置**：`cardbox/*/icon.png` 是宝箱图标不是卡面；`1156` 的 fore.map 在服务端 `Fighting.Service/bin/Debug/net48/map/1156/`，客户端 `resource/v1.1/image/map/` 下**没有** 1156 目录，地图预览图需用站点自带 jpg。
 
 ## 四、标准流程（每次改动的固定闭环）
 
 1. 改 `dist/` 下的文件。
-2. **版本参数 +1**（当前 v=30 → v=31，全站统一替换，别漏 collision 拉取那一处）。
+2. **版本参数 +1**（当前 v=31 → v=32，全站统一替换，别漏 `collision` 拉取那一处和引擎内部 `v=31` 导入）。
 3. 跑回归（在项目根目录）：
    ```bash
    npm run test:engine            # 引擎 55 项

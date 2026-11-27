@@ -171,18 +171,19 @@ iPhone 真机地址栏高度、Home Indicator 和嵌入浏览器顶部栏与仿�
 - 历史：版本 6 首次切换到浏览器内 WASM；版本 7 修正文档与加载文案尺寸；版本 8 合并
   远端角色支撑、待机与流畅度修复；版本 9 修复 iPhone 横屏体验。
 - **3.0.0** 把静态后端从 WASM 换成纯 JS 引擎（`dist/js/engine/` +
-  `dist/standalone-api.js`），Go 服务端保留用于在线路径；静态资源查询版本现为 `?v=30`
+  `dist/standalone-api.js`），Go 服务端保留用于在线路径；静态资源查询版本现为 `?v=31`
   （3.0.0 首发为 v24，v25 随「角色/武器回退原版 1:1 尺寸」升级，v26 随「弹道搜索移入
   Web Worker」升级，v27 随「技能改为出牌制」升级，v28 随「原版技能图标 / 音效来源校正 /
-  移除伪造的合成击中音」升级，v29 随「帮助文案与音频行为对齐」升级，v30 随「回合镜头拉远 / 翻牌奖励与本地存档 / 战斗加载过场」升级；
+  移除伪造的合成击中音」升级，v29 随「帮助文案与音频行为对齐」升级，v30 随「回合镜头拉远 / 翻牌奖励与本地存档 / 战斗加载过场」升级，
+  v31 随「原版 LuckyCard / RoomLoading 素材替换、镜头垂直构图、体力固定 2000」升级；
   `js/engine/` 内部引用仍为 `?v=25`）。
-- 公网 `index.html` 引用 `styles.css?v=30`、`js/main.js?v=30`、`standalone-api.js?v=30`；
+- 公网 `index.html` 引用 `styles.css?v=31`、`js/main.js?v=31`、`standalone-api.js?v=31`；
   静态包不再包含 `wasm/gunny.wasm`。
 - 静态路径同步 v22 规则：`BallList.xml` 每发弹自带 `Power/Radii/Crater/Amount`，
   POW 打各武器 Special 弹（雷霆/烈火/水果篮/马桶三连发）；出生按原版语义扫描列，
   12 张地图均不嵌入悬空地形；`crater/121/131/411` 原版真图随包发布。
 - 地图位图走预压缩 `data/<id>.fore.map.gz`（`DecompressionStream` 解压，
-  无该 API 时回退原始 `.map`），前景图用无损 WebP，版本串 `?v=30`。
+  无该 API 时回退原始 `.map`），前景图用无损 WebP，版本串 `?v=31`。
 - 公网 844×390 冒烟：后端 `js`、双方 x=240/1640、待机帧 9、120 fps、
   玩家 1 发落地生成 1 个弹坑、console/page error 为 0。
 - 静态资源首次加载约 350 KB 地图位图 + 约 1.5k 行 JS；浏览器随后使用版本化缓存。
@@ -254,9 +255,9 @@ fore.map，无法满足逐像素一致规则；改用资源完整的石柱古城
 maps）、`npm test`（61/61）、`npm run test:map`（1156 / 1049 均 0 失配）与
 `go test ./...` 均通过。
 
-## 12. 镜头 / 结算存档 / 加载过场（2026-11-27，v30）
+## 13. 镜头 / 结算存档 / 加载过场（2026-11-27，v30）
 
-### 12.1 回合镜头
+### 13.1 回合镜头
 
 `VIEW.baseZoomFactor` 2.5 → 1.25、`baseZoomMin` 0.5 → 0.45、`minZoomFloor` 0.34 → 0.3。
 1440×800 实测 `zoom = 0.980`、可见宽 1468.8 世界像素（旧版被 `baseZoomMax` 顶到 1.05、
@@ -264,7 +265,7 @@ maps）、`npm test`（61/61）、`npm run test:map`（1156 / 1049 均 0 失配�
 人物仍在屏幕正中（`player` 模式 `targetX/Y = actor.x/y`），地图外改由
 `renderer._drawBackground()` 拉伸背景图边缘列 + 深色渐隐填充。
 
-### 12.2 结算翻牌与本地存档
+### 13.2 结算翻牌与本地存档
 
 浏览器端到端（`?test=1`，先把敌方 HP 设为 1 再 `aimAndFirePlayer()`）：
 
@@ -277,14 +278,61 @@ maps）、`npm test`（61/61）、`npm run test:map`（1156 / 1049 均 0 失配�
 | 刷新恢复 | 重新加载后顶栏钱包仍为 `321 / 1` |
 | 损坏存档 | 非法 JSON 触发 `normalize()` 重建，不抛错 |
 
-### 12.3 战斗加载过场
+### 13.3 战斗加载过场
 
 加载屏进度由 10 个真实资源 Promise 驱动，实测采样 `0% → 50% → 94% → 100%`；
 844×390 与 1440×800 均完整显示地图背景、地图名、双方信息、进度条与“点击开启音效”
 按钮（音频未解锁时）。装载失败进入 `fatal` 面板并带“重新加载”按钮。
 
-### 12.4 回归
+### 13.4 回归
 
 `npm run test:engine` 48 项通过；`npm run test:map` mismatches 0；
 `npm run test:browser:static`、`browser_acceptance`、`browser_controls_audio`、
 `browser_mobile` 全部 PASS（`test:browser:*` 已固定 `GAME_URL=http://127.0.0.1:8077/?test=1`）。
+
+## 14. 原版素材回填 / 镜头构图 / 体力 2000（v31）
+
+### 14.1 素材来源核实（FFDec 21.0.1，headless）
+
+| 目标 | 结论 | 证据 |
+| --- | --- | --- |
+| `asset.takeoutCard.LuckyCard` | 在 `flash/ui/vietnam/swf/gameover.swf`，character id 122 | `-export symbolClass` 得到 `122;asset.takeoutCard.LuckyCard` |
+| 卡背图 | 该 sprite 第 1 帧 `1.png`，249×286 RGBA | 导出后目视确认：金色花纹边框 + 宝箱 |
+| 卡框 | `gameover_fla.Symbol3_23`（`DefineSprite_115`）第 20 帧，117×163 RGBA | 第 1 帧全透明（0 个不透明像素），第 20 帧 4878 个 |
+| `asset.roomLoading.*` | 在 `room.swf`，`game.swf` / `gameii.swf` / `_corei.swf` 均无 | 解压 114 个 SWF 的 tag 流做字符串检索，仅 `room.swf` 命中 |
+| `Bg` / `BattleFieldBg` / `FieldNameBg` / `CharacterBg_*` | 1000×600 jpg / 316×163 / 295×33 / 171×208 RGBA | `-export image` 导出后核对尺寸 |
+| 翻卡音 `048` | `audio.swf` 的 `7_Sound048.flv` | `LuckyCard.as:256` 调用；转 mp3 后 0.56 s |
+
+### 14.2 镜头
+
+`VIEW.focusBottomFraction = 0.62` 真正接入 `_desired()`：`targetY = actor.y - viewH * 0.12`。
+实测桌面 1440×800 `cy = 291.08`（`actor.y = 389`，`viewH = 816`），844×390 `cy = 307.24`。
+`allowOverscanX` 改为 `false`：出生点 `x = 240` 时不再把 1/3 屏幕让给地图外延展，
+代价是贴边时角色偏离画面中心（这是刻意取舍，已在 README 说明）。
+
+### 14.3 结算翻牌
+
+- 卡背 / 卡框换成上面的原版导出图；`card-back img` 加 `backface-visibility: hidden`，
+  卡面改不透明底，修掉翻转后卡背透出来的问题。
+- 音效改为 `008`（点击）+ `048`（翻开），与 `LuckyCard` 一致。
+- 端到端复跑：翻 3 张 → `金币 +412` → 领取 → 钱包 `512 / 0` → 重复点击存档字节不变
+  → 刷新后余额仍在。
+
+### 14.4 加载过场
+
+布局换成原版组件：`Bg` 铺底、`BattleFieldBg` 做地图预览框（保留 "Dấu trường" 标题栏）、
+`FieldNameBg` 做地图名底板、`CharacterBg_Blue/Red` 做双方立绘框。桌面与 844×390 均无溢出。
+
+### 14.5 体力
+
+| 检查 | 结果 |
+| --- | --- |
+| 开局 | `2000` |
+| 按住右移 0.9 s | `1958.13`（扣 41.9，≈60/s） |
+| 停下 0.9 s | `1958.13`（回血 0） |
+| 开炮 → 敌方回合 → 自己回合 | 全程 `1946` → 回到自己回合 `2000` |
+| UI | `体力 2000/2000` |
+
+### 14.6 回归
+
+`npm run test:engine` 48 项全过。

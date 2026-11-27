@@ -101,9 +101,9 @@ export const BATTLE = Object.freeze({
   energyPerHeal: 8,
   // 体力是有限资源：上限 2000，技能按张消耗，每回合恢复 500。站定不再自动回满。
   staminaMax: 2000,
-  staminaMoveCost: 0,
+  staminaMoveCost: 60,
   staminaIdleRegen: 0,
-  staminaTurnRestore: 500,
+  staminaTurnRestore: 0,
   powDamageMultiplier: 1.8,
   powBlastRadius: 82,
   powCraterRadius: 78,
@@ -274,6 +274,9 @@ export const VIEW = Object.freeze({
   maxZoom: 1.15,
   // Put the followed ground line at 62% of screen height.
   focusBottomFraction: 0.62,
+  // Max share of the viewport that may hang past a map edge while following
+  // the turn actor (0.1 = 10%). Keeps spawns clear of the corner HUD.
+  edgeOverscanFraction: 0.1,
   bothPaddingX: 46,
   bothPaddingY: 78,
   bothActorMarginX: 220,

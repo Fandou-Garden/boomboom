@@ -35,6 +35,8 @@
 | 黑白家电爆炸 | 同上 | 100 | `sound-100-boom-appliance.mp3` |
 | 风神爆炸 | 同上 | 089 | `sound-089-boom-wind.mp3` |
 | 选技能 / 选道具 | `RightPropBar.__itemClicked()` | 008 | `sound-008-ui.mp3` |
+| 点击翻牌 | `LuckyCard.__onClick()` | 008 | `sound-008-ui.mp3` |
+| 翻开卡牌 | `LuckyCard.play()` | 048 | `sound-048-card-flip.mp3` |
 | 道具 / POW | `GameLiving.doUseItemAnimation()` | 039 | `sound-039-item.mp3` |
 | 角色阵亡 | `GamePlayer.die()` | 042 | `sound-042-death.mp3` |
 | 玩家回合开始 | `ChangePlayerAction`（本地玩家分支） | 016 | `sound-016-turn-self.mp3` |
@@ -99,3 +101,14 @@ ffmpeg -i in.mp3 -af "volume=+0.9dB" -codec:a libmp3lame -b:a 128k out.mp3
 | --- | --- | --- |
 | 战斗加载过场 | 原版地图 1001 BGM（`assets/audio/bgm-map1001.mp3`） | 音量压到 45% 播放，进入战斗后 0.5 s 内升回 `bgmVolume`；同一条 loop，不会与战斗 BGM 叠加 |
 | 首次冷启动 | 同上 | 受浏览器手势限制，加载卡片提供“点击开启音效”，点击后才解锁；未点击则静默 |
+
+## 048（翻卡翻开音）来源
+
+- 定义：`Tank.Flash/flash/audio.swf` 的 `Sound048`（FFDec `-export sound` 得到
+  `7_Sound048.flv`）。
+- 调用点：`Source Flash/src/game/view/card/LuckyCard.as:256`，
+  `SoundManager.instance.play("048")`，位于 `play()`（卡牌翻开）内；
+  `LuckyCard.as:174` 的 `play("008")` 是点击音，两者不同。
+- 转换：`ffmpeg -i 7_Sound048.flv -ar 44100 -codec:a libmp3lame -b:a 128k
+  sound-048-card-flip.mp3`，时长 0.56 s。
+- 只在结算翻牌时播放；加载过场没有原版加载音，**不要**拿 048 顶替。

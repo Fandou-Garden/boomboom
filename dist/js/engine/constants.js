@@ -60,9 +60,11 @@ export const ENERGY_PER_HEAL = 8.0;
 // a slice of it. It never regenerates while idling (that would make the cost
 // meaningless within a single turn).
 export const STAMINA_MAX = 2000.0;
-export const STAMINA_MOVE_COST = 0.0;
+export const STAMINA_MOVE_COST = 60.0;
 export const STAMINA_IDLE_REGEN = 0.0;
-export const STAMINA_TURN_RESTORE = 500.0;
+// Kept for API compatibility only. Turns reset to STAMINA_MAX instead of
+// accumulating, so this value is no longer added anywhere.
+export const STAMINA_TURN_RESTORE = 0.0;
 // Every skill slot holds this many cards per turn; each press spends one.
 export const SKILL_USES_PER_ROUND = 3;
 // POW no longer uses a global multiplier/radius/crater: SOURCE BallList.xml

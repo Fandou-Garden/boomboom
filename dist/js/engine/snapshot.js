@@ -2,8 +2,8 @@
  * Pure-JS port of server/game/snapshot.go. Field order follows the Go struct
  * so the emitted JSON matches what the Go server/SSE and WASM bridge produce.
  */
-import { WEAPON_DEFS, WEAPON_ORDER } from './constants.js?v=25';
-import { actorJson, copyProjectile } from './json.js?v=25';
+import { WEAPON_DEFS, WEAPON_ORDER } from './constants.js?v=31';
+import { actorJson, copyProjectile } from './json.js?v=31';
 
 export function buildSnapshot(m) {
   const weapon = m.playerWeapon();

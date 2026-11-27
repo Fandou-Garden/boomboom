@@ -12,11 +12,11 @@ import {
   BLAST_RADIUS, CRITICAL_LUCKY, CRITICAL_REDUCE, ENERGY_MAX, ENERGY_PER_HIT,
   ENERGY_PER_VOLLEY, ENERGY_PER_HEAL, FORCE_MAX, GROUND_BOTTOM, HEAL_AMOUNT,
   HEAL_DELAY, HEALS_PER_ROUND, MAX_FLIGHT_SECONDS, PHYSICS_DT, RESOLVE_DELAY,
-  SKILL_DEFS, SKILL_ORDER, SKILL_USES_PER_ROUND, STAMINA_MAX, STAMINA_TURN_RESTORE,
+  SKILL_DEFS, SKILL_ORDER, SKILL_USES_PER_ROUND, STAMINA_MAX,
   WORLD_WIDTH, ballFor, clamp,
-} from './constants.js?v=25';
-import { blastDamage, launch, muzzlePoint, sourceCriticalDamage, stepProjectile } from './physics.js?v=25';
-import { makeImpact } from './json.js?v=25';
+} from './constants.js?v=31';
+import { blastDamage, launch, muzzlePoint, sourceCriticalDamage, stepProjectile } from './physics.js?v=31';
+import { makeImpact } from './json.js?v=31';
 
 export function fireLocked(m, index, angle, force) {
   if (m.phase === 'over' || index < 0 || index > 1) return false;
@@ -429,7 +429,10 @@ export function beginTurnLocked(m, index, rollWind) {
     m.powSelected = false;
     m.carryArmed = false;
     m.canCarry = true;
-    m.stamina = Math.min(STAMINA_MAX, (m.stamina || 0) + STAMINA_TURN_RESTORE);
+    // Every player turn starts with the full pool (2000). It is not a
+    // carry-over resource: adding a slice per turn made the number drift up
+    // over a long match, so the turn start now resets instead of accumulating.
+    m.stamina = STAMINA_MAX;
     const pw = m.playerWeapon();
     m.angle = clamp(m.angle, pw.angleMin, pw.angleMax);
     m.actors[0].aimAngle = m.angle;

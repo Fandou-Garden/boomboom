@@ -243,3 +243,15 @@ return (float)num2 / 10f;
   成功后尝试 `screen.orientation.lock('landscape')`；退出时 `unlock()`。失败不伪造状态。
 - **PWA**：`manifest.webmanifest` 使用 `display: fullscreen` / `orientation: landscape`，
   iOS 使用 `apple-mobile-web-app-capable`、`black-translucent` 与 180px 主屏幕图标。
+
+## 回合镜头与体力
+
+| 项目 | 值 | 状态 |
+| --- | --- | --- |
+| 回合镜头缩放 | `VIEW.baseZoomFactor = 1.25` | **本版设计**（原版 `MapView.setCenter()` 只做平滑移动，没有固定的缩放倍率；数值按"可见宽≈1450 世界像素"调出） |
+| 角色垂直构图 | `VIEW.focusBottomFraction = 0.62` | **本版设计**（原版 `_map.setCenter(x, y)` 把目标点放屏幕中心，本版下移 12% 让脚下地形可见） |
+| 边缘过扫描上限 | `VIEW.edgeOverscanFraction = 0.1` | **本版设计**（避免出生点贴边时角色被左下摇杆压住） |
+| 体力上限 | `STAMINA_MAX = 2000` | **本版设计**（原版无体力/出牌系统；2000 与 `PHYSICS.forceMax` 同量级，便于读百分比） |
+| 走路消耗 | `STAMINA_MOVE_COST = 60 / s` | **本版设计** |
+| 静止回血 | `STAMINA_IDLE_REGEN = 0` | **本版设计** |
+| 回合开始 | `m.stamina = STAMINA_MAX` | **本版设计**（原版无此概念；旧的 +500 累加已删除） |

@@ -170,7 +170,7 @@ HUD、血条、风力、回合、距离、移动/调角/发射按钮全部是 Ca
 
 | 状态 | 行为 |
 | --- | --- |
-| 玩家/电脑回合（`player`） | 跟随当前出手角色并严格居中，视角比旧版更远：可见宽度约 1450 世界像素（1843 px 地图的约 78%），人物周围能看到完整的地形起伏；不移动出生点、不做 X/Y 非等比压缩 |
+| 玩家/电脑回合（`player`） | 跟随当前出手角色：水平居中、垂直落在视口 `VIEW.focusBottomFraction = 0.62`（中间偏下），可见宽度约 1450 世界像素（1843 px 地图的约 78%）；角色贴近地图边缘时改为夹取视野，宁可人物略偏也不把地图外空白露出来；不移动出生点、不做 X/Y 非等比压缩 |
 | 炮弹飞行（`shot`） | 跟随炮弹并允许镜头进入天空；飞行开始时锁定缩放，不在飞行中反复缩放 |
 | 战斗结束（`both`） | 把双方（含墓碑）装进同一视口，保证死亡演出与结算背景完整 |
 | 落地 / 换回合 | 平滑回到 `player`，位置平滑 `0.36 s`，缩放平滑 `0.32 s` |
@@ -181,8 +181,14 @@ HUD、血条、风力、回合、距离、移动/调角/发射按钮全部是 Ca
   `baseZoomMax = 1.05`，人物几乎填满屏幕）；`minZoomFloor = 0.3` 只给广角兜底。
   桌面 1440×800 的 `zoom ≈ 0.98`、手机横屏 844×390 的 `zoom ≈ 0.57`，两者可见宽度都在
   1450 世界像素左右，桌面与手机观感一致。
-- 角色贴地图边缘时视野会露出地图外：`renderer._drawBackground()` 用背景图最外侧一列
-  向外拉伸并叠加深色渐隐，让水面/远景连续，不再出现大块纯色空白。
+- 垂直构图：`camera.js#_desired()` 的 turn 分支取
+  `targetY = actor.y - (height / zoom) * (VIEW.focusBottomFraction - 0.5)`，
+  即角色落在 62% 高度，脚下地形与上方抛物线都留得下。实测桌面 `cy = 291`（角色 `y = 389`）、
+  手机横屏 `cy = 307`。
+- 水平构图：`allowOverscanX = false`，视野夹在地图内。出生点 `x = 240` 时若强行居中，
+  屏幕左侧会有 1/3 是地图外延展；夹取后角色左移但整屏都是真实地形，这是刻意取舍。
+- 地图外仍保留兜底：`renderer._drawBackground()` 把背景图边缘列模糊延展并压暗，
+  只在 `both` 广角取景或过扫描时可见。
 - 双方取景会按视口宽高计算 `fitZoom`，最小可到 `VIEW.minZoomWide = 0.11`；仍使用单一
   `zoom`，不会把地图横向压扁。窄屏再给右侧技能栏留 20 px 构图偏移，避免对手被按钮压住。
 - `computeView()` 正常情况下把相机中心夹在地图内；`shot` 模式允许天空 overscan，
@@ -417,11 +423,19 @@ extra 卡片初始只显示占位图与「点击加载」角标，不请求任�
   胜利翻 3 张、失败翻 2 张，超时自动揭晓剩余卡面。
 - **奖励**：只发金币与玄武石（原版发背包道具，静态站没有背包/后端）。
   胜利 80–260 金币 + 1–4 玄武石，失败 30–90 金币 + 1–2 玄武石，每张卡独立随机。
-- **素材**：卡背用原版 `Tank.Flash/resource/v1.1/image/cardbox/ruong/icon.png`（宝箱，
-  保留透明背景与原比例）；金币/玄武石图标分别取
-  `resource/v1.1/image/unfrightprop/gold/icon.png` 与 `.../stones/icon.png`。
-  原版 `card/<CODE><n>/icon.jpg` 是宠物/角色卡面，与本版奖励不对应，因此没有套用；
-  卡框由 CSS 绘制，属于**临时卡面**，不是原版翻牌卡图。
+- **素材（全部导出，非重绘）**：
+  - 卡背：`gameover.swf` → `asset.takeoutCard.LuckyCard`（character id 122），
+    FFDec 导出 `1.png`，249×286 RGBA，原比例、透明背景。
+  - 卡框：`LuckyCard` 内部的空卡框 sprite `DefineSprite_115`（`gameover_fla.Symbol3_23`）
+    第 20 帧，117×163 RGBA；卡框中间是透明的，图标与数量叠在里面。
+  - 金币 / 玄武石图标：`resource/v1.1/image/unfrightprop/gold|stones/icon.png`。
+  - 核对结论：`cardbox/*/icon.png` 是宝箱/卡盒图标（越南语 `ruong` = 箱子），
+    **不是翻牌卡面**，之前的版本把它当卡背用是错的，已改正。
+  - `card/<CODE><n>/icon.jpg` 是宠物/角色卡，与金币、玄武石奖励不对应，未使用。
+- **音效（按源码）**：`LuckyCard.__onClick()` 播放 `008`（点击），
+  `LuckyCard.play()` 播放 `048`（翻开）。`048` 已从 `audio.swf` 的
+  `7_Sound048.flv` 转成 `dist/assets/audio/sound-048-card-flip.mp3`（44.1 kHz / 128 kbps，
+  0.56 s）。
 - **存档**：`dist/js/save.js`，键 `gunny-wind-arena.profile.v1`，结构
   `{ version, coins, stones, claims[{id, coins, stones, at}], updatedAt }`。
   金币、玄武石、每场领奖记录（最多 40 条）与版本号都会持久化，刷新或重新部署后
@@ -436,14 +450,37 @@ extra 卡片初始只显示占位图与「点击加载」角标，不请求任�
 
 - **时机**：地图选择器点“进入战场”（或首次打开）后，在 `boot()` 装载资源期间显示；
   资源就绪、`frame()` 启动前淡出，因此不会覆盖或改变战斗内操控。
-- **内容**：当前地图背景图（轻微缓慢推镜）、地图名与 ID、双方头像/名字/HP、以及由
+- **素材（FFDec 核实后导出）**：`asset.roomLoading.*` 全部在
+  `Tank.Flash/flash/ui/vietnam/swf/room.swf` —— 用 symbolClass 逐个扫过
+  `flash/ui/vietnam/swf` 下 114 个 SWF，只有 `room.swf` 命中；`game.swf`、`gameii.swf`、
+  `_corei.swf` 均**不含**该命名空间（此前认为在 game.swf 的说法是错的）。
+  实际使用：`Bg`（1000×600 jpg）做背景、`BattleFieldBg`（316×163）做地图预览框、
+  `FieldNameBg`（295×33）做地图名底板、`CharacterBg_Blue/Red`（171×208）做双方立绘框。
+- **内容**：地图缩略图（缓慢推镜）、地图名与 ID、双方头像/名字/HP、以及由
   `boot()` 中 10 个真实资源 Promise 驱动的进度条（不是假计时器）。
 - **失败处理**：任一资源失败进入 `fatal` 面板，提供“重新加载”按钮，不会卡在加载页。
-- **音效**：原版 `audio.swf` / `SoundManager.as` **没有**专门的加载或进入战斗音效
-  （映射表只有 001–130 通用音与 1001 地图 BGM）。因此加载期间播放的是原版地图 1001
-  主题 BGM，音量压到 45%，进入战斗后升回 `bgmVolume`，全程同一条 loop，不会与战斗
-  BGM 重叠，也没有伪造“原版加载音”。首次冷启动时浏览器要求手势，加载卡片提供
-  “点击开启音效”按钮，点击后才解锁音频；未点击则静默加载。
+- **音效**：`RoomLoadingState.as`、`RoomLoadingView.as`、`RoomLoadingBattleFieldItem.as`
+  都没有调用 `SoundManager.Instance.play()`；`audio.swf` 的 SoundManager 映射只有
+  001–130 通用音与 1001 地图 BGM，没有专用的加载/进入战斗音。因此加载期间播放的是原版
+  地图 1001 主题 BGM，音量压到 45%，进入战斗后升回 `bgmVolume`，全程同一条 loop，
+  不会与战斗 BGM 重叠，也没有把翻卡的 `048` 冒充成加载音。首次冷启动时浏览器要求手势，
+  加载卡片提供“点击开启音效”按钮，点击后才解锁音频；未点击则静默加载。
+
+### 4.3 体力：每回合固定 2000
+
+- **规则**：`STAMINA_MAX = 2000`，`beginTurnLocked()` 在玩家回合开始时直接
+  `m.stamina = STAMINA_MAX`（**重置**，不是累加）。旧写法
+  `Math.min(max, stamina + STAMINA_TURN_RESTORE)` 会让体力越打越多，已删除；
+  `STAMINA_TURN_RESTORE` 保留导出但固定为 0，避免外部引用报错。
+- **消耗**：只有走路扣体力，`STAMINA_MOVE_COST = 60 / s`，静止 `STAMINA_IDLE_REGEN = 0`
+  （不再回血）。`movePlayerLocked()` 里原本那句 `this.stamina = Math.max(0, this.stamina)`
+  是全无效果的残留，已改成真正的扣减。
+- **UI**：属性栏显示 `当前/2000`（`statStamina` 文本改为 `${now}/${BATTLE.staminaMax}`），
+  外圈进度环仍按 `stamina / staminaMax` 计算。
+- **实测**：开局 `2000`；按住右移 0.9 s 后 `1958.1`（扣 41.9）；停下 0.9 s 后仍
+  `1958.1`（回血 0）；开一炮进入敌方回合期间保持 `1946`，回到自己回合后精确变回 `2000`。
+- **无原版对应**：原版弹弹堂没有“体力/出牌”这一层，这是网页版为技能出牌加的资源，
+  数值不来自 `Source Flash`，属于本版设计，已在 `docs/SOURCE_MAPPING.md` 标注。
 
 ## 五、参数来源
 

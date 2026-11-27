@@ -1160,30 +1160,31 @@ svg { display: block; }
 .cards-title { margin: 0 0 6px; color: #ffdf94; font-size: 11px; text-align: center; letter-spacing: 0.03em; }
 .cards-countdown { display: block; margin-top: 3px; color: #ffb38b; font-size: 10px; letter-spacing: 0.06em; }
 /* SOURCE: SmallCardsView._cardCnt = 9, _cardColumns = 3, _countDownTime = 5 */
-.cards-row { display: grid; grid-template-columns: repeat(var(--card-columns, 3), 54px); gap: 5px; justify-content: center; }
-.result-card { width: 54px; height: 72px; padding: 0; border: 0; background: transparent; cursor: pointer; perspective: 600px; }
+.cards-row { display: grid; grid-template-columns: repeat(var(--card-columns, 3), 64px); gap: 6px; justify-content: center; }
+.result-card { width: 64px; height: 84px; padding: 0; border: 0; background: transparent; cursor: pointer; perspective: 600px; }
 .result-card .card-inner { position: relative; display: block; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 420ms cubic-bezier(.2,.7,.3,1); }
 .result-card.is-flipped .card-inner { transform: rotateY(180deg); }
 .card-back, .card-face { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border-radius: 10px; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-.card-back {
-  border: 2px solid rgba(255, 214, 130, 0.7);
-  background: radial-gradient(circle at 50% 42%, #2a6a7d, #10333f 72%);
-  box-shadow: inset 0 0 0 3px rgba(6, 26, 36, 0.7), 0 6px 16px rgba(0, 0, 0, 0.4);
-  overflow: hidden;
-}
-/* Back face art is the original cardbox/ruong chest icon (transparent PNG). */
-.card-back img { width: 78%; height: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,.45)); }
-.card-icon { width: 26px; height: auto; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
+/* SOURCE: gameover.swf -> asset.takeoutCard.LuckyCard (frame 1, 249x286 RGBA).
+   The card back is the original asset at its own proportions, no redraw. */
+.card-back { border: 0; background: transparent; box-shadow: none; }
+.card-back img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,.45)); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.card-icon { width: 22px; height: auto; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
 .card-emblem { color: #ffd98a; font-size: 20px; text-shadow: 0 0 10px rgba(255, 200, 90, 0.7); }
 .card-face {
   transform: rotateY(180deg);
-  border: 2px solid rgba(255, 224, 150, 0.9);
-  background: linear-gradient(160deg, rgba(96, 69, 20, 0.96), rgba(40, 29, 12, 0.96));
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), inset 0 0 18px rgba(255, 200, 100, 0.25);
+  overflow: hidden;
+  background: linear-gradient(160deg, #4b3411, #1d1508);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
   color: #fff3d0;
 }
-.card-face b { font-size: 20px; line-height: 1; }
-.card-face small { font-size: 8px; color: #ffe6ab; }
+/* SOURCE: the empty card frame inside LuckyCard (117x163 RGBA) sits on top of
+   the face; the reward icon and amount are layered inside it. */
+.card-frame { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; z-index: 0; pointer-events: none; }
+.card-face .card-icon, .card-face b, .card-face small { position: relative; z-index: 1; }
+.card-face { padding: 10% 8% 8%; gap: 2px; }
+.card-face b { font-size: 15px; line-height: 1.05; }
+.card-face small { font-size: 7px; color: #ffe6ab; }
 .result-card.is-disabled { cursor: default; }
 .result-card:hover:not(.is-flipped):not(.is-disabled) .card-inner { transform: translateY(-3px) rotateY(-8deg); }
 
@@ -1374,35 +1375,54 @@ svg { display: block; }
 }
 .reward-balance { margin: 0; font-size: 9px; color: #8fb4bd; }
 
-/* ---------- 战斗加载过场（房间确认进入战斗 -> 战场出现） ---------- */
-.battle-load { background: radial-gradient(circle at 50% 28%, #0a3346, #02121b 78%); }
+/* ---------- 战斗加载过场（房间确认进入战斗 -> 战场出现） ----------
+ * Artwork: room.swf -> asset.roomLoading.Bg (1000x600 jpg),
+ * BattleFieldBg (316x163), FieldNameBg (295x33), CharacterBg_Blue/Red
+ * (171x208). Verified with FFDec symbolClass export; room.swf is the only
+ * SWF under flash/ui/vietnam/swf holding asset.roomLoading.*. */
+.battle-load { background: #04121a; }
 .load-card {
   width: min(720px, 94vw); overflow: hidden; text-align: left;
-  border: 1px solid rgba(150, 230, 245, 0.24); border-radius: 20px;
-  background: #07222e; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(120, 200, 230, 0.22); border-radius: 14px;
+  background: #03101a; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 }
 .load-stage { position: relative; aspect-ratio: 16 / 7; overflow: hidden; }
-.load-backdrop {
-  width: 100%; height: 100%; object-fit: cover;
-  animation: load-drift 16s ease-in-out infinite alternate;
+.load-bg {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  animation: load-drift 18s ease-in-out infinite alternate;
 }
-@keyframes load-drift { from { transform: scale(1.02); } to { transform: scale(1.09) translateY(-1.5%); } }
+@keyframes load-drift { from { transform: scale(1.03); } to { transform: scale(1.1) translateY(-1.5%); } }
 .load-stage-shade {
   position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(2, 16, 24, 0.3), rgba(2, 16, 24, 0.04) 38%, rgba(3, 20, 30, 0.92));
+  background: linear-gradient(180deg, rgba(2, 10, 18, 0.42), rgba(2, 10, 18, 0.12) 42%, rgba(2, 8, 14, 0.9));
 }
-.load-mapname { position: absolute; left: 16px; top: 12px; display: flex; align-items: baseline; gap: 8px; color: #eafaff; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); }
-.load-mapname small { font-size: 9px; letter-spacing: 0.18em; opacity: 0.8; }
-.load-mapname b { font-size: 20px; }
-.load-mapname span { font-size: 9px; opacity: 0.7; }
-.load-vs { position: absolute; left: 0; right: 0; bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 18px; }
-.load-side { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 128px; text-align: center; color: #fff; }
-.load-side img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(160, 240, 255, 0.5); background: rgba(4, 28, 38, 0.6); }
-.load-side.enemy img { border-color: rgba(255, 180, 120, 0.55); }
-.load-side b { font-size: 12px; }
-.load-side span { font-size: 9px; color: #a9d3dc; }
-.load-vs em { font-style: normal; font-size: 11px; letter-spacing: 0.2em; color: #ffd88a; }
-.load-progress { padding: 10px 16px 14px; }
+/* 地图预览框：原版 BattleFieldBg 包住地图缩略图（框内标题栏留给"战场"） */
+.load-field { position: absolute; left: 3%; top: 7%; width: 48%; aspect-ratio: 316 / 163; }
+.load-field-frame { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+.load-preview {
+  position: absolute; left: 3.4%; top: 20%; width: 93.2%; height: 74%;
+  object-fit: cover; object-position: center 42%; border-radius: 2px;
+}
+/* 地图名：原版 FieldNameBg 作为底板 */
+.load-mapname {
+  position: absolute; left: 4%; bottom: 8%; display: inline-flex; align-items: center; gap: 7px;
+  padding: 3px 14px 3px 10px; color: #f2fbff; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+.load-name-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; z-index: 0; opacity: 0.9; }
+.load-mapname b { position: relative; z-index: 1; font-size: 17px; letter-spacing: 0.04em; }
+.load-mapname span { position: relative; z-index: 1; font-size: 9px; opacity: 0.75; }
+/* 双方角色：原版 CharacterBg_Blue / _Red 竖框，头像放在框内光晕处 */
+.load-vs { position: absolute; right: 3%; top: 6%; bottom: 6%; display: flex; align-items: center; gap: 8px; }
+.load-side { position: relative; width: 84px; height: 104px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+.load-char-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+.load-portrait {
+  position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%);
+  width: 54%; border-radius: 50%; object-fit: cover;
+}
+.load-side b { position: relative; z-index: 1; margin-bottom: 12px; font-size: 11px; color: #fff; text-shadow: 0 1px 3px #000; }
+.load-side span { position: absolute; left: 50%; transform: translateX(-50%); bottom: -13px; width: 130px; text-align: center; font-size: 8px; color: #a9d3dc; }
+.load-vs em { font-style: normal; font-size: 11px; letter-spacing: 0.14em; color: #ffd88a; }
+.load-progress { padding: 10px 16px 14px; background: #071a24; }
 .load-bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
 .load-bar i { display: block; width: 0; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #42d8ee, #8ef3c8); transition: width 220ms ease; }
 .load-status { display: flex; justify-content: space-between; margin: 6px 0 0; font-size: 10px; color: #a8ccd4; }
@@ -1417,17 +1437,20 @@ svg { display: block; }
 .loading.battle-load.is-leaving .load-card { transform: scale(1.02); }
 
 @media (max-height: 540px) {
-  .load-stage { aspect-ratio: auto; height: 132px; }
-  .load-side img { width: 32px; height: 32px; }
-  .load-mapname b { font-size: 16px; }
+  .load-stage { aspect-ratio: auto; height: 140px; }
+  .load-side { width: 58px; height: 72px; }
+  .load-side b { font-size: 9px; margin-bottom: 7px; }
+  .load-side span { display: none; }
+  .load-mapname b { font-size: 13px; }
+  .load-field { width: 40%; top: 5%; }
   .load-progress { padding: 8px 12px 10px; }
 }
 .link-button { padding: 0; border: 0; background: none; color: #8fe1ed; font: inherit; text-decoration: underline; cursor: pointer; }
 
 /* 小屏横屏：结算面板高度有限，压缩卡片让“领取”按钮尽量不滚动即可见 */
 @media (max-height: 480px) {
-  .result-card { width: 46px; height: 62px; }
-  .cards-row { grid-template-columns: repeat(var(--card-columns, 3), 46px); gap: 4px; }
+  .result-card { width: 50px; height: 66px; }
+  .cards-row { grid-template-columns: repeat(var(--card-columns, 3), 50px); gap: 4px; }
   .card-face b { font-size: 15px; }
   .card-icon { width: 20px; }
   .result-score { margin: 6px 0; }
