@@ -80,19 +80,26 @@ test('parity: seeded critical adds damage and changes the summary', () => {
   assert.equal(r.summary, '第 1 回合 · 暴击 288+151 伤害');
 });
 
-test('parity: POW carves the large crater and multiplies damage', () => {
+// SOURCE: BallList.xml — fruit's Special ball is 411 (three-shell POW volley,
+// Power 0.5, Radii 65, Crater 411). The three shells fire sequentially and
+// all three connect at this angle/force, so the last impact is shell 2 of 3.
+test('parity: POW fires the special ball volley', () => {
   const r = runScenario({
     setup: (m) => m.command({ type: 'pow', value: 100 }),
     angle: 22, force: 1125,
   });
-  assert.equal(r.seq, 12);
-  assert.equal(r.lastImpact.damage, 549);
-  assert.equal(r.lastImpact.removed, 3730);
+  assert.equal(r.seq, 22);
+  assert.equal(r.lastImpact.damage, 148);
+  assert.equal(r.lastImpact.type, 'actor');
+  assert.equal(r.lastImpact.shell, 2);
+  assert.equal(r.lastImpact.shells, 3);
+  assert.equal(r.lastImpact.removed, 0);
   assert.equal(r.lastImpact.craterKind, 'large');
-  assert.equal(r.lastImpact.craterArt, '4');
-  assert.equal(r.craters, 1);
-  assert.equal(r.a1.hp, 1451);
-  assert.equal(r.energy, 20);
+  assert.equal(r.lastImpact.craterArt, '411');
+  assert.equal(r.craters, 0);
+  assert.equal(r.a1.hp, 1556);
+  assert.equal(r.energy, 60);
+  assert.equal(r.events.filter((e) => e.endsWith(':fire')).length, 3);
 });
 
 test('parity: carry teleport lands on the same point', () => {

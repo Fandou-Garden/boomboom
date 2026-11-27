@@ -33,20 +33,30 @@ func bytesFromJS(v js.Value) []byte {
 }
 
 func initMatch(this js.Value, args []js.Value) any {
-	if len(args) < 4 {
-		return "gunnyInit requires map + three crater PNG buffers"
+	if len(args) < 5 {
+		return "gunnyInit requires map + crater PNG buffers"
 	}
+	// SOURCE: BallList.xml Crater 列 —— 基础三坑 50/401/4 之外，v22 起追加
+	// 原版真图 411(水果篮大招榴莲坑)/121(风神普通)/131(风神大招)。
+	// 兼容旧 5 参数调用：args = map, c50, c401, c4, debug | map, c50, c401, c4, c411, c121, c131, debug
 	arts := map[string][]byte{
 		"50":  bytesFromJS(args[1]),
 		"401": bytesFromJS(args[2]),
 		"4":   bytesFromJS(args[3]),
+	}
+	debugIdx := 4
+	if len(args) >= 8 {
+		arts["411"] = bytesFromJS(args[4])
+		arts["121"] = bytesFromJS(args[5])
+		arts["131"] = bytesFromJS(args[6])
+		debugIdx = 7
 	}
 	terrain, err := game.LoadTerrainFromBytes(bytesFromJS(args[0]), arts)
 	if err != nil {
 		return err.Error()
 	}
 	match = game.NewMatch(terrain, time.Now().UnixNano(), true)
-	debug := len(args) > 4 && args[4].Truthy()
+	debug := len(args) > debugIdx && args[debugIdx].Truthy()
 	match.SetDebug(debug)
 	lastSeq = 0
 	return ""

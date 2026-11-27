@@ -270,7 +270,7 @@ JS 侧不需要类，直接取对象字段即可。
 
 | Go 文件 | 行数 | JS 目标 | 工作量 | 要点 |
 | --- | --- | --- | --- | --- |
-| `config.go` | 368 | `engine/constants.js` | 小 | 把 `SOURCE` 常数并入 `config.js`；`SpawnX=[240,1640]`、`WorldWidth=1843`、`WorldHeight=1020`、`BedrockY=1015`、`FixedWind=true`、`EnergyMax=100`、`PowDamageMultiplier=1.8`、`CriticalLucky=180` 一个不能漏 |
+| `config.go` | 368 | `engine/constants.js` | 小 | 把 `SOURCE` 常数并入 `config.js`；`SpawnX=[240,1640]`、`WorldWidth=1843`、`WorldHeight=1020`、`BedrockY=1015`、`FixedWind=true`、`EnergyMax=100`、`CriticalLucky=180` 一个不能漏；v22 起追加 `BALL_DEFS`（每发弹 `Power/Radii/Crater/Amount/ActionType`）、各武器 `specialBallId` 与 `actionType`（POW 已无全局倍率） |
 | `terrain.go` | 302 | `engine/terrain.js` | 中 | 复用 `dist/js/terrain.js` 的 chunk/mask/carve；补 `FindGroundY` / `FindNextWalkPoint` / `SlopeAt` / `Hash` / `CratersCopy` / `Carve` 跳过 `y>=BedrockY` |
 | `physics.go` | 281 | `engine/physics.js` | 中 | 复用 `dist/js/physics.js`；补 `SourceDamage`（`falloff=1-distance/radius/4`）、`SourceCriticalDamage`、3px 子步 CCD、`trunc10`、`NextWind` |
 | `ai.go` | 90 | `engine/ai.js` | 小 | 复用 `dist/js/ai.js`，`ChooseShotForWeapon` 签名对齐 |
@@ -476,7 +476,8 @@ docs/PURE_JS_REFACTOR_PLAN.md（本文，实施时升级为 ROADMAP 进度版）
 dist/index.html          去掉 /api/state probe 与 wasm_exec.js/offline-api.js 加载；
                          改为 <script type="module"> 引 standalone-api.js + main.js
 dist/js/config.js        BUILD_VERSION 2.0.0 → 3.0.0；并入 Go 侧权威常数
-dist/js/main.js          __GUNNY_BACKEND__ 取值 'wasm' → 'js'；缓存串 v21 → v22
+dist/js/main.js          __GUNNY_BACKEND__ 取值 'wasm' → 'js'；缓存串随交付升到 v24
+dist/standalone-api.js   载入 data/<id>.fore.map.gz（DecompressionStream，回退原始 .map）
 dist/js/physics.js / ai.js / terrain.js   升级为权威（或移入 engine/ 后 re-export 兼容）
 scripts/build-static.sh  去掉 build-wasm.sh 调用，直接 zip dist/
 package.json             scripts 收敛为 check / test / test:browser:* / build:static

@@ -22,9 +22,9 @@ import { nextWind, simulateShot, sourceCriticalDamage, sourceDamage } from '../.
 import { chooseShotInRange } from '../../dist/js/engine/ai.js';
 import { GoRand } from '../../dist/js/engine/rng.js';
 import {
-  ANGLE_MAX, ANGLE_MIN, BEDROCK_Y, CRITICAL_LUCKY, CRITICAL_REDUCE, FIXED_WIND,
-  FORCE_MAX, MAX_FLIGHT_SECONDS, MOVE_STEP_Y, PHYSICS_DT, SKILL_DEFS, START_ANGLE,
-  WEAPON_DEFS, WEAPON_ORDER,
+  ANGLE_MAX, ANGLE_MIN, BALL_DEFS, BEDROCK_Y, CRITICAL_LUCKY, CRITICAL_REDUCE,
+  ENERGY_MAX, FIXED_WIND, FORCE_MAX, MAX_FLIGHT_SECONDS, MOVE_STEP_Y, PHYSICS_DT,
+  SKILL_DEFS, SPAWN_PROBE_Y, START_ANGLE, WEAPON_DEFS, WEAPON_ORDER, ballFor,
 } from '../../dist/js/engine/constants.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -291,6 +291,82 @@ test('fire volley and resolve', () => {
   assert.notEqual(m.phase, 'flight', 'flight did not resolve');
   assert.ok(m.lastImpact, 'missing impact');
   assert.ok(m.phase === 'resolve' || m.phase === 'player', `unexpected phase ${m.phase}`);
+});
+
+// SOURCE: BallList.xml + bombconfig.xml — POW uses the Special ball's own
+// Amount/Power/Radii/Crater (fruit 411: three shells, Power 0.5, Radii 65,
+// Crater 411). Port of TestPowVolleyUsesSpecialBall.
+test('POW volley uses the weapon special ball', () => {
+  const b411 = ballFor('411');
+  assert.deepEqual(
+    { power: b411.power, radii: b411.radii, crater: b411.crater, amount: b411.amount },
+    { power: 0.5, radii: 65, crater: '411', amount: 3 },
+  );
+  for (const [id, want] of Object.entries({ 171: [3, 0.6, 45], 151: [3, 0.6], 371: [3, 0.5] })) {
+    const b = BALL_DEFS[id];
+    assert.equal(b.amount, want[0], `ball ${id} amount`);
+    assert.equal(b.power, want[1], `ball ${id} power`);
+    if (want.length > 2) assert.equal(b.radii, want[2], `ball ${id} radii`);
+  }
+  const fruit = WEAPON_DEFS.fruit;
+  assert.equal(fruit.specialBallId, '411');
+  assert.equal(fruit.actionType, 0);
+  assert.equal(fruit.specialActionType, 0);
+  const bow = WEAPON_DEFS.bow;
+  assert.equal(bow.actionType, 1);
+  assert.equal(bow.specialActionType, 1);
+
+  const m = newMatch();
+  m.playerWeaponId = 'fruit';
+  m.energy = ENERGY_MAX;
+  m.powSelected = true;
+  assert.ok(fireLocked(m, 0, 45, 1200), 'pow fire rejected');
+  assert.equal(m.volleyTotal, 3);
+  assert.equal(m.queuedShots.length, 2);
+  assert.equal(m.shot.craterArt, '411');
+  assert.equal(m.shot.blastRadius, 65);
+  assert.equal(m.shot.damageScale, 0.5);
+  assert.ok(m.shot.pow, 'shell must be flagged pow');
+
+  const m2 = newMatch();
+  m2.playerWeaponId = 'wind';
+  assert.ok(fireLocked(m2, 0, 40, 1200), 'wind fire rejected');
+  assert.equal(m2.shot.craterArt, '121');
+  assert.equal(m2.shot.blastRadius, 55);
+  assert.equal(m2.shot.damageScale, 1);
+
+  const m3 = newMatch();
+  m3.playerWeaponId = 'cannon';
+  m3.energy = ENERGY_MAX;
+  m3.powSelected = true;
+  assert.ok(fireLocked(m3, 0, 65, 1200), 'cannon pow fire rejected');
+  assert.equal(m3.volleyTotal, 1);
+  assert.equal(m3.shot.craterArt, '401');
+  assert.equal(m3.shot.blastRadius, 65);
+  assert.equal(m3.shot.damageScale, 1.3);
+});
+
+// SOURCE: BaseGame.cs PosX/PosX1 spawn columns. Maps like 1157 have floating
+// foreground above the fixed column, so spawning must scan for a column with
+// ground underfoot and 110 px of head clearance. Port of
+// TestSpawnColumnAvoidsFloatingTerrain.
+test('spawn columns avoid floating terrain on every map', () => {
+  for (const id of ['1156', '1001', '1002', '1003', '1008', '1014', '1035', '1038', '1157', '1190', '1192']) {
+    const bytes = new Uint8Array(readFileSync(path.join(ROOT, `dist/data/${id}.fore.map`)));
+    const tr = loadTerrainFromBytes(bytes);
+    const m = new Match({ terrain: tr, seed: 7, clock: () => 0 });
+    for (let i = 0; i < m.actors.length; i += 1) {
+      const a = m.actors[i];
+      const x = Math.trunc(a.x);
+      const y = Math.trunc(a.y);
+      assert.ok(y >= SPAWN_PROBE_Y && y < tr.height - 20, `${id} actor ${i} spawns out of bounds (${x},${y})`);
+      for (let sy = y - 110; sy < y; sy += 1) {
+        if (sy < 0) continue;
+        assert.ok(!tr.isSolid(x, sy), `${id} actor ${i} embedded at (${x},${sy})`);
+      }
+      assert.ok(tr.isSolid(x, y), `${id} actor ${i} has no ground under (${x},${y})`);
+    }
+  }
 });
 
 test('AI plan is reachable', () => {

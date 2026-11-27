@@ -11,12 +11,11 @@
 import {
   BLAST_RADIUS, CRITICAL_LUCKY, CRITICAL_REDUCE, ENERGY_MAX, ENERGY_PER_HIT,
   ENERGY_PER_VOLLEY, ENERGY_PER_HEAL, FORCE_MAX, GROUND_BOTTOM, HEAL_AMOUNT,
-  HEAL_DELAY, HEALS_PER_ROUND, MAX_FLIGHT_SECONDS, PHYSICS_DT, POW_BLAST_RADIUS,
-  POW_CRATER_ART, POW_DAMAGE_MULTIPLIER, RESOLVE_DELAY, SKILL_DEFS, SKILL_ORDER,
-  WORLD_WIDTH, clamp,
-} from './constants.js?v=22';
-import { blastDamage, launch, muzzlePoint, sourceCriticalDamage, stepProjectile } from './physics.js?v=22';
-import { makeImpact } from './json.js?v=22';
+  HEAL_DELAY, HEALS_PER_ROUND, MAX_FLIGHT_SECONDS, PHYSICS_DT, RESOLVE_DELAY,
+  SKILL_DEFS, SKILL_ORDER, WORLD_WIDTH, ballFor, clamp,
+} from './constants.js?v=24';
+import { blastDamage, launch, muzzlePoint, sourceCriticalDamage, stepProjectile } from './physics.js?v=24';
+import { makeImpact } from './json.js?v=24';
 
 export function fireLocked(m, index, angle, force) {
   if (m.phase === 'over' || index < 0 || index > 1) return false;
@@ -39,11 +38,23 @@ export function fireLocked(m, index, angle, force) {
   let sequential = false;
   const carry = index === 0 && m.carryArmed && m.canCarry;
   const pow = index === 0 && !carry && m.powSelected && m.energy >= ENERGY_MAX;
+  // SOURCE: bombconfig.xml Common/Special -> BallList.xml. A normal shot uses
+  // the weapon's Common ball; POW fires its Special ball. Shell count, damage
+  // multiplier, blast radius and crater all come from that BallList row.
+  let ball = ballFor(weapon.ballId);
+  if (pow) ball = ballFor(weapon.specialBallId);
+  let ballPower = ball.power;
+  if (carry) ballPower = 0;
   if (carry) {
     offsets = [0];
     scales = [1];
-  } else if (pow) {
-    // NEW browser POW: one heavy shell with the original crater-4 bitmap.
+  } else if (pow && ball.amount > 1) {
+    // SOURCE: BallList Amount=3 POW balls (151/171/371/411) fire the same
+    // vector sequentially; every scale must be 1 (a zero-filled slice would
+    // clamp the force to 1 and drop the shells straight down).
+    offsets = new Array(ball.amount).fill(0);
+    scales = new Array(ball.amount).fill(1);
+    sequential = true;
   } else if (index === 0 && m.selectedSkill !== '') {
     const def = SKILL_DEFS[m.selectedSkill];
     if (def && def.kind === 'attack' && m.skillUses[m.selectedSkill] > 0) {
@@ -78,8 +89,9 @@ export function fireLocked(m, index, angle, force) {
       owner: index, x: mx, y: my, prevX: mx, prevY: my, vx, vy, ax: 0, ay: 0,
       age: 0, alive: true, impact: '', direction, elevation, force: f,
       trail: [{ x: mx, y: my }], volleyId, slot: i, shells: offsets.length,
-      skill: firedSkill, weapon: weapon.id, craterArt: weapon.craterArt,
-      damageScale, pow, carry: false, resolved: false,
+      skill: firedSkill, weapon: weapon.id, craterArt: ball.crater,
+      blastRadius: ball.radii, damageScale: damageScale * ballPower,
+      pow, carry: false, resolved: false,
     };
     if (carry) {
       // BallList ID=3: Power=0, Crater="" — no damage, no crater; the impact
@@ -239,23 +251,23 @@ export function resolveImpactLocked(m, p) {
     x: ix, y: iy, type: impactType, owner: p.owner, shell: p.slot, shells: p.shells,
   });
   if (impactType === 'ground' || impactType === 'actor') {
+    // SOURCE: BallList.xml — the crater and blast radius belong to the shell
+    // (BallList Radii/Crater), not to a global POW override.
     let art = p.craterArt;
-    if (art === '') art = m.weaponForActor(p.owner).craterArt;
+    if (!art) art = m.weaponForActor(p.owner).craterArt;
     let kind = 'medium';
-    let radius = BLAST_RADIUS;
-    if (p.pow) {
-      art = POW_CRATER_ART;
-      kind = 'large';
-      radius = POW_BLAST_RADIUS;
-    }
+    let radius = p.blastRadius;
+    if (!(radius > 0)) radius = BLAST_RADIUS;
+    if (radius >= 60) kind = 'large';
     const carved = m.terrain.carve(ix, iy, art, kind);
     impact.removed = carved.removed;
     impact.craterKind = kind;
     impact.craterArt = art;
     for (const a of m.actors) m.refreshSupportLocked(a);
+    // SOURCE: SimpleBomb.MakeDamage — the ball Power is folded into
+    // DamageScale at launch (normal 1.0, POW 1.5/1.3/0.6/0.5, carry 0).
     const blast = blastDamage(target, ix, iy, attacker, radius);
     let damage = Math.trunc(blast.damage * p.damageScale);
-    if (p.pow) damage = Math.trunc(damage * POW_DAMAGE_MULTIPLIER);
     if (damage < 0) damage = 0;
     let critical = 0;
     if (damage > 0 && target.alive) {

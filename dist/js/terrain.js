@@ -11,8 +11,8 @@
  * BaseBomb.DigMap() removes a pre-authored crater shape. The browser keeps an
  * original Gunny crater bitmap as the base and adds seeded lobes.
  */
-import { WORLD, TERRAIN } from './config.js?v=22';
-import { buildExplosionShape, explosionSeed } from './explosion.js?v=22';
+import { WORLD, TERRAIN } from './config.js?v=24';
+import { buildExplosionShape, explosionSeed } from './explosion.js?v=24';
 
 export const SOLID_ALPHA_THRESHOLD = TERRAIN.solidAlphaThreshold;
 
@@ -34,7 +34,7 @@ export function makeCanvas(width, height) {
   return canvas;
 }
 
-const ASSET_VERSION = '14';
+const ASSET_VERSION = '15';
 
 export function loadImage(src) {
   return new Promise((resolve, reject) => {

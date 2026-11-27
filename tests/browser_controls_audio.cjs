@@ -135,14 +135,16 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       await page.waitForFunction(() => window.__GUNNY_TEST__.snapshot().stats.playerShots >= 3, { timeout: 3000 });
       await page.waitForFunction(() => {
         const pose = window.__GUNNY_TEST__.snapshot().poses?.[0];
-        return pose?.weaponVisible && [22, 23, 26, 27].includes(pose.frame);
+        // SOURCE: PrepareShootAction — 默认武器水果篮 BallList ActionType=0
+        // → 开火播 SHOWTHROWS [28,29,30]（投掷），不再是统一 SHOT。
+        return pose?.weaponVisible && [28, 29, 30].includes(pose.frame);
       }, { timeout: 1200 });
       const fired = await snapshot(page);
       assert.equal(fired.phase, 'flight');
       assert.equal(fired.stats.playerShots, 3, 'extra2 must launch three shells');
       assert.equal(fired.selectedSkill, null, 'skill is spent only after the volley starts');
       assert.equal(fired.poses[0].weaponVisible, true, 'firing must keep the weapon raised');
-      assert.ok([22, 23, 26, 27].includes(fired.poses[0].frame), `firing must use SHOT, got ${fired.poses[0].frame}`);
+      assert.ok([28, 29, 30].includes(fired.poses[0].frame), `firing must use SHOWTHROWS for a throw-type weapon, got ${fired.poses[0].frame}`);
       await page.evaluate(() => window.__GUNNY_TEST__.audioReady());
       const fire = await audioEvents(page, 'fire');
       assert.equal(fire.length, 3, 'each sequential extra2 shell must emit its launch sound');
@@ -216,7 +218,8 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       assert.ok(s.stats.playerHits >= 1, `POW at solved angle must hit: ${JSON.stringify({ volley: s.playerVolley, last: s.lastImpact, actors: s.actors.map((a) => ({ x: a.x, y: a.y, hp: a.hp })) })}`);
       const fire = await audioEvents(page, 'fire');
       const pow = await audioEvents(page, 'pow');
-      assert.equal(fire.length, 1, 'POW volley must emit launch sound once');
+      // SOURCE: BallList 411 Amount=3 —— 水果篮大招是三连发，每发一次发射音。
+      assert.equal(fire.length, 3, 'fruit POW volley (Amount=3) must emit one launch sound per shell');
       assert.equal(pow.length, 1, 'POW activation must emit item sound once');
       assert.equal(fire[0].sample, '114');
       assert.equal(pow[0].sample, '039');

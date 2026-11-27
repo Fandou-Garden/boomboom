@@ -14,15 +14,15 @@ import {
   MIN_FIRE_FORCE, MOVE_SPEED, MOVE_STEP_X, MOVE_STEP_Y, PIXELS_PER_METRE, PLAYER_MAX_HP,
   RESOLVE_DELAY, SHOOT_MINUS, SKILL_DEFS, SKILL_ORDER, SPAWN_PROBE_Y, SPAWN_X,
   STAMINA_MAX, WORLD_HEIGHT, WORLD_WIDTH, clamp, weaponFor, WEAPON_DEFS, LUCKY,
-} from './constants.js?v=22';
-import { nextWind } from './physics.js?v=22';
-import { GoRand } from './rng.js?v=22';
-import { chooseShotForWeapon } from './ai.js?v=22';
+} from './constants.js?v=24';
+import { nextWind } from './physics.js?v=24';
+import { GoRand } from './rng.js?v=24';
+import { chooseShotForWeapon } from './ai.js?v=24';
 import {
   beginTurnLocked, finishResolveLocked, fireLocked, healLocked, updateFlightLocked,
-} from './actions.js?v=22';
-import { buildSnapshot } from './snapshot.js?v=22';
-import { aiPlanJson } from './json.js?v=22';
+} from './actions.js?v=24';
+import { buildSnapshot } from './snapshot.js?v=24';
+import { aiPlanJson } from './json.js?v=24';
 
 function makeActor(overrides) {
   return {
@@ -116,15 +116,11 @@ export class Match {
     this.enemyAimTo = enemyWeapon.startAngle;
     this.enemyAimElapsed = 0;
 
-    const spawnY = [0, 0];
-    for (let i = 0; i < SPAWN_X.length; i += 1) {
-      const g = this.terrain.findGroundY(Math.trunc(SPAWN_X[i]), SPAWN_PROBE_Y, GROUND_BOTTOM);
-      spawnY[i] = g.ok ? g.y : WORLD_HEIGHT - 60;
-    }
+    const spawn = [this.spawnColumnLocked(0), this.spawnColumnLocked(1)];
     this.actors = [
       makeActor({
         index: 0, id: 'player', name: '蓝波', subtitle: '你',
-        x: SPAWN_X[0], y: spawnY[0], hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP,
+        x: spawn[0][0], y: spawn[0][1], hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP,
         facing: 1, alive: true, grounded: true, aimAngle: playerWeapon.startAngle,
         weapon: playerWeapon.id, baseDamage: BASE_DAMAGE, attack: ATTACK,
         baseGuard: BASE_GUARD, defence: DEFENCE, grade: GRADE, lucky: LUCKY,
@@ -132,7 +128,7 @@ export class Match {
       }),
       makeActor({
         index: 1, id: 'enemy', name: '芽芽', subtitle: '电脑',
-        x: SPAWN_X[1], y: spawnY[1], hp: ENEMY_MAX_HP, maxHp: ENEMY_MAX_HP,
+        x: spawn[1][0], y: spawn[1][1], hp: ENEMY_MAX_HP, maxHp: ENEMY_MAX_HP,
         facing: -1, alive: true, grounded: true, aimAngle: enemyWeapon.startAngle,
         weapon: enemyWeapon.id, baseDamage: BASE_DAMAGE, attack: ATTACK,
         baseGuard: BASE_GUARD, defence: DEFENCE, grade: GRADE, lucky: LUCKY,
@@ -150,6 +146,42 @@ export class Match {
     this.emit('turn', { turn: 0, round: 1 });
     this.emit('wind', { wind: 0.0 });
     this.emit('toast', { text: '按住左右移动 · 上/下调角度 · 按住发射蓄力，松手开炮' });
+  }
+
+  /**
+   * Mirrors match.go spawnColumnLocked: walk outward from the preferred column
+   * in 10 px steps and take the first one with ground underfoot, 110 px of
+   * head clearance and shoulder support two pixels either side. Falls back to
+   * the preferred column, then to the sky, exactly like the Go code.
+   */
+  spawnColumnLocked(index) {
+    const prefer = Math.trunc(SPAWN_X[index]);
+    const width = this.terrain.width;
+    const offsets = [0];
+    for (let d = 10; d <= 360; d += 10) offsets.push(d, -d);
+    for (const d of offsets) {
+      const x = prefer + d;
+      if (x < 80 || x > width - 80) continue;
+      const g = this.terrain.findGroundY(x, SPAWN_PROBE_Y, GROUND_BOTTOM);
+      if (!g.ok) continue;
+      let clear = true;
+      for (let y = g.y - 110; y < g.y; y += 1) {
+        if (this.terrain.isSolid(x, y)) { clear = false; break; }
+      }
+      if (!clear) continue;
+      let supported = false;
+      for (let y = g.y + 1; y <= g.y + 8 && y < this.terrain.height; y += 1) {
+        if (this.terrain.isSolid(x - 16, y) || this.terrain.isSolid(x + 16, y)) {
+          supported = true;
+          break;
+        }
+      }
+      if (!supported) continue;
+      return [x, g.y];
+    }
+    const g = this.terrain.findGroundY(prefer, SPAWN_PROBE_Y, GROUND_BOTTOM);
+    if (g.ok) return [prefer, g.y];
+    return [prefer, WORLD_HEIGHT - 60];
   }
 
   playerWeapon() { return weaponFor(this.playerWeaponId); }

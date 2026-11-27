@@ -26,30 +26,32 @@ type TrailPoint struct {
 
 // Projectile is the JSON projection of one SimpleBomb.
 type Projectile struct {
-	Owner       int          `json:"owner"`
-	X           float64      `json:"x"`
-	Y           float64      `json:"y"`
-	PrevX       float64      `json:"prevX"`
-	PrevY       float64      `json:"prevY"`
-	VX          float64      `json:"vx"`
-	VY          float64      `json:"vy"`
-	AX          float64      `json:"ax"`
-	AY          float64      `json:"ay"`
-	Age         float64      `json:"age"`
-	Alive       bool         `json:"alive"`
-	Impact      string       `json:"impact,omitempty"`
-	Direction   int          `json:"direction"`
-	Elevation   float64      `json:"elevation"`
-	Force       float64      `json:"force"`
-	Trail       []TrailPoint `json:"trail"`
-	VolleyID    string       `json:"volleyId"`
-	Slot        int          `json:"slot"`
-	Shells      int          `json:"shells"`
-	Skill       string       `json:"skill,omitempty"`
-	Weapon      string       `json:"weapon,omitempty"`
-	CraterArt   string       `json:"craterArt,omitempty"`
-	DamageScale float64      `json:"damageScale"`
-	Pow         bool         `json:"pow"`
+	Owner     int          `json:"owner"`
+	X         float64      `json:"x"`
+	Y         float64      `json:"y"`
+	PrevX     float64      `json:"prevX"`
+	PrevY     float64      `json:"prevY"`
+	VX        float64      `json:"vx"`
+	VY        float64      `json:"vy"`
+	AX        float64      `json:"ax"`
+	AY        float64      `json:"ay"`
+	Age       float64      `json:"age"`
+	Alive     bool         `json:"alive"`
+	Impact    string       `json:"impact,omitempty"`
+	Direction int          `json:"direction"`
+	Elevation float64      `json:"elevation"`
+	Force     float64      `json:"force"`
+	Trail     []TrailPoint `json:"trail"`
+	VolleyID  string       `json:"volleyId"`
+	Slot      int          `json:"slot"`
+	Shells    int          `json:"shells"`
+	Skill     string       `json:"skill,omitempty"`
+	Weapon    string       `json:"weapon,omitempty"`
+	CraterArt string       `json:"craterArt,omitempty"`
+	// SOURCE: BallList.xml @Radii — 本发弹的爆炸半径（0 时回落 BlastRadius）。
+	BlastRadius float64 `json:"blastRadius,omitempty"`
+	DamageScale float64 `json:"damageScale"`
+	Pow         bool    `json:"pow"`
 	// SOURCE: SetBall(3) / BombType.FLY — a "carry" (fly/teleport) ball has
 	// Power=0, Crater="" in BallList.xml ID=3, so it deals no damage and digs
 	// no crater; on impact the owner is translated to the landing point instead.

@@ -9,7 +9,7 @@
  * foreground, so the render alpha (A > 100) and the collision bitmask are
  * pixel-identical:
  *   - assets/map-<id>-back.jpg   tiled background (pre-baked to full width)
- *   - assets/map-<id>-fore.png   visible destructible foreground
+ *   - assets/map-<id>-fore.webp（无损）   visible destructible foreground
  *   - data/<id>.fore.map         [int32 w][int32 h][MSB-first row] bitmask
  *
  * The offline adapter (standalone-api.js) loads data/<id>.fore.map and the

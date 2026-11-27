@@ -21,6 +21,7 @@ export function copyProjectile(p) {
   if (p.skill) c.skill = p.skill;
   if (p.weapon) c.weapon = p.weapon;
   if (p.craterArt) c.craterArt = p.craterArt;
+  if (p.blastRadius) c.blastRadius = p.blastRadius;
   if (p.carry) c.carry = true;
   return c;
 }

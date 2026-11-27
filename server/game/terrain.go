@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Crater is one carved original crater bitmap recorded for late joiners.
@@ -53,6 +54,22 @@ func LoadTerrain(mapPath, assetsDir string) (*Terrain, error) {
 		}
 		arts[id] = raw
 	}
+	// SOURCE: BallList.xml 的 Crater 列按弹引用不同 crater/<id>/crater.png。
+	// 除了三张基础坑外，注册 assets 目录下其余 crater-<id>.png（121/131/411
+	// 等原版真图），供对应弹的 Carve 使用。
+	matches, _ := filepath.Glob(filepath.Join(assetsDir, "crater-*.png"))
+	for _, name := range matches {
+		base := filepath.Base(name)
+		id := strings.TrimSuffix(strings.TrimPrefix(base, "crater-"), ".png")
+		if _, ok := arts[id]; ok {
+			continue
+		}
+		raw, err := os.ReadFile(name)
+		if err != nil {
+			continue
+		}
+		arts[id] = raw
+	}
 	return LoadTerrainFromBytes(data, arts)
 }
 
@@ -83,11 +100,14 @@ func LoadTerrainFromBytes(data []byte, arts map[string][]byte) (*Terrain, error)
 		Mask: mask, Base: append([]uint8(nil), mask...),
 		Art: map[string]*CraterArt{},
 	}
+	// 基础三坑必须存在；其余（BallList Crater 列引用的原版弹坑）一并注册，
+	// 缺哪个弹的坑就只影响该弹的 Carve。
 	for _, id := range []string{"50", "401", "4"} {
-		raw, ok := arts[id]
-		if !ok {
+		if _, ok := arts[id]; !ok {
 			return nil, fmt.Errorf("missing crater art %s", id)
 		}
+	}
+	for id, raw := range arts {
 		art, err := decodeCraterArt(id, raw)
 		if err != nil {
 			return nil, err

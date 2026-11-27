@@ -4,8 +4,8 @@
  * Search policy is a NEW addition (the original checkout has no aiming AI), but
  * it runs against the same source ballistics, so a fixed seed reproduces it.
  */
-import { clamp } from './constants.js?v=22';
-import { muzzlePoint, simulateShot } from './physics.js?v=22';
+import { clamp } from './constants.js?v=24';
+import { muzzlePoint, simulateShot } from './physics.js?v=24';
 
 function scoreCandidate(shooter, target, terrain, wind, angle, force, direction, maxSeconds, forceMax) {
   const { x: mx, y: my } = muzzlePoint(shooter, angle, direction);

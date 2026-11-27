@@ -75,7 +75,7 @@ func genCraters() {
 	b.WriteString("// Alpha bitmask (MSB-first rows, 1 = alpha > 100), identical to\n")
 	b.WriteString("// server/game/terrain.go decodeCraterArt. Base64 payload per art id.\n")
 	b.WriteString("export const CRATER_MASKS = {\n")
-	for _, id := range []string{"50", "401", "4"} {
+	for _, id := range []string{"50", "401", "4", "121", "131", "411"} {
 		path := filepath.Join("dist", "assets", "crater-"+id+".png")
 		raw, err := os.ReadFile(path)
 		must(err)

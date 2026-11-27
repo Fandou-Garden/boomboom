@@ -5,7 +5,7 @@
  * compiled to WASM. The Go HTTP server remains the source of truth for
  * local/online play; this path only runs on static hosting.
  */
-import { GunnyEngine } from './js/engine/index.js?v=22';
+import { GunnyEngine } from './js/engine/index.js?v=24';
 
 const API_COMMAND = '/api/command';
 const MAP_IDS = ['1156', '1001', '1002', '1003', '1008', '1014', '1035', '1038', '1157', '1190', '1192'];
@@ -48,7 +48,25 @@ function flush(source) {
 async function loadBytes(url) {
   const response = await fetch(url, { cache: 'no-store' });
   if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
-  return new Uint8Array(await response.arrayBuffer());
+  const raw = await response.arrayBuffer();
+  // The cache-busting query (?v=24) rides on the same URL, so test the path.
+  if (!/\.gz(\?|$)/.test(url)) return new Uint8Array(raw);
+  // Static hosts usually transfer without content-encoding, so the map is
+  // shipped pre-gzipped (232KB -> ~10KB) and inflated in the browser.
+  if (typeof DecompressionStream !== 'function') {
+    throw new Error('DecompressionStream unavailable for pre-gzipped map');
+  }
+  const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function loadMapBytes(mapId) {
+  try {
+    return await loadBytes(`data/${mapId}.fore.map.gz?v=24`);
+  } catch (error) {
+    console.warn('pre-gzipped map unavailable, falling back to raw bitmask', error);
+    return loadBytes(`data/${mapId}.fore.map?v=24`);
+  }
 }
 
 async function boot() {
@@ -60,7 +78,7 @@ async function boot() {
     // authoritative match can be initialised with any of them unchanged.
     const mapId = MAP_IDS.includes(params.get('map')) ? params.get('map') : '1156';
     window.__GUNNY_MAP_ID__ = mapId;
-    const map = await loadBytes(`data/${mapId}.fore.map?v=22`);
+    const map = await loadMapBytes(mapId);
     const debug = params.get('test') === '1' || params.get('cheat') === '1';
     const error = engine.init(map, null, null, null, debug);
     if (error) throw new Error(error);

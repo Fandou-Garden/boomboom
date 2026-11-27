@@ -89,6 +89,18 @@ npm run build:static
 **https://slnp165x30zq.reakh.fun/** 使用这条路径。`server/` 仍保留在仓库中用于在线
 路径，`npm run build:wasm` 可以重建旧的 WASM 兜底（`dist/wasm/` 默认不再打进静态包）。
 
+**首屏加载优化（v23）**：发布主机（openresty）忽略 `Accept-Encoding`、不做任何
+压缩传输，因此大资源全部预压缩、由前端解压：
+
+| 资源 | 之前 | 现在 | 手段 |
+| --- | --- | --- | --- |
+| `wasm/gunny.wasm` | 3.36 MB | **0.92 MB** | `gzip -9` → `gunny.wasm.gz`，浏览器用 `DecompressionStream('gzip')` 解压后实例化 |
+| `data/<id>.fore.map` | 232 KB/张 | **约 10 KB** | 同上走 `.gz`（`loadBytesGz`，无 DecompressionStream 时回退原始文件） |
+| `assets/map-<id>-fore.png` | 231 KB–1.7 MB | **约 74%** | 无损 WebP（`exact=True`，与原 PNG **逐像素一致**，`verify_map_parity.py` 仍比对 PNG 原图，0 diff） |
+| 音效+BGM（约 2 MB） | 与首屏并行抢带宽 | **延后** | `sound.preload()` 从模块顶层移到 boot 完成、加载屏隐藏之后 |
+
+首屏（默认地图 1156）传输量从约 6.7 MB 降到约 2.3 MB，且音频在首帧渲染后才解码。
+
 `npm run test:browser:static` 会在本机起一个没有 `/api` 的静态服务器，验证
 纯 JS 引擎启动、完整回合、AI 行动、弹坑和重开，不需要 Go 服务端。
 `npm run test:browser:mobile` 另外用 iPhone UA 模拟 1024×386 浏览器剩余可视区和
@@ -330,6 +342,20 @@ HUD、血条、风力、回合、距离、移动/调角/发射按钮全部是 Ca
   每发伤害 90%）；4–8 为伤害增幅 50/40/30/20/10%，可叠加并在开火时消耗。
   治疗改为顶部心形按钮与 `H` 键。
 - `POW` 是独立按键，只负责选中，不会发射；能量满才解锁，选中后仍由蓝色主键蓄力发射。
+- **大招（SOURCE 复刻）**：照抄 `bombconfig.xml` 的 `Common/Special` 与 `BallList.xml`
+  各弹行的 `Power/Radii/Crater/Amount`。POW 使用各武器的 **Special 大招弹**——
+  三连发：雷霆 151（每发 60%）、烈火 171（每发 60%，半径 45）、水果篮 411（每发 50%，
+  原版榴莲弹体与 `crater/411` 榴莲坑）、马桶 371（每发 50%）；单发加伤：石斧/弓箭/AK/
+  黄金枪/手术刀/司马砸缸/黑白家电 150%、轰天 130%（半径 65）、风神 131（原版弹坑）。
+  弹坑素材缺失的弹按既有映射落到 4/50/401；`crater/121/131/411` 为原版真图。
+  旧版全局 POW ×1.8/半径 82 已移除，伤害系数在发射时并入该发弹。
+- **开火动作（SOURCE 复刻）**：按 `PrepareShootAction` 的规则，
+  `ball.ActionType == 0` 播 `SHOWTHROWS [28,29,30]` 投掷（石斧/风神/烈火/司马砸缸/
+  水果篮/手术刀/黑白家电），`== 1` 播 `SHOWGUN [19,20,21]` 举枪（弓箭/AK/黄金枪/
+  轰天/雷霆/马桶）；大招弹与普通弹各自取自己的 ActionType。
+- **出生点**：固定列 240/1640 在部分地图（如 1157）上方有悬空前景，会出生进墙体。
+  现按原版出生语义就地扫描：脚下有连续地面、身体与头顶 110px 净空无碰撞，
+  11 张地图全部验证不嵌入。
 - 瞄准反馈只在角色旁画 44–58 px 的短虚线/角度扇形，不预测整条抛物线。
 - 推荐力度由 `solveForceForAngle()` 按**当前角度、当前技能弹群、POW 与当前风力**
   先以 2% 步长调用真实 `simulateShot`/爆炸伤害复算，整段无命中时回退到 1% 步长；

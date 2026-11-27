@@ -6,8 +6,8 @@
  * really is LITTLE-endian — dist/data/1156.fore.map starts 33 07 00 00 fc 03).
  * Crater art comes from baked alpha bitmasks generated out of the original PNGs.
  */
-import { BEDROCK_Y } from './constants.js?v=22';
-import { CRATER_MASKS } from './crater-masks.js?v=22';
+import { BEDROCK_Y } from './constants.js?v=24';
+import { CRATER_MASKS } from './crater-masks.js?v=24';
 
 function base64ToBytes(b64) {
   const bin = atob(b64);
@@ -45,8 +45,11 @@ export function loadTerrainFromBytes(data) {
       if (raw[row + (x >> 3)] & (0x80 >> (x & 7))) mask[y * w + x] = 1;
     }
   }
+  // SOURCE: BallList.xml Crater column — every baked crater bitmap is
+  // registered (50/401/4 plus the original 121/131/411), so a shell only
+  // misses its own art if that asset never shipped.
   const art = {};
-  for (const id of ['50', '401', '4']) art[id] = decodeCraterArt(id);
+  for (const id of Object.keys(CRATER_MASKS)) art[id] = decodeCraterArt(id);
   return new Terrain(w, h, mask, art);
 }
 

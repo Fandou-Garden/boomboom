@@ -60,9 +60,9 @@ export const STAMINA_MAX = 100.0;
 export const STAMINA_MOVE_COST = 0.0;
 export const STAMINA_IDLE_REGEN = 0.0;
 export const STAMINA_TURN_RESTORE = 0.0;
-export const POW_BLAST_RADIUS = 82.0;
-export const POW_DAMAGE_MULTIPLIER = 1.8;
-export const POW_CRATER_ART = '4';
+// POW no longer uses a global multiplier/radius/crater: SOURCE BallList.xml
+// gives every ball its own Power/Radii/Crater/Amount, and POW fires the
+// weapon's Special ball (see BALL_DEFS).
 
 export const ANGLE_MIN = 15.0;
 export const ANGLE_MAX = 65.0;
@@ -106,86 +106,133 @@ export const WEAPON_ORDER = [
   'thunder', 'brick', 'fruit', 'scalpel', 'toilet', 'appliance',
 ];
 
+// SOURCE: GameAdmin/Backup/XMLReader/XMLImport/BallList.xml. Power = damage
+// multiplier, radii = blast radius (px), crater = crater art id, amount =
+// shells per volley, actionType = fire pose (0 throw / 1 gun). Missing crater
+// art falls back to the existing 4/50/401 mapping; 121/131/411 use originals.
+export const BALL_DEFS = {
+  20: { id: '20', power: 1.0, radii: 55, crater: '4', amount: 1, actionType: 0 },
+  21: { id: '21', power: 1.5, radii: 65, crater: '401', amount: 1, actionType: 0 },
+  18: { id: '18', power: 1.0, radii: 50, crater: '50', amount: 1, actionType: 1 },
+  19: { id: '19', power: 1.5, radii: 59, crater: '401', amount: 1, actionType: 1 },
+  22: { id: '22', power: 1.0, radii: 55, crater: '50', amount: 1, actionType: 1 },
+  23: { id: '23', power: 1.5, radii: 65, crater: '401', amount: 1, actionType: 1 },
+  30: { id: '30', power: 1.0, radii: 55, crater: '50', amount: 1, actionType: 1 },
+  31: { id: '31', power: 1.5, radii: 65, crater: '401', amount: 1, actionType: 1 },
+  101: { id: '101', power: 1.0, radii: 55, crater: '401', amount: 1, actionType: 1 },
+  111: { id: '111', power: 1.3, radii: 65, crater: '401', amount: 1, actionType: 1 },
+  121: { id: '121', power: 1.0, radii: 55, crater: '121', amount: 1, actionType: 0 },
+  131: { id: '131', power: 1.5, radii: 65, crater: '131', amount: 1, actionType: 0 },
+  141: { id: '141', power: 1.0, radii: 55, crater: '401', amount: 1, actionType: 1 },
+  151: { id: '151', power: 0.6, radii: 65, crater: '401', amount: 3, actionType: 1 },
+  161: { id: '161', power: 1.0, radii: 55, crater: '401', amount: 1, actionType: 0 },
+  171: { id: '171', power: 0.6, radii: 45, crater: '4', amount: 3, actionType: 0 },
+  341: { id: '341', power: 1.0, radii: 55, crater: '50', amount: 1, actionType: 0 },
+  351: { id: '351', power: 1.5, radii: 65, crater: '401', amount: 1, actionType: 0 },
+  381: { id: '381', power: 1.0, radii: 55, crater: '4', amount: 1, actionType: 0 },
+  391: { id: '391', power: 1.5, radii: 65, crater: '401', amount: 1, actionType: 0 },
+  401: { id: '401', power: 1.0, radii: 55, crater: '401', amount: 1, actionType: 0 },
+  411: { id: '411', power: 0.5, radii: 65, crater: '411', amount: 3, actionType: 0 },
+  361: { id: '361', power: 1.0, radii: 55, crater: '401', amount: 1, actionType: 1 },
+  371: { id: '371', power: 0.5, radii: 65, crater: '401', amount: 3, actionType: 1 },
+  321: { id: '321', power: 1.0, radii: 55, crater: '50', amount: 1, actionType: 0 },
+  331: { id: '331', power: 1.5, radii: 65, crater: '401', amount: 1, actionType: 0 },
+};
+
+export function ballFor(id) {
+  const key = String(id);
+  return BALL_DEFS[key] || { id: key, power: 1.0, radii: BLAST_RADIUS, crater: '50', amount: 1, actionType: 1 };
+}
+
 export const WEAPON_DEFS = {
   axe: {
     id: 'axe', label: '石斧', trait: '低角 · 大坑重击', source: 'Template 7001 · Pic axe · Ball 20',
-    pic: 'axe', ballId: '20', projectile: 'axe',
+    pic: 'axe', ballId: '20', specialBallId: '21', projectile: 'axe',
     angleMin: 25, angleMax: 60, startAngle: 42, craterArt: '4',
     weaponSprite: 'weapon-axe',
   },
   bow: {
     id: 'bow', label: '弓箭', trait: '高角 · 轻巧速射', source: 'Template 7002 · Pic bow · Ball 18',
-    pic: 'bow', ballId: '18', projectile: 'bow',
+    pic: 'bow', ballId: '18', specialBallId: '19', projectile: 'bow',
     angleMin: 35, angleMax: 65, startAngle: 50, craterArt: '50',
     weaponSprite: 'weapon-bow',
   },
   gun: {
     id: 'gun', label: 'AK-48', trait: '高角 · 稳定火力', source: 'Template 7003 · Pic gun · Ball 22',
-    pic: 'gun', ballId: '22', projectile: 'gun',
+    pic: 'gun', ballId: '22', specialBallId: '23', projectile: 'gun',
     angleMin: 35, angleMax: 60, startAngle: 48, craterArt: '50',
     weaponSprite: 'weapon-gun',
   },
   goldgun: {
     id: 'goldgun', label: '黄金枪', trait: '低角 · 黄金弹幕', source: 'Template 7005 · Pic goldgun · Ball 30',
-    pic: 'goldgun', ballId: '30', projectile: 'goldgun',
+    pic: 'goldgun', ballId: '30', specialBallId: '31', projectile: 'goldgun',
     angleMin: 20, angleMax: 40, startAngle: 30, craterArt: '50',
     weaponSprite: 'weapon-goldgun',
   },
   fire: {
     id: 'fire', label: '烈火', trait: '中角 · 高攻爆发', source: 'Template 7006/7103 · Pic bombpack · Ball 161 · Crater 161',
-    pic: 'bombpack', ballId: '161', projectile: 'fire',
+    pic: 'bombpack', ballId: '161', specialBallId: '171', projectile: 'fire',
     angleMin: 20, angleMax: 50, startAngle: 35, craterArt: '401',
     weaponSprite: 'weapon-fire',
   },
   cannon: {
     id: 'cannon', label: '轰天', trait: '高角 · 重炮挖坑', source: 'Template 7007/7104 · Pic bomb · Ball 101 · Crater 101',
-    pic: 'bomb', ballId: '101', projectile: 'cannon',
+    pic: 'bomb', ballId: '101', specialBallId: '111', projectile: 'cannon',
     angleMin: 55, angleMax: 70, startAngle: 65, craterArt: '401',
     weaponSprite: 'weapon-cannon',
   },
   wind: {
     id: 'wind', label: '风神', trait: '低角 · 高敏先手', source: 'Template 7008/7105 · Pic dart · Ball 121',
-    pic: 'dart', ballId: '121', projectile: 'wind',
+    pic: 'dart', ballId: '121', specialBallId: '131', projectile: 'wind',
     angleMin: 15, angleMax: 50, startAngle: 35, craterArt: '50',
     weaponSprite: 'weapon-wind',
   },
   thunder: {
     id: 'thunder', label: '雷霆', trait: '中角 · 雷暴爆发', source: 'Template 7009/7106 · Pic electricbar · Ball 141',
-    pic: 'electricbar', ballId: '141', projectile: 'thunder',
+    pic: 'electricbar', ballId: '141', specialBallId: '151', projectile: 'thunder',
     angleMin: 25, angleMax: 60, startAngle: 42, craterArt: '401',
     weaponSprite: 'weapon-thunder',
   },
   brick: {
     id: 'brick', label: '司马砸缸', trait: '广角 · 巨坑压制', source: 'Template 7010/7107 · Pic brick · Ball 381',
-    pic: 'brick', ballId: '381', projectile: 'brick',
+    pic: 'brick', ballId: '381', specialBallId: '391', projectile: 'brick',
     angleMin: 20, angleMax: 65, startAngle: 42, craterArt: '4',
     weaponSprite: 'weapon-brick',
   },
   fruit: {
     id: 'fruit', label: '水果篮', trait: '中角 · 敏幸均衡', source: 'Template 7011/7108 · Pic fruit · Ball 401',
-    pic: 'fruit', ballId: '401', projectile: 'fruit',
+    pic: 'fruit', ballId: '401', specialBallId: '411', projectile: 'fruit',
     angleMin: 20, angleMax: 50, startAngle: 35, craterArt: '401',
     weaponSprite: 'weapon-fruit',
   },
   scalpel: {
     id: 'scalpel', label: '手术刀', trait: '低角 · 精准切割', source: 'Template 7012/7109 · Pic OPSbox · Ball 341',
-    pic: 'OPSbox', ballId: '341', projectile: 'scalpel',
+    pic: 'OPSbox', ballId: '341', specialBallId: '351', projectile: 'scalpel',
     angleMin: 15, angleMax: 45, startAngle: 30, craterArt: '50',
     weaponSprite: 'weapon-scalpel',
   },
   toilet: {
     id: 'toilet', label: '马桶', trait: '低角 · 刁钻弹道', source: 'Template 7013/7110 · Pic closestool · Ball 361',
-    pic: 'closestool', ballId: '361', projectile: 'toilet',
+    pic: 'closestool', ballId: '361', specialBallId: '371', projectile: 'toilet',
     angleMin: 20, angleMax: 45, startAngle: 32, craterArt: '401',
     weaponSprite: 'weapon-toilet',
   },
   appliance: {
     id: 'appliance', label: '黑白家电', trait: '高角 · 四维均衡', source: 'Template 7014/7111 · Pic television · Ball 321',
-    pic: 'television', ballId: '321', projectile: 'appliance',
+    pic: 'television', ballId: '321', specialBallId: '331', projectile: 'appliance',
     angleMin: 50, angleMax: 70, startAngle: 60, craterArt: '50',
     weaponSprite: 'weapon-appliance',
   },
 };
+
+// SOURCE: PrepareShootAction.doPrepareToShootAction() — ball.actionType 0 uses
+// GameCharacter.SHOWTHROWS (throw), 1 uses SHOWGUN (aim the gun). POW uses the
+// Special ball's own action type.
+for (const id of Object.keys(WEAPON_DEFS)) {
+  const w = WEAPON_DEFS[id];
+  w.actionType = ballFor(w.ballId).actionType;
+  w.specialActionType = ballFor(w.specialBallId).actionType;
+}
 
 export function weaponFor(id) {
   return WEAPON_DEFS[id] || WEAPON_DEFS[DEFAULT_PLAYER_WEAPON];
