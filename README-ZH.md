@@ -83,6 +83,10 @@ WASM 启动、完整回合、AI 行动、弹坑和重开，不需要 Go 服务�
 `npm run test:browser:mobile` 另外用 iPhone UA 模拟 1024×386 浏览器剩余可视区和
 390×844 竖屏，检查控件不越界、全屏说明不遮挡 HUD、竖屏只进入只读预览。
 
+> **后续方向**：仓库已规划把 Go/WASM 权威引擎**全量重构为纯 JS**（零 Go 依赖、静态站点直接部署）。
+> 完整路线、接口契约冻结、Go→JS 模块映射、确定性/PRNG 风险与分阶段验收清单见
+> [`docs/PURE_JS_REFACTOR_PLAN.md`](docs/PURE_JS_REFACTOR_PLAN.md)。该文档仅为规划，未改动任何运行时代码。
+
 ### 操作
 
 | 操作 | 手机 | 电脑 |
@@ -409,6 +413,7 @@ gunny-wind-arena/
 ├── docs/GO_SERVER.md
 ├── docs/IMMERSIVE_UI.md
 ├── docs/VALIDATION.md
+├── docs/PURE_JS_REFACTOR_PLAN.md # 纯 JS 全量重构规划（仅规划，未实施）
 └── package.json
 ```
 
