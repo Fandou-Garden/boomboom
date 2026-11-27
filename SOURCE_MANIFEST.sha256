@@ -178,7 +178,7 @@ d7daa086757f9a10bb18bed2c57db417c668ad33bb60aae4b261e70d5e9f9f0f  ./dist/js/maps
 8b97554697df1479597dd3810744e31bc26aec227058e03b7779cbd64a4cef22  ./dist/js/renderer.js
 6f33cfdbf835d6846c75547cf0aa1a62284c70c4d922ad5a6dc633bc271f4b76  ./dist/js/terrain.js
 93bace24e4236c61f16ed395c0009e0169573f17646ae7959ea7d786a993a132  ./dist/manifest.webmanifest
-b81809bfefc778e41c042576e1089ea83571aac41fe9368f5c402140d129b299  ./dist/standalone-api.js
+57693a3730d75c9d12110f9265b687bf374621cd3b61b93cd8badbaf6af579c7  ./dist/standalone-api.js
 189f4dda6101ead1be2d937b5534438c516529c4e61a6fdbfceb27d8cb9a0bf5  ./dist/styles.css
 3141ea7f08272889cee6e698d0066bca5ba25bc4c02964aa8fce97faa2c1e1ee  ./dist/wasm/gunny.wasm.gz
 951671247b41d2c1ef8a6f6cbb6cb4900fa8c3f442af692700273b09d1c6185a  ./docs/AUDIO_MAPPING.md
