@@ -10,10 +10,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="风场弹道">
   <title>风场弹道 · Gunny Wind Arena</title>
-  <link rel="icon" href="assets/favicon.svg?v=25" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=25">
-  <link rel="manifest" href="manifest.webmanifest?v=25">
-  <link rel="stylesheet" href="styles.css?v=25">
+  <link rel="icon" href="assets/favicon.svg?v=26" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=26">
+  <link rel="manifest" href="manifest.webmanifest?v=26">
+  <link rel="stylesheet" href="styles.css?v=26">
 </head>
 <body>
   <div id="app" class="app">
@@ -22,7 +22,7 @@
     <header id="topbar" class="topbar">
       <section class="battle-hud" aria-label="双方状态与风力">
         <article class="combatant player-card" aria-label="玩家状态">
-          <span class="portrait"><img src="assets/portrait-player.png?v=25" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-player.png?v=26" alt=""></span>
           <div class="combatant-copy">
             <div class="name-row"><span class="team-dot"></span><strong>蓝波</strong><span class="role">你</span></div>
             <div class="hp-track"><i id="hpBar0"></i></div>
@@ -48,7 +48,7 @@
             <div class="hp-track"><i id="hpBar1"></i></div>
             <div class="hp-number" id="hp1">2000</div>
           </div>
-          <span class="portrait"><img src="assets/portrait-enemy.png?v=25" alt=""></span>
+          <span class="portrait"><img src="assets/portrait-enemy.png?v=26" alt=""></span>
         </article>
       </section>
 
@@ -71,9 +71,6 @@
         </button>
         <button id="mapButton" class="icon-button" type="button" aria-label="更换地图" title="更换战场地图">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6 9 3l6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15M15 6v15"/></svg>
-        </button>
-        <button id="carryButton" class="icon-button carry-toggle" type="button" aria-label="飞行：传送弹" aria-pressed="false" title="飞行（原版 10016 传送弹，每回合一次）">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="plane-top" d="M2 12 22 4 13 12l-5 2 5-2-5 6Z"/><path class="plane-bottom" d="M2 12 8 18l5-6Z"/></svg>
         </button>
         <button id="heal" class="icon-button heal-button" type="button" aria-label="自我治疗：恢复生命，消耗本回合" aria-keyshortcuts="H" title="治疗（H）">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.2-7-9.2A4 4 0 0 1 12 7a4 4 0 0 1 7 3.8C19 15.8 12 20 12 20Z"/><path d="M8.5 12h7M12 8.5v7"/></svg>
@@ -226,6 +223,13 @@
       </section>
 
       <div class="fire-cluster">
+        <!-- SOURCE: WeaponPropBar.drawCells() — the 10016 fly prop is the
+             WeaponPropCell("f") slot (F key) next to the R deputy slot. -->
+        <button id="carryButton" class="carry-key" type="button" aria-label="飞行：传送弹（F）" aria-keyshortcuts="F" aria-pressed="false" title="飞行（原版 10016 传送弹，每回合一次，快捷键 F）">
+          <kbd class="skill-key" aria-hidden="true">F</kbd>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="plane-top" d="M2 12 22 4 13 12l-5 2 5-2-5 6Z"/><path class="plane-bottom" d="M2 12 8 18l5-6Z"/></svg>
+          <span class="carry-copy">飞行</span>
+        </button>
         <button id="pow" class="pow-button" type="button" disabled aria-label="POW 大招未充能，当前 0%" aria-keyshortcuts="R">
           <kbd class="skill-key pow-key" aria-hidden="true">R</kbd>
           <span class="pow-label">POW</span>
@@ -325,13 +329,13 @@
         // Static hosting: run the pure-JS engine as a local EventSource/fetch
         // backend. This must be installed before main.js constructs RemoteMatch.
         try {
-          await import('./standalone-api.js?v=25');
+          await import('./standalone-api.js?v=26');
         } catch (error) {
           console.error('离线引擎加载失败', error);
         }
       }
       try {
-        await import('./js/main.js?v=25');
+        await import('./js/main.js?v=26');
       } catch (error) {
         console.error('前端入口加载失败', error);
         const fatal = document.getElementById('fatal');

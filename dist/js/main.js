@@ -1,12 +1,12 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=25';
-import { loadImage, Terrain } from './terrain.js?v=25';
-import { RemoteMatch } from './net-client.js?v=25';
-import { Renderer } from './renderer.js?v=25';
-import { Camera, projectPoint } from './camera.js?v=25';
-import { InputController } from './input.js?v=25';
-import { solvePerfect } from './ai.js?v=25';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=25';
-import { MAPS, getMap, resolveMapId } from './maps.js?v=25';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=26';
+import { loadImage, Terrain } from './terrain.js?v=26';
+import { RemoteMatch } from './net-client.js?v=26';
+import { Renderer } from './renderer.js?v=26';
+import { Camera, projectPoint } from './camera.js?v=26';
+import { InputController } from './input.js?v=26';
+import { solvePerfect } from './ai.js?v=26';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=26';
+import { MAPS, getMap, resolveMapId } from './maps.js?v=26';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -1421,6 +1421,26 @@ function usePowShortcut() {
   return success;
 }
 
+// SOURCE: WeaponPropCell("f") — F triggers the 10016 fly prop like the
+// original bottom prop bar.
+function useCarryShortcut() {
+  unlockSound();
+  if (!canUsePlayerUi()) return false;
+  if (game.phase !== 'player' || game.charging) return false;
+  if (!game.canCarry) {
+    showToast('飞行已用过：每回合只能飞行一次', { alert: true, duration: 2000 });
+    return false;
+  }
+  if (game.toggleCarry()) {
+    showToast(game.carryArmed
+      ? '飞行已就绪：下一发是传送弹，落到哪里你就飞到哪里'
+      : '已取消飞行', { duration: 2200 });
+    lastFrame = performance.now();
+    return true;
+  }
+  return false;
+}
+
 function beginPlayerCharge() {
   unlockSound();
   if (!game || game.phase !== 'player') return false;
@@ -1460,6 +1480,7 @@ function setupInput() {
     onChargeCancel: cancelPlayerCharge,
     onSkillSlot: useSkillSlot,
     onPowShortcut: usePowShortcut,
+    onCarryShortcut: useCarryShortcut,
     onHealShortcut: useHeal,
     onUserGesture: unlockSound,
     onAngleTap: (delta) => {

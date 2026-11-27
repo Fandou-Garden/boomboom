@@ -581,7 +581,7 @@ async function releaseSpaceAtForce(page, target, timeout = 5000) {
       assert.match(rangeUi.recommend, new RegExp(`^推荐 ${rangeUi.verified.pct} ·`));
       assert.match(rangeUi.title, new RegExp(`${rangeUi.verified.pct}%`));
       assert.deepEqual(rangeUi.order, ['skillExtra2', 'skillScatter', 'skillExtra1', 'skillBoost50', 'skillBoost40', 'skillBoost30', 'skillBoost20', 'skillBoost10']);
-      assert.deepEqual(rangeUi.keys, ['1', '2', '3', '4', '5', '6', '7', '8', 'R']);
+      assert.deepEqual(rangeUi.keys, ['1', '2', '3', '4', '5', '6', '7', '8', 'F', 'R']);
       const before = await snapshot(page);
       await page.keyboard.press('9');
       await sleep(80);

@@ -256,8 +256,9 @@ export class Match {
       case 'charge_start': {
         if (!this.canPlayerControl()) return '';
         this.charging = true;
-        this.chargeStarted = this.now();
+        this.chargeStarted = this.time;
         this.chargeElapsed = 0;
+        this.chargeDir = 1;
         this.force = 0;
         this.moveDir = 0;
         this.actors[0].walkDirection = 0;
@@ -266,10 +267,13 @@ export class Match {
       }
       case 'charge_release': {
         if (!this.charging) return '';
-        const elapsed = this.now() - this.chargeStarted;
-        const force = chargeForce(elapsed);
-        this.charging = false;
-        this.force = 0;
+        const elapsed = this.time - this.chargeStarted;
+        // SOURCE: EnergyView.__enterFrame() fires with the live `this._force`
+        // (which includes any rebound drain), not the elapsed-time maximum.
+        const force = this.force;
+    this.charging = false;
+    this.chargeDir = 1;
+    this.force = 0;
         this.chargeElapsed = 0;
         this.emit('charge-end', {});
         if (elapsed < MIN_CHARGE_SECONDS || force < MIN_FIRE_FORCE) {
@@ -281,8 +285,9 @@ export class Match {
       }
       case 'charge_cancel': {
         if (!this.charging) return '';
-        this.charging = false;
-        this.force = 0;
+    this.charging = false;
+    this.chargeDir = 1;
+    this.force = 0;
         this.chargeElapsed = 0;
         this.emit('charge-cancel', {});
         return '';
@@ -406,8 +411,23 @@ export class Match {
     this.time += step;
 
     if (this.charging) {
-      this.chargeElapsed = this.now() - this.chargeStarted;
-      this.force = chargeForce(this.chargeElapsed);
+      // SOURCE: EnergyView.calcForce() — force rises at SHOOT_FORCE_STEP per
+      // frame, flips to drain (dir = -1) once it reaches FORCE_MAX, and
+      // skipping the turn (`this._self.skip()`) when it drains back to 0
+      // while the key is still held.
+      this.chargeElapsed = this.time - this.chargeStarted;
+      this.force += this.chargeDir * CHARGE_RATE * step;
+      if (this.force >= FORCE_MAX) {
+        this.force = FORCE_MAX;
+        this.chargeDir = -1;
+      } else if (this.force <= 0) {
+        this.force = 0;
+        this.charging = false;
+        this.chargeElapsed = 0;
+        this.emit('charge-end', {});
+        this.emit('toast', { text: '力度回弹到 0：按满未松手，本回合跳过（原版蓄力规则）' });
+        beginTurnLocked(this, 1, true);
+      }
     }
     this.updateFallingLocked(step);
 
