@@ -539,8 +539,20 @@ export class Match {
       a.walkTime += MOVE_STEP_X * 0.09;
       return true;
     }
+    // SOURCE: SelfPlayerWalkAction.as — when findNextWalkPoint is empty (the
+    // step is taller than stepY) the original does not keep walking: canStand
+    // at the current foot height decides. A solid shoulder column means a steep
+    // slope face blocks the way; only two empty columns mean a cliff to fall
+    // off. Skipping this gate walked the actor into the slope body.
+    if (this.terrain.isSolid(Math.trunc(nextX) - 1, Math.trunc(a.y)) ||
+        this.terrain.isSolid(Math.trunc(nextX) + 1, Math.trunc(a.y))) {
+      a.walkDirection = 0;
+      a.facing = direction;
+      return false;
+    }
     // Walking off a ledge is allowed; gravity takes over next tick.
-    const g = this.terrain.findGroundY(Math.trunc(nextX), Math.trunc(a.y) + MOVE_STEP_Y + 1, this.terrain.height - 1);
+    // SOURCE: findYLineNotEmptyPointDown(x2, y - stepY, height)。
+    const g = this.terrain.findGroundY(Math.trunc(nextX), Math.trunc(a.y) - MOVE_STEP_Y, this.terrain.height - 1);
     if (g.ok) {
       a.x = nextX;
       a.facing = direction;

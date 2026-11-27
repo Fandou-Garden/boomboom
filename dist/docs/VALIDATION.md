@@ -12,7 +12,7 @@ CHECK PASS
 
 npm test
 Go: gunny/server/game ok
-Node: 13 tests / 13 pass / 0 fail
+Node: 54 tests / 54 pass / 0 fail
 
 npm run test:browser:visual
 BROWSER ACCEPTANCE PASS
@@ -100,7 +100,9 @@ MOBILE ADAPTATION PASS
 满帧绘制战场。本机 headless Chromium 启用 GPU 时实测约 120 fps；触摸设备/小窗口将
 画布 backing store 限制在 1.5× DPR。挖坑后服务端会重算角色所在列的真实地表高度并立即
 刷新支撑点，回归测试 `TestCraterReseatsActorAndWalkStaysOnSurface` 已覆盖角色不陷入弹坑、
-行走时脚底贴合地形。
+行走时脚底贴合地形。行走遇到陡坡时按 `SelfPlayerWalkAction` 的 `canStand` 门停下，
+不再走进坡体；`tests/engine/embed.test.mjs`（移植自 `server/game/embed_sim_test.go`）
+在 11 张地图上各跑 9000 tick 真实对局，逐 tick 断言角色不嵌入坡体、不悬空。
 
 ## 6. 静态站点（纯 JS 引擎）
 

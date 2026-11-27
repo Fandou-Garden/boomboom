@@ -785,12 +785,22 @@ func (m *Match) stepActorLocked(a, other *Actor, direction int) bool {
 		a.WalkTime += MoveStepX * 0.09
 		return true
 	}
+	// SOURCE: SelfPlayerWalkAction.as — findNextWalkPoint 为空（爬坡高度超过
+	// stepY 被挡）时，原版并不继续走，而是用 canStand(x2, y) 判定：肩柱在当前
+	// 脚部高度仍实心 → 是陡坡坡面，停下；两侧都空 → 才是悬崖，转入下落。
+	// 之前的移植漏掉 canStand 门，直接向下找地面把角色走进坡体内部，造成
+	// "飘进地形"。
+	if m.Terrain.IsSolid(int(nextX)-1, int(a.Y)) || m.Terrain.IsSolid(int(nextX)+1, int(a.Y)) {
+		a.WalkDirection = 0
+		a.Facing = direction
+		return false
+	}
 	// Walking off a ledge is allowed; gravity takes over next tick.
-	if gy, found := m.Terrain.FindGroundY(int(nextX), int(a.Y)+MoveStepY+1, m.Terrain.Height-1); found {
+	// SOURCE: findYLineNotEmptyPointDown(x2, y - stepY, height)。
+	if _, found := m.Terrain.FindGroundY(int(nextX), int(a.Y)-MoveStepY, m.Terrain.Height-1); found {
 		a.X = nextX
 		a.Facing = direction
 		a.WalkTime += MoveStepX * 0.09
-		_ = gy
 		m.startFallingLocked(a)
 		return true
 	}

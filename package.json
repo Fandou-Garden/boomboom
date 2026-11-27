@@ -7,7 +7,7 @@
   "scripts": {
     "start": "sh server/run.sh",
     "start:debug": "GUNNY_DEBUG=1 sh server/run.sh",
-    "test": "sh server/test.sh && sh scripts/node.sh --test tests/physics.test.mjs tests/engine/match.test.mjs tests/engine/parity.test.mjs",
+    "test": "sh server/test.sh && sh scripts/node.sh --test tests/physics.test.mjs tests/engine/match.test.mjs tests/engine/parity.test.mjs tests/engine/embed.test.mjs",
     "test:map": "python3 tests/verify_map_parity.py",
     "check": "sh server/check.sh",
     "test:browser": "npm run test:browser:visual && npm run test:browser:controls && npm run test:browser:mobile",
@@ -17,7 +17,7 @@
     "build:wasm": "sh scripts/build-wasm.sh",
     "build:static": "sh scripts/build-static.sh",
     "test:browser:static": "sh scripts/node.sh tests/browser_static.cjs",
-    "test:engine": "sh scripts/node.sh --test tests/engine/match.test.mjs tests/engine/parity.test.mjs"
+    "test:engine": "sh scripts/node.sh --test tests/engine/match.test.mjs tests/engine/parity.test.mjs tests/engine/embed.test.mjs"
   },
   "devDependencies": {
     "puppeteer-core": "^23.11.1"
