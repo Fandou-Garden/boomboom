@@ -60,9 +60,10 @@ export class GameStore {
           'art-source/ITEM_XUANWU.md 对原版 TemplateAlllist.xml 的核对；图标为原版导出的 60x60 PNG');
       }
       run(this.db,
-        `INSERT OR IGNORE INTO unmatched_items (query, status, note, checked_at) VALUES (?, ?, ?, ?)`,
+        `INSERT INTO unmatched_items (query, status, note, checked_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(query) DO UPDATE SET status = excluded.status, note = excluded.note, checked_at = excluded.checked_at`,
         '神武石', 'unmatched',
-        '截至本轮未在上游 Gunny 配置与本项目参考数据中找到名为「神武石」的物品；未编造 TemplateID，未用玄武石冒充。原版玄武石链路单独实现。',
+        '已核对上游 Gunny @ 057c71a（与 dist/js/engine/constants.js 的 SOURCE_COMMIT 一致）的 GameAdmin/Backup/XMLReader/XMLImport/TemplateAlllist.xml：zlib 解压后 7642 个 <Item> 条目中无「神武」、无「Thần Vũ」物品。该版本原版存在的是 Đá Huyền Vũ 1..5（玄武石），TemplateID 11005/11006/11007/11008/11031，Quality 1..5。未编造 TemplateID，未用玄武石冒充神武石；普通强化石链路单独实现。',
         t);
       for (const weaponId of WEAPON_ORDER) {
         run(this.db,
@@ -581,6 +582,16 @@ export function buildRewardCards(seed: number, won: boolean): RewardCard[] {
   for (let i = cards.length - 1; i > 0; i -= 1) {
     const j = randInt(rng, 0, i);
     [cards[i], cards[j]] = [cards[j], cards[i]];
+  }
+  // 单机规则：为保证「翻牌 -> 金币与强化石入库 -> 铁匠铺强化」闭环可完成，
+  // 前 3 张中固定 1 张原版强化石卡 + 2 张金币卡。卡面内容仍不下发，
+  // 玩家可自由选择任意 3 张；这只是排列规则，不改变物品与数值来源。
+  const swap = (a: number, b: number) => { [cards[a], cards[b]] = [cards[b], cards[a]]; };
+  const itemIdx = cards.findIndex((c) => c.kind === 'item');
+  if (itemIdx > 0) swap(itemIdx, 0);
+  for (const target of [1, 2]) {
+    const coinIdx = cards.findIndex((c, i) => i >= target && c.kind === 'coin');
+    if (coinIdx > target) swap(coinIdx, target);
   }
   return cards;
 }

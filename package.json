@@ -11,6 +11,8 @@
     "dev:server": "DDT_DEBUG=1 npx tsx watch server-node/src/index.ts",
     "typecheck:server": "tsc --noEmit -p server-node/tsconfig.json",
     "test:server": "node --test tests/server/*.test.mjs",
+    "test:server:browser": "node tests/server/browser-e2e.mjs",
+    "test:server:perf": "node tests/server/perf.mjs",
     "test": "sh server/test.sh && sh scripts/node.sh --test tests/physics.test.mjs tests/engine/match.test.mjs tests/engine/parity.test.mjs tests/engine/embed.test.mjs",
     "test:map": "python3 tests/verify_map_parity.py",
     "check": "sh server/check.sh",

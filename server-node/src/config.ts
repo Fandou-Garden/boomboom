@@ -98,7 +98,8 @@ export const config = {
     maxLevel: 12,
     /** 每级增加的原版 attack 属性点数，直接进入 MakeDamage 公式。 */
     attackPerLevel: 25,
-    coinCostBase: 120,
+    /** 首级消耗低于单张金币卡下限，保证「翻牌 -> 强化」单机闭环可完成。 */
+    coinCostBase: 60,
     coinCostPerLevel: 80,
     itemCostBase: 1,
     itemCostPerLevel: 1,

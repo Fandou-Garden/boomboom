@@ -117,15 +117,16 @@ export class BattleSession {
     }
     const type = String(cmd.type || '');
     const isDebug = type === 'fire' || type.startsWith('debug_');
+    const isDebugCommand = type.startsWith('debug_');
     if (!PLAYER_INTENTS.has(type) && !(config.debug && isDebug)) {
       return { ok: false, status: 403, error: `命令 ${type || '(空)'} 不是允许的操作意图` };
     }
-    if (!config.debug) {
-      for (const key of Object.keys(cmd)) {
-        if (FORBIDDEN_FIELDS.has(key)) {
-          return { ok: false, status: 403, error: `命令不得包含结果字段 ${key}` };
-        }
-      }
+    // 结果字段在任何模式下都禁止：调试模式只额外开放调试命令类型，
+    // 不允许前端借此注入伤害 / 奖励 / 强化结果。hp 仅 debug_set_hp 可用。
+    for (const key of Object.keys(cmd)) {
+      if (!FORBIDDEN_FIELDS.has(key)) continue;
+      if (config.debug && isDebugCommand && key === 'hp') continue;
+      return { ok: false, status: 403, error: `命令不得包含结果字段 ${key}` };
     }
     if (type === 'select_weapon') {
       const owned = this.store.room().weapons.some((w: any) => w.weaponId === cmd.weapon);

@@ -1695,3 +1695,136 @@ svg { display: block; }
   .modal.is-result .dialog-card { max-height: 96vh; }
   .settle-ruler { height: 20px; }
 }
+
+/* ============================================================
+   服务端版：个人房间 / 铁匠铺覆盖层
+   战斗 HUD、Canvas、手机横屏控件仍使用上面的站点版样式，不复制前端。
+   ============================================================ */
+.ddt-layer {
+  position: fixed; inset: 0; z-index: 9999; display: flex;
+  align-items: center; justify-content: center; padding: 16px;
+  background: radial-gradient(circle at 50% 40%, rgba(10, 48, 62, .92), rgba(2, 14, 20, .97));
+  color: var(--cream);
+}
+.ddt-layer[hidden], .ddt-layer [hidden] { display: none !important; }
+.ddt-room, .ddt-forge { position: relative; width: min(1100px, 96vw); max-height: 94vh; overflow: auto; }
+.ddt-room {
+  border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
+  background: #072532; padding: 18px 20px 20px;
+}
+.ddt-room-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .26; pointer-events: none; z-index: 0; }
+.ddt-room-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(4,24,33,.55), rgba(4,24,33,.9)); pointer-events: none; z-index: 0; }
+.ddt-room-head, .ddt-room-grid { position: relative; z-index: 1; }
+.ddt-room-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.ddt-room-head h1 { margin: 0 0 4px; font-size: clamp(20px, 2.4vw, 30px); letter-spacing: 2px; }
+.ddt-room-head p { margin: 0; font-size: 11px; color: var(--muted); }
+.ddt-badge { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: 999px; font-size: 11px; letter-spacing: 0;
+  background: rgba(86,224,210,.16); border: 1px solid rgba(86,224,210,.5); color: var(--teal); vertical-align: middle; }
+.ddt-wallet { display: flex; gap: 8px; }
+.ddt-chip { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+  background: var(--panel); border: 1px solid var(--line); }
+.ddt-chip img { width: 22px; height: 22px; object-fit: contain; }
+.ddt-chip b { font-size: 16px; color: var(--amber); }
+.ddt-chip small { font-size: 10px; color: var(--muted); }
+.ddt-room-grid { display: grid; grid-template-columns: 210px minmax(320px, 1fr) 270px; gap: 12px; }
+.ddt-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; min-height: 300px; }
+.ddt-portrait { position: relative; height: 150px; display: flex; justify-content: center; }
+.ddt-portrait-bg { width: 130px; height: 150px; object-fit: fill; filter: drop-shadow(0 6px 14px rgba(0,0,0,.4)); }
+/* hero-figure.png 为原版角色逐帧图（127x253，3 帧）；object-fit:none + 顶部对齐只取第一帧。 */
+.ddt-portrait-figure { position: absolute; top: 22px; left: 50%; transform: translateX(-50%);
+  width: 127px; height: 84px; object-fit: none; object-position: center top;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,.55)); }
+.ddt-player-panel h2 { text-align: center; margin: 6px 0 12px; font-size: 16px; }
+.ddt-label { font-size: 10px; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+.ddt-equipped { padding: 10px; border-radius: 10px; background: rgba(22,143,227,.14); border: 1px solid rgba(95,209,255,.3); }
+.ddt-equipped-name { font-size: 18px; font-weight: 700; }
+.ddt-equipped-name span { color: var(--amber); }
+.ddt-attr { margin-top: 4px; font-size: 11px; color: var(--muted); }
+.ddt-materials { margin-top: 12px; }
+.ddt-mat-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.ddt-mat { display: flex; flex-direction: column; align-items: center; width: 54px; padding: 4px 2px;
+  border-radius: 8px; background: rgba(4,24,33,.6); border: 1px solid var(--line); }
+.ddt-mat img { width: 30px; height: 30px; object-fit: contain; }
+.ddt-mat b { font-size: 12px; color: var(--amber); }
+.ddt-mat small { font-size: 8px; color: var(--muted); text-align: center; line-height: 1.1; }
+.ddt-panel-title { display: flex; align-items: center; gap: 8px; font-weight: 700; margin-bottom: 10px; }
+.ddt-panel-title img { width: 68px; height: auto; }
+.ddt-map-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ddt-map { position: relative; padding: 0; border: 2px solid transparent; border-radius: 10px; overflow: hidden;
+  background: #08222e; cursor: pointer; color: var(--cream); text-align: left; }
+.ddt-map img { display: block; width: 100%; height: 66px; object-fit: cover; }
+.ddt-map span { display: block; padding: 4px 6px 0; font-size: 11px; font-weight: 700; }
+.ddt-map small { display: block; padding: 0 6px 5px; font-size: 8px; color: var(--muted); }
+.ddt-map:hover { border-color: rgba(86,224,210,.6); }
+.ddt-map.is-active { border-color: var(--amber); box-shadow: 0 0 0 2px rgba(255,211,106,.2); }
+.ddt-hint { margin: 10px 0 0; font-size: 10px; color: var(--muted); line-height: 1.5; }
+.ddt-bot-row { display: flex; gap: 8px; align-items: center; }
+.ddt-bot-row img { width: 52px; height: 60px; object-fit: contain; }
+.ddt-bot-row b { display: block; font-size: 13px; }
+.ddt-bot-row small { display: block; font-size: 9px; color: var(--muted); }
+.ddt-weapon-list { margin-top: 14px; }
+.ddt-weapon-row { display: flex; flex-wrap: wrap; gap: 5px; max-height: 108px; overflow: auto; }
+.ddt-weapon { padding: 4px 8px; border-radius: 7px; font-size: 10px; cursor: pointer;
+  background: rgba(4,24,33,.7); border: 1px solid var(--line); color: var(--cream); }
+.ddt-weapon small { margin-left: 4px; color: var(--amber); }
+.ddt-weapon.is-active { border-color: var(--teal); background: rgba(86,224,210,.16); }
+.ddt-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.ddt-btn { min-height: 38px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line);
+  font-size: 13px; font-weight: 700; cursor: pointer; color: var(--cream); background: var(--panel); }
+.ddt-btn:disabled { opacity: .5; cursor: default; }
+.ddt-btn-forge { background: linear-gradient(180deg, #7d5a22, #5a3d13); border-color: rgba(255,211,106,.6); }
+.ddt-btn-continue { background: linear-gradient(180deg, #126c7a, #0a4b57); border-color: rgba(86,224,210,.6); }
+.ddt-btn-start { background: linear-gradient(180deg, #1b9fd8, #0d6ea3); border-color: rgba(95,209,255,.7); font-size: 15px; }
+.ddt-btn-ghost { min-height: 30px; font-size: 11px; }
+.ddt-status { min-height: 28px; margin: 8px 0 0; font-size: 10px; color: var(--muted); }
+.ddt-status.is-alert { color: var(--coral); }
+
+/* 铁匠铺：临时界面，明确标注，保留替换入口 */
+.ddt-forge { display: flex; align-items: center; justify-content: center; }
+.ddt-forge-panel { width: min(980px, 96vw); max-height: 90vh; overflow: auto; padding: 18px;
+  border-radius: 16px; background: #082634; border: 1px solid var(--line); box-shadow: var(--shadow); }
+.ddt-forge-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ddt-forge-head h2 { margin: 0; font-size: 20px; }
+.ddt-asset-note { margin: 10px 0 14px; padding: 8px 10px; border-radius: 8px; font-size: 11px;
+  color: var(--amber); background: rgba(217,133,40,.12); border: 1px dashed rgba(255,211,106,.5); }
+.ddt-forge-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.ddt-forge-col { min-height: 240px; padding: 12px; border-radius: 12px; background: var(--panel-soft); border: 1px solid var(--line); }
+.ddt-forge-col h3 { margin: 0 0 10px; font-size: 14px; }
+.ddt-forge-weapons { display: flex; flex-direction: column; gap: 5px; max-height: 260px; overflow: auto; }
+.ddt-forge-weapon { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 9px;
+  border-radius: 8px; cursor: pointer; font-size: 12px; color: var(--cream);
+  background: rgba(4,24,33,.65); border: 1px solid var(--line); }
+.ddt-forge-weapon small { color: var(--amber); font-size: 10px; }
+.ddt-forge-weapon.is-active { border-color: var(--teal); background: rgba(86,224,210,.16); }
+.ddt-forge-balance { font-size: 13px; margin-bottom: 8px; }
+.ddt-forge-balance b { color: var(--amber); font-size: 18px; }
+.ddt-mat-pick { cursor: pointer; width: 58px; }
+.ddt-mat-pick.is-active { border-color: var(--amber); box-shadow: 0 0 0 2px rgba(255,211,106,.2); }
+.ddt-forge-rule { margin-top: 14px; font-size: 10px; color: var(--muted); line-height: 1.6; }
+.ddt-detail-name { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+.ddt-forge-detail dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 10px; margin: 0 0 12px; font-size: 12px; }
+.ddt-forge-detail dt { color: var(--muted); }
+.ddt-forge-detail dd { margin: 0; text-align: right; }
+.ddt-forge-detail dd.is-good { color: var(--teal); }
+.ddt-forge-result { min-height: 36px; margin: 10px 0 0; font-size: 11px; color: var(--amber); }
+.ddt-forge.is-success .ddt-forge-panel { animation: ddt-forge-ok 700ms ease-out; }
+.ddt-forge.is-fail .ddt-forge-panel { animation: ddt-forge-fail 700ms ease-out; }
+@keyframes ddt-forge-ok { 0% { box-shadow: 0 0 0 0 rgba(86,224,210,.8); } 100% { box-shadow: 0 0 0 22px rgba(86,224,210,0); } }
+@keyframes ddt-forge-fail { 0%, 60% { transform: translateX(0); } 20% { transform: translateX(-5px); } 40% { transform: translateX(5px); } }
+
+/* 服务端翻牌：沿用原版 .result-card / card-*.png，仅承载服务端返回的奖励内容 */
+.ddt-card-prize { position: relative; z-index: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px; width: 100%; height: 100%; }
+.ddt-cards-error { grid-column: 1 / -1; padding: 12px; font-size: 12px; color: var(--coral); }
+
+@media (max-width: 900px), (max-height: 520px) {
+  .ddt-room { padding: 12px; }
+  .ddt-room-grid { grid-template-columns: 1fr 1fr; }
+  .ddt-action-panel { grid-column: 1 / -1; min-height: 0; }
+  .ddt-panel { min-height: 0; }
+  .ddt-map-grid { grid-template-columns: repeat(6, 1fr); }
+  .ddt-map img { height: 46px; }
+  .ddt-forge-grid { grid-template-columns: 1fr 1fr; }
+  .ddt-forge-detail { grid-column: 1 / -1; min-height: 0; }
+  .ddt-portrait img { width: 90px; }
+}

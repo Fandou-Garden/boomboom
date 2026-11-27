@@ -354,14 +354,32 @@
           console.error('离线引擎加载失败', error);
         }
       }
+      // 统一数据访问接口：先确定 offline（站点版）/ server（服务端版）模式，
+      // 再加载同一份前端。静态部署时 /api/server/config 不可用 -> offline。
+      try {
+        const { dataApi } = await import('./js/data-api.js?v=33');
+        await dataApi.init();
+      } catch (error) {
+        console.warn('数据访问接口初始化失败，按站点版运行', error);
+      }
+      let mainLoaded = false;
       try {
         await import('./js/main.js?v=33');
+        mainLoaded = true;
       } catch (error) {
         console.error('前端入口加载失败', error);
         const fatal = document.getElementById('fatal');
         const text = document.getElementById('fatalText');
         if (fatal) fatal.hidden = false;
         if (text) text.textContent = `前端入口加载失败：${error.message}`;
+      }
+      if (mainLoaded) {
+        try {
+          const { initServerMode } = await import('./js/server-mode.js?v=33');
+          await initServerMode();
+        } catch (error) {
+          console.error('服务端模式界面初始化失败', error);
+        }
       }
     })();
   </script>

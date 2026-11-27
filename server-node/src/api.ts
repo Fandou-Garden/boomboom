@@ -42,7 +42,15 @@ export function createApiRouter({ store, session }: Deps): Router {
 
   router.get('/healthz', handler((_req, res) => {
     noStore(res);
-    res.json({ ok: true, mode: config.mode, battleState: session.state, battleId: session.battleId });
+    // 实测值（非估算）：用于记录后端常驻内存，也方便本地监控。
+    const mem = process.memoryUsage();
+    res.json({
+      ok: true, mode: config.mode, battleState: session.state, battleId: session.battleId,
+      memory: {
+        rssBytes: mem.rss, heapUsedBytes: mem.heapUsed,
+        heapTotalBytes: mem.heapTotal, externalBytes: mem.external,
+      },
+    });
   }));
 
   // ---------------------------------------------------------------- 既有前端契约

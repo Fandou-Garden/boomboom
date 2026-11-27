@@ -9,6 +9,7 @@ import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=33'
 import { MAPS, getMap, resolveMapId } from './maps.js?v=33';
 import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=33';
 import { loadSave, claimReward, hasClaimed, resetSave, formatAmount } from './save.js?v=33';
+import { dataApi } from './data-api.js?v=33';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -1261,6 +1262,19 @@ function rewardIcon(kind) {
 
 /** Repaint the always-on wallet chips (top-left under the minimap). */
 function paintWallet() {
+  // 服务端版：钱包数值来自 SQLite，由统一数据接口提供；站点版仍读 localStorage。
+  if (dataApi.isServer()) {
+    const wallet = dataApi.getCachedWallet();
+    const coins = Number(wallet?.coins ?? 0);
+    const stones = (wallet?.items || []).reduce((sum, i) => sum + Number(i.quantity || 0), 0);
+    const coinsEl = document.getElementById('walletCoins');
+    const stonesEl = document.getElementById('walletStones');
+    if (coinsEl) coinsEl.textContent = formatAmount(coins);
+    if (stonesEl) stonesEl.textContent = formatAmount(stones);
+    document.getElementById('walletCoinsChip')?.setAttribute('aria-label', `金币 ${coins}`);
+    document.getElementById('walletStonesChip')?.setAttribute('aria-label', `玄武石 ${stones}`);
+    return { coins, stones };
+  }
   const save = loadSave();
   const coins = document.getElementById('walletCoins');
   const stones = document.getElementById('walletStones');
@@ -1273,7 +1287,12 @@ function paintWallet() {
   return save;
 }
 
-function setupResultCards(win) {
+function setupResultCards(win, resultData = {}) {
+  // 服务端版：同一套原版九宫格 DOM/素材，但卡片内容与发奖全部来自服务端事务。
+  const serverUi = window.__GUNNY_SERVER_UI__;
+  if (dataApi.isServer() && serverUi?.renderServerCards) {
+    return serverUi.renderServerCards({ win, resultData, sound, showToast });
+  }
   const row = document.getElementById('cardsRow');
   const timer = document.getElementById('cardsCountdown');
   const claimBtn = document.getElementById('claimReward');
@@ -1409,7 +1428,13 @@ function setupResultCards(win) {
 function showResult(data) {
   input?.cancelAll('result');
   modalMode = 'result';
+  if (dataApi.isServer() && !data.battleId) {
+    data = { ...data, battleId: window.__GUNNY_SERVER_UI__?.currentBattleId };
+  }
   const win = data.winner === 0;
+  const settleNote = dataApi.isServer()
+    ? '服务端单机规则 · 3×3 卡片每场最多翻 3 张 · 奖励由服务端事务结算（不代表原版所有模式默认值）'
+    : '每个玩家可免费进行两次翻牌 · 也可花费点券增加一次翻牌机会';
   const save = paintWallet();
   sound.play(win ? 'win' : 'lose');
   const accuracy = data.stats.playerShots ? Math.round(data.stats.playerHits / data.stats.playerShots * 100) : 0;
@@ -1421,7 +1446,7 @@ function showResult(data) {
         <span class="settle-index" aria-hidden="true"><img src="assets/ui/num-0.png?v=33" alt=""><img src="assets/ui/num-1.png?v=33" alt=""></span>
         <div class="settle-head-text">
           <h2>游戏结算</h2>
-          <p>每个玩家可免费进行两次翻牌 · 也可花费点券增加一次翻牌机会</p>
+          <p>${settleNote}</p>
         </div>
         <span class="settle-outcome ${win ? 'is-win' : 'is-lose'}">${win ? '胜利' : '惜败'}</span>
       </header>
@@ -1469,8 +1494,8 @@ function showResult(data) {
       </footer>
     </div>
   `;
-  setupResultCards(win);
-  els.modalAction.textContent = '再战一局';
+  setupResultCards(win, data);
+  els.modalAction.textContent = dataApi.isServer() ? '返回房间' : '再战一局';
   els.modalClose.hidden = true;
   els.modal.hidden = false;
   lastFrame = performance.now();
@@ -1488,6 +1513,12 @@ function closeModal() {
 }
 
 function restartMatch() {
+  // 服务端权威：新一局必须从房间开始（本局武器属性在开局时冻结），
+  // 不能在客户端直接 reset 引擎。
+  if (dataApi.isServer() && window.__GUNNY_SERVER_UI__?.returnToRoom) {
+    window.__GUNNY_SERVER_UI__.returnToRoom();
+    return;
+  }
   // Drop any death presentation state so the next match starts at age 0 and a
   // stale settlement can never appear mid-game.
   deathClocks.clear();
@@ -2919,10 +2950,12 @@ async function boot() {
     measureLayout();
     selectedWeaponId = game.weapon || selectedWeaponId;
     // 开局先选地图（无 ?map= 且非测试/作弊时）；选完重载后再弹武器选择器。
-    const showMapPicker = !hasExplicitMap && !isTest && !isCheat;
+    // 服务端版由个人房间负责选图/选武器，不弹站点版首屏选择器。
+    const serverMode = dataApi.isServer();
+    const showMapPicker = !hasExplicitMap && !isTest && !isCheat && !serverMode;
     if (showMapPicker) {
       openMapPicker();
-    } else if (isTest) {
+    } else if (isTest || serverMode) {
       els.weaponPicker.hidden = true;
     } else {
       openWeaponPicker({ force: true });
@@ -2935,7 +2968,9 @@ async function boot() {
     window.setTimeout(hideLoadingScreen, 220);
     // 首屏资源（WASM/地图）就绪后再解码音效，第一个手势仍能命中原始采样。
     sound.preload();
-    showToast('开局先选武器 · 1–8 选战斗道具 · 右下按住蓄力并松手发射', { duration: 5200 });
+    showToast(serverMode
+      ? '房间已就绪 · 选择地图与武器后开始战斗'
+      : '开局先选武器 · 1–8 选战斗道具 · 右下按住蓄力并松手发射', { duration: 5200 });
     requestAnimationFrame(frame);
   } catch (error) {
     window.__GUNNY_BOOT_ERROR__ = error?.stack || String(error);
@@ -2949,3 +2984,13 @@ async function boot() {
 }
 
 boot();
+
+// 服务端版 UI 层通过钩子复用现有结算界面、钱包绘制与音效实现，
+// 不复制第二套前端；站点版（offline）不会加载 UI 层，行为完全不变。
+window.__GUNNY_HOOKS__ = {
+  showResult,
+  paintWallet,
+  restartMatch,
+  showToast,
+  playSound: (name, weapon = null) => sound.play(name, weapon),
+};
