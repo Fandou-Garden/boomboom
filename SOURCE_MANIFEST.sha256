@@ -247,3 +247,4 @@ b79ac375c25035cea3672f9ad09b3d1601b661677623524bf6caa44314b57805  ./tests/browse
 9529c693267cea6017ac5cd2a1eff8713d31dfd52a3a07a974a5fc4bf7c13c90  ./tests/engine/parity.test.mjs
 7477cc902fa80e31adabcbb69fdcd01cfbc0787f7479a047b5bbc976eed130be  ./tests/physics.test.mjs
 75a927e96ad53d5d15fb5403400bd36d8358408f332db685b2a32c259346af5a  ./tests/verify_map_parity.py
+9e55b5200b088adaf8e1152da04efc0d3b25e236e6baf2dee96f81e23e084966  ./参考FPS_game.html
