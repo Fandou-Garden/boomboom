@@ -26,6 +26,8 @@ const MIME = {
   '.svg': 'image/svg+xml',
   '.mp3': 'audio/mpeg',
   '.map': 'application/octet-stream',
+  '.gz': 'application/gzip',
+  '.webp': 'image/webp',
 };
 
 function serve() {

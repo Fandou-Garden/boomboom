@@ -40,9 +40,29 @@
   }
 
   async function loadBytes(url) {
-    const response = await fetch(url, { cache: 'no-store' });
+    const response = await fetch(url, { cache: 'force-cache' });
     if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
     return new Uint8Array(await response.arrayBuffer());
+  }
+
+  // The static host sends everything uncompressed, so large assets ship as
+  // pre-gzipped .gz files and are inflated in the browser (see gzip -9).
+  // Falls back to the raw file when DecompressionStream is unavailable.
+  async function loadBytesGz(gzUrl, rawUrl) {
+    if (typeof DecompressionStream === 'function') {
+      try {
+        const response = await fetch(gzUrl, { cache: 'force-cache' });
+        if (response.ok) {
+          const stream = new Blob([await response.arrayBuffer()])
+            .stream()
+            .pipeThrough(new DecompressionStream('gzip'));
+          return new Uint8Array(await new Response(stream).arrayBuffer());
+        }
+      } catch (error) {
+        console.warn(`gzip 资源加载失败，回退原始文件：${gzUrl}`, error);
+      }
+    }
+    return loadBytes(rawUrl);
   }
 
   async function boot() {
@@ -50,9 +70,8 @@
     bootPromise = (async () => {
       if (typeof window.Go !== 'function') throw new Error('wasm_exec.js 未加载');
       const go = new window.Go();
-      const response = await fetch('wasm/gunny.wasm?v=22', { cache: 'force-cache' });
-      if (!response.ok) throw new Error(`gunny.wasm: HTTP ${response.status}`);
-      const bytes = await response.arrayBuffer();
+      // SOURCE: 3.4MB 未压缩 WASM 改走 945KB 的 gunny.wasm.gz（静态主机不做 gzip）。
+      const bytes = await loadBytesGz('wasm/gunny.wasm.gz?v=23', 'wasm/gunny.wasm?v=23');
       let instantiated;
       try {
         instantiated = await WebAssembly.instantiate(bytes, go.importObject);
@@ -73,14 +92,15 @@
       const mapId = mapIds.includes(params.get('map')) ? params.get('map') : '1156';
       window.__GUNNY_MAP_ID__ = mapId;
       const [map, crater50, crater401, crater4, crater411, crater121, crater131] = await Promise.all([
-        loadBytes(`data/${mapId}.fore.map?v=22`),
-        loadBytes('assets/crater-50.png?v=22'),
-        loadBytes('assets/crater-401.png?v=22'),
-        loadBytes('assets/crater-4.png?v=22'),
+        // 232KB 的 fore.map 位图同样走 .gz（约 10KB）。
+        loadBytesGz(`data/${mapId}.fore.map.gz?v=23`, `data/${mapId}.fore.map?v=23`),
+        loadBytes('assets/crater-50.png?v=23'),
+        loadBytes('assets/crater-401.png?v=23'),
+        loadBytes('assets/crater-4.png?v=23'),
         // SOURCE: BallList.xml Crater 列 —— 411 水果篮大招榴莲坑、121/131 风神。
-        loadBytes('assets/crater-411.png?v=22'),
-        loadBytes('assets/crater-121.png?v=22'),
-        loadBytes('assets/crater-131.png?v=22'),
+        loadBytes('assets/crater-411.png?v=23'),
+        loadBytes('assets/crater-121.png?v=23'),
+        loadBytes('assets/crater-131.png?v=23'),
       ]);
       const debug = params.get('test') === '1' || params.get('cheat') === '1';
       const error = window.GunnyWasm.init(map, crater50, crater401, crater4, crater411, crater121, crater131, debug);

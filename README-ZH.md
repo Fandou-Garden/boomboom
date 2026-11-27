@@ -78,6 +78,18 @@ npm run build:static
 首次加载约 3.6 MB WASM + 349 KB 地图，之后由浏览器缓存。公网站点
 **https://slnp165x30zq.reakh.fun/** 使用这条路径。
 
+**首屏加载优化（v23）**：发布主机（openresty）忽略 `Accept-Encoding`、不做任何
+压缩传输，因此大资源全部预压缩、由前端解压：
+
+| 资源 | 之前 | 现在 | 手段 |
+| --- | --- | --- | --- |
+| `wasm/gunny.wasm` | 3.36 MB | **0.92 MB** | `gzip -9` → `gunny.wasm.gz`，浏览器用 `DecompressionStream('gzip')` 解压后实例化 |
+| `data/<id>.fore.map` | 232 KB/张 | **约 10 KB** | 同上走 `.gz`（`loadBytesGz`，无 DecompressionStream 时回退原始文件） |
+| `assets/map-<id>-fore.png` | 231 KB–1.7 MB | **约 74%** | 无损 WebP（`exact=True`，与原 PNG **逐像素一致**，`verify_map_parity.py` 仍比对 PNG 原图，0 diff） |
+| 音效+BGM（约 2 MB） | 与首屏并行抢带宽 | **延后** | `sound.preload()` 从模块顶层移到 boot 完成、加载屏隐藏之后 |
+
+首屏（默认地图 1156）传输量从约 6.7 MB 降到约 2.3 MB，且音频在首帧渲染后才解码。
+
 `npm run test:browser:static` 会在本机起一个没有 `/api` 的静态服务器，验证
 WASM 启动、完整回合、AI 行动、弹坑和重开，不需要 Go 服务端。
 `npm run test:browser:mobile` 另外用 iPhone UA 模拟 1024×386 浏览器剩余可视区和

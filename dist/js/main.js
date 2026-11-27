@@ -1,12 +1,12 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=22';
-import { loadImage, Terrain } from './terrain.js?v=22';
-import { RemoteMatch } from './net-client.js?v=22';
-import { Renderer } from './renderer.js?v=22';
-import { Camera, projectPoint } from './camera.js?v=22';
-import { InputController } from './input.js?v=22';
-import { solvePerfect } from './ai.js?v=22';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=22';
-import { MAPS, getMap, resolveMapId } from './maps.js?v=22';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=23';
+import { loadImage, Terrain } from './terrain.js?v=23';
+import { RemoteMatch } from './net-client.js?v=23';
+import { Renderer } from './renderer.js?v=23';
+import { Camera, projectPoint } from './camera.js?v=23';
+import { InputController } from './input.js?v=23';
+import { solvePerfect } from './ai.js?v=23';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=23';
+import { MAPS, getMap, resolveMapId } from './maps.js?v=23';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -472,9 +472,8 @@ class SoundEngine {
 }
 
 const sound = new SoundEngine();
-// Decode source clips before the first gesture so the first select/fire can
-// already use the original sample. The context stays suspended until unlock().
-sound.preload();
+// 音效预载延后到 boot 完成后执行（见 boot() 末尾）：避免与 WASM/地图图片
+// 抢首屏带宽——静态主机不压缩传输，音频合计约 2MB。
 
 function setViewportVariables() {
   const vv = window.visualViewport;
@@ -2267,7 +2266,9 @@ async function boot() {
     };
     const weaponIds = ['axe', 'bow', 'gun', 'goldgun', 'fire', 'cannon', 'wind', 'thunder', 'brick', 'fruit', 'scalpel', 'toilet', 'appliance'];
     const mapBackUrl = `assets/map-${currentMapId}-back.jpg`;
-    const mapForeUrl = `assets/map-${currentMapId}-fore.png`;
+    // 无损 WebP（逐像素一致，见 tests/verify_map_parity.py 的 PNG 原图），
+    // 比同内容 PNG 小约 25%。
+    const mapForeUrl = `assets/map-${currentMapId}-fore.webp`;
     // Reflect the chosen map in the minimap header (was hard-coded "亚特兰蒂斯").
     const minimapTitle = document.querySelector('.minimap-title');
     if (minimapTitle) minimapTitle.textContent = currentMap.name;
@@ -2330,6 +2331,8 @@ async function boot() {
     }
     syncOrientationNotice();
     els.loading.classList.add('is-hidden');
+    // 首屏资源（WASM/地图）就绪后再解码音效，第一个手势仍能命中原始采样。
+    sound.preload();
     showToast('开局先选武器 · 1–8 选战斗道具 · 右下按住蓄力并松手发射', { duration: 5200 });
     requestAnimationFrame(frame);
   } catch (error) {
