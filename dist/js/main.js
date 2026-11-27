@@ -1,12 +1,12 @@
-import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=24';
-import { loadImage, Terrain } from './terrain.js?v=24';
-import { RemoteMatch } from './net-client.js?v=24';
-import { Renderer } from './renderer.js?v=24';
-import { Camera, projectPoint } from './camera.js?v=24';
-import { InputController } from './input.js?v=24';
-import { solvePerfect } from './ai.js?v=24';
-import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=24';
-import { MAPS, getMap, resolveMapId } from './maps.js?v=24';
+import { CONTROLS, PHYSICS, COMBAT, WORLD, SOURCE_COMMIT, SOURCE_REPO, AI, BATTLE, TERRAIN, VIEW, BUILD_VERSION } from './config.js?v=25';
+import { loadImage, Terrain } from './terrain.js?v=25';
+import { RemoteMatch } from './net-client.js?v=25';
+import { Renderer } from './renderer.js?v=25';
+import { Camera, projectPoint } from './camera.js?v=25';
+import { InputController } from './input.js?v=25';
+import { solvePerfect } from './ai.js?v=25';
+import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=25';
+import { MAPS, getMap, resolveMapId } from './maps.js?v=25';
 
 const $ = (id) => document.getElementById(id);
 const els = {
