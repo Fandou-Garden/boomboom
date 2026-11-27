@@ -16,7 +16,7 @@ import (
 //   - never with solid terrain in the body column right above the feet.
 func TestActorsNeverEmbedInTerrainAllMaps(t *testing.T) {
 	root := filepath.Join("..", "..")
-	mapIDs := []string{"1156", "1001", "1002", "1003", "1008", "1014", "1035", "1038", "1157", "1190", "1192"}
+	mapIDs := []string{"1156", "1001", "1002", "1003", "1008", "1014", "1035", "1038", "1157", "1190", "1192", "1049"}
 	for _, id := range mapIDs {
 		t.Run("map-"+id, func(t *testing.T) {
 			tr, err := LoadTerrain(filepath.Join(root, "dist/data", id+".fore.map"), filepath.Join(root, "dist/assets"))

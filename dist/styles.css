@@ -723,7 +723,8 @@ svg { display: block; }
 .skill-button svg.skill-icon { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 /* Icon language follows the original 10001–10008 art, redrawn as solid vector
    shapes: double orange/red bolts for +2, a filled blue three-ray fan for ×3,
-   one gold bolt for +1, and a gold power star + arrow for the amplifiers. */
+   one gold bolt for +1, gold power stars for amplifiers 4–7, and a flame for
+   slot 8 (10008) to match the original right-side 必杀技 emphasis. */
 .skill-button svg.icon-double-bolt path.bolt-back { fill: #ff8a2b; stroke: #fff1cf; stroke-width: 1.2; }
 .skill-button svg.icon-double-bolt path.bolt-front { fill: #e8341f; stroke: #ffd9a8; stroke-width: 1.2; }
 .skill-button svg.icon-trispark path.fan { fill: #2f9de0; stroke: #bff0ff; stroke-width: 1.4; }
@@ -731,6 +732,9 @@ svg { display: block; }
 .skill-button svg.icon-single-bolt path { fill: #ffca3d; stroke: #fff6cd; stroke-width: 1.2; }
 .skill-button svg.icon-power path.power-star { fill: #ffc93d; stroke: #fff2bf; stroke-width: 1; }
 .skill-button svg.icon-power path.power-arrow { fill: #ff9d2e; stroke: #ffd98a; stroke-width: 1; }
+/* Slot 8 (10008 / +10%) uses the original 必杀技-style flame instead of the generic amplifier star. */
+.skill-button svg.icon-ultimate path.ultimate-flame { fill: #ff7b2e; stroke: #ffd9a8; stroke-width: 1; }
+.skill-button svg.icon-ultimate path.ultimate-core { fill: #ffe555; stroke: #fff8d1; stroke-width: 0.8; }
 .skill-button.is-selected .skill-icon { transform: translateY(-1px) scale(1.06); filter: drop-shadow(0 0 5px rgba(255, 228, 142, 0.62)); }
 .skill-copy { max-width: 100%; color: currentColor; font-size: 6px; font-weight: 700; line-height: 1; letter-spacing: 0; white-space: nowrap; opacity: 0.88; }
 .skill-badge {
@@ -908,6 +912,19 @@ svg { display: block; }
 .map-option .map-name { font-size: clamp(12px, 1.3vw, 15px); font-weight: 800; }
 .map-option .map-id { position: absolute; top: 10px; left: 10px; padding: 1px 7px; border-radius: 6px; background: rgba(3, 20, 28, 0.78); color: #ffe1a0; font: 700 10px/1.5 ui-monospace, Menlo, monospace; }
 .map-option .map-trait { color: #9bcbd5; font-size: 10px; line-height: 1.2; }
+/* On-demand maps: a locked card shows a placeholder plus a status badge. */
+.map-option.is-locked { border-style: dashed; opacity: 0.9; }
+.map-option.is-locked:hover { opacity: 1; }
+.map-thumb-locked {
+  display: grid; place-items: center; width: 100%; aspect-ratio: 240 / 133;
+  border-radius: 8px; background: repeating-linear-gradient(45deg, #0b2c38, #0b2c38 8px, #0d3442 8px, #0d3442 16px);
+  color: rgba(180, 226, 236, 0.5); font: 800 30px/1 ui-monospace, Menlo, monospace;
+}
+.map-load-badge {
+  position: absolute; right: 10px; bottom: 9px; padding: 2px 8px; border-radius: 7px;
+  background: rgba(6, 26, 35, 0.92); border: 1px solid rgba(255, 197, 84, 0.6);
+  color: #ffd979; font: 700 10px/1.4 ui-monospace, Menlo, monospace;
+}
 .map-dialog-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 14px; }
 #mapSource { min-width: 0; overflow: hidden; color: #86aeb9; font: 10px/1.3 ui-monospace, Menlo, monospace; text-overflow: ellipsis; white-space: nowrap; }
 .map-confirm {

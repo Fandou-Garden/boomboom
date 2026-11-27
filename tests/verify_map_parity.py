@@ -15,8 +15,13 @@ except ImportError:
     sys.exit("Pillow is required: python3 -m pip install pillow")
 
 ROOT = Path(__file__).resolve().parents[1]
-PNG = ROOT / "dist/assets/map-1156-fore.png"
-MAP = ROOT / "reference/map/1156/fore.map"
+# Optional argv[1] selects a map (default 1156, the original parity baseline).
+# 1156 keeps using the original reference/map bitmask; other maps use the
+# generated dist/data bitmask so the newly added maps can be verified too.
+MAP_ID = sys.argv[1] if len(sys.argv) > 1 else "1156"
+PNG = ROOT / f"dist/assets/map-{MAP_ID}-fore.png"
+MAP = (ROOT / "reference/map/1156/fore.map") if MAP_ID == "1156" else (ROOT / f"dist/data/{MAP_ID}.fore.map")
+print(f"map {MAP_ID}: {PNG.name} vs {MAP}")
 
 img = Image.open(PNG).convert("RGBA")
 w, h = img.size

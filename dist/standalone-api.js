@@ -8,7 +8,7 @@
 import { GunnyEngine } from './js/engine/index.js?v=26';
 
 const API_COMMAND = '/api/command';
-const MAP_IDS = ['1156', '1001', '1002', '1003', '1008', '1014', '1035', '1038', '1157', '1190', '1192'];
+const MAP_IDS = ['1156', '1001', '1002', '1003', '1008', '1014', '1035', '1038', '1157', '1190', '1192', '1049'];
 
 let bootPromise = null;
 let activeSource = null;

@@ -7,6 +7,7 @@ import { InputController } from './input.js?v=26';
 import { solvePerfect } from './ai.js?v=26';
 import { muzzlePoint, simulateShot, segmentTerrainHit } from './physics.js?v=26';
 import { MAPS, getMap, resolveMapId } from './maps.js?v=26';
+import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=26';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -996,7 +997,7 @@ function handleEvent(type, data = {}) {
     showToast(active.length
       ? `已选 ${active.map(skillName).join(' + ')} · 下一发生效，仍用蓝色主键发射`
       : '已取消技能选择', { duration: 2200 });
-    sound.play('skill-select');
+    // Sound is played immediately in useSkillSlot() to match original click timing.
   } else if (type === 'weapon-select') {
     showToast(`主武器：${data.label || data.weapon} · 角度 ${data.angleMin}°–${data.angleMax}°`, { duration: 2600 });
     sound.play('select');
@@ -1395,7 +1396,13 @@ function useSkillSlot(index) {
     return success;
   }
   const success = game.toggleSkill(id);
-  if (success) lastFrame = performance.now();
+  if (success) {
+    lastFrame = performance.now();
+    // SOURCE: RightPropBar.__itemClicked() plays SoundManager.instance.play("008")
+    // before useProp(), so the click feedback is immediate rather than after the
+    // engine echo. We mirror that timing here.
+    sound.play('skill-select');
+  }
   return success;
 }
 
@@ -1882,6 +1889,7 @@ function exposeTestApi() {
         rotateOpen: !els.rotateNotice.hidden,
         paused,
         layout: { ...layout },
+        mapId: currentMapId,
         world: { width: WORLD.width, height: WORLD.height, chunkSize: WORLD.chunkSize },
         terrain: terrain ? { chunks: terrain.chunks.length, craters: terrain.craters.length, dirtyChunks: terrain.dirtyChunks.size } : null,
         camera: view ? {
@@ -1945,6 +1953,16 @@ function exposeTestApi() {
     charging: () => !!game?.charging,
     audioReady: () => sound.ready(),
     audioPlay: (name, weapon = null) => { sound.play(name, weapon); },
+    mapState: () => ({
+      currentMapId,
+      core: MAP_MANIFEST.core.map((m) => m.id),
+      extra: EXTRA_IDS.slice(),
+      loaded: [...loadedMaps],
+      statuses: Object.fromEntries([...mapLoadState].map(([id, s]) => [id, { status: s.status, progress: s.progress }])),
+      pickerOpen: !els.mapPicker.hidden,
+    }),
+    mapLoad: (id) => startMapLoad(id),
+    openMapPicker: () => openMapPicker(),
     // SOURCE: SimpleBomb.BombImp emits damage + critical separately. This
     // test-only hook replays one WASM event and lets the browser rendering of
     // a critical / the result cards be asserted deterministically.
@@ -2208,30 +2226,128 @@ function setupCheatPanel() {
   }
 }
 
-/* ---------- Map picker (开局选图, ?map= 驱动重载) ---------- */
+/* ---------- Map picker (开局选图；core 即用，extra 点击异步加载) ----------
+ * 首屏 only renders the five core thumbs. The extra cards (5 + 玛雅废墟) fetch
+ * four artefacts each on demand and remember completion in localStorage, so a
+ * loaded map unlocks on the next visit without re-downloading. Downloading is
+ * fire-and-forget: the player can pick any core map and enter while it runs,
+ * and reopening the picker shows progress / unlock without a page reload.
+ * Switching still uses the ?map= URL so both engines get a clean terrain. */
 const hasExplicitMap = MAPS.some((m) => m.id === params.get('map'));
 let mapPickerBound = false;
 let selectedMapId = currentMapId;
 
+const loadedMaps = new Set();
+try {
+  for (const id of EXTRA_IDS) {
+    if (localStorage.getItem(LOADED_KEY_PREFIX + id) === '1') loadedMaps.add(id);
+  }
+} catch { /* storage disabled: cards simply reload each visit */ }
+const mapLoadState = new Map(); // id -> { status: 'loading'|'ready'|'error', progress, promise }
+
+function isMapReady(id) {
+  return isCoreMap(id) || loadedMaps.has(String(id));
+}
+
+function startMapLoad(id) {
+  id = String(id);
+  if (isMapReady(id)) return Promise.resolve(true);
+  const existing = mapLoadState.get(id);
+  if (existing) return existing.promise;
+  const urls = mapAssetUrls(id);
+  const state = { status: 'loading', progress: 0, promise: null };
+  // Four artefacts in parallel. Images must actually decode; the collision
+  // map must be a 200 with a body. Any failure marks the card for retry and
+  // never affects the other maps.
+  const steps = [
+    () => loadImage(urls.thumb),
+    () => loadImage(urls.fore),
+    () => loadImage(urls.back),
+    () => fetch(`${urls.collision}?v=25`).then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.arrayBuffer();
+    }),
+  ];
+  state.promise = (async () => {
+    let done = 0;
+    try {
+      await Promise.all(steps.map((step) => step().then(() => {
+        done += 1;
+        state.progress = Math.round((done / steps.length) * 100);
+        paintMapPicker();
+      })));
+      loadedMaps.add(id);
+      try { localStorage.setItem(LOADED_KEY_PREFIX + id, '1'); } catch { /* storage disabled */ }
+      state.status = 'ready';
+      paintMapPicker();
+      showToast(`${getMap(id)?.name || id} 已就绪 · 可以进入战场`, { duration: 1800 });
+      return true;
+    } catch (error) {
+      state.status = 'error';
+      console.warn(`地图 ${id} 加载失败`, error);
+      paintMapPicker();
+      return false;
+    }
+  })();
+  mapLoadState.set(id, state);
+  paintMapPicker();
+  return state.promise;
+}
+
 function buildMapPicker() {
-  els.mapGrid.innerHTML = MAPS.map((map) => `
-    <button class="map-option" type="button" role="radio" data-map="${map.id}" aria-checked="false">
+  els.mapGrid.innerHTML = MAPS.map((map) => {
+    const ready = isMapReady(map.id);
+    const state = mapLoadState.get(map.id);
+    const badge = ready ? '' : `<span class="map-load-badge" data-badge="${map.id}">${state?.status === 'error' ? '重试' : '点击加载'}</span>`;
+    const thumb = ready
+      ? `<img src="assets/map-${map.id}-thumb.jpg" alt="${map.name}">`
+      : '<span class="map-thumb-locked" aria-hidden="true">?</span>';
+    return `
+    <button class="map-option${ready ? '' : ' is-locked'}" type="button" role="radio" data-map="${map.id}" aria-checked="false">
       <span class="map-id">${map.id}</span>
-      <img src="assets/map-${map.id}-thumb.jpg" alt="${map.name}">
+      ${thumb}
       <span class="map-name">${map.name}</span>
       <span class="map-trait">${map.trait}</span>
+      ${badge}
     </button>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function paintMapPicker() {
   for (const option of els.mapGrid.querySelectorAll('.map-option')) {
-    const active = option.dataset.map === selectedMapId;
+    const id = option.dataset.map;
+    const ready = isMapReady(id);
+    const active = id === selectedMapId;
     option.classList.toggle('is-selected', active);
+    option.classList.toggle('is-locked', !ready);
     option.setAttribute('aria-checked', String(active));
+    // Unlock the thumbnail in place once the download completes.
+    if (ready && !option.querySelector('img')) {
+      const lock = option.querySelector('.map-thumb-locked');
+      if (lock) {
+        const img = document.createElement('img');
+        img.src = `assets/map-${id}-thumb.jpg`;
+        img.alt = getMap(id)?.name || id;
+        lock.replaceWith(img);
+      }
+    }
+    const badge = option.querySelector('.map-load-badge');
+    if (badge) {
+      const state = mapLoadState.get(id);
+      if (ready) badge.remove();
+      else if (state?.status === 'loading') badge.textContent = `加载中 ${state.progress}%`;
+      else if (state?.status === 'error') badge.textContent = '重试';
+      else badge.textContent = '点击加载';
+    }
   }
   const chosen = getMap(selectedMapId);
-  els.mapSource.textContent = `已选 ${chosen.name}（${chosen.id}）· ${chosen.trait}`;
+  const ready = isMapReady(selectedMapId);
+  const state = mapLoadState.get(selectedMapId);
+  els.mapSource.textContent = ready
+    ? `已选 ${chosen.name}（${chosen.id}）· ${chosen.trait}`
+    : `${chosen.name} 加载中 ${state?.progress || 0}% · 完成后可切换`;
+  els.mapConfirm.textContent = ready ? '进入战场' : '加载中…';
 }
 
 function openMapPicker() {
@@ -2261,10 +2377,23 @@ function setupMapPicker() {
   els.mapGrid.addEventListener('click', (event) => {
     const option = event.target.closest('.map-option');
     if (!option) return;
-    selectedMapId = option.dataset.map;
+    const id = option.dataset.map;
+    selectedMapId = id;
+    if (!isMapReady(id)) {
+      if (mapLoadState.get(id)?.status === 'error') mapLoadState.delete(id);
+      startMapLoad(id);
+      showToast(`后台下载中 · 可先选其它地图开局，loaded 后回来即可进入`, { duration: 1600 });
+    }
     paintMapPicker();
   });
-  els.mapConfirm.addEventListener('click', () => goToMap(selectedMapId));
+  els.mapConfirm.addEventListener('click', () => {
+    if (!isMapReady(selectedMapId)) {
+      startMapLoad(selectedMapId);
+      showToast(`地图加载中 ${mapLoadState.get(selectedMapId)?.progress || 0}%，完成后再切换`, { duration: 1800 });
+      return;
+    }
+    goToMap(selectedMapId);
+  });
   els.mapButton?.addEventListener('click', (event) => {
     if (event.detail === 0) return;
     openMapPicker();

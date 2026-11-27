@@ -23,7 +23,7 @@ import { GoRand } from '../../dist/js/engine/rng.js';
 import { FORCE_MAX, MOVE_SPEED, PHYSICS_DT } from '../../dist/js/engine/constants.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const MAP_IDS = ['1156', '1001', '1002', '1003', '1008', '1014', '1035', '1038', '1157', '1190', '1192'];
+const MAP_IDS = ['1156', '1001', '1002', '1003', '1008', '1014', '1035', '1038', '1157', '1190', '1192', '1049'];
 const TICKS = 9000;
 
 function loadMap(id) {
