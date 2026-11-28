@@ -192,7 +192,7 @@ test('camera clamps at world edges and smooths instead of jumping', () => {
   assert.ok(left.worldTop >= -1e-6);
 });
 
-test('shot mode follows the shell and permits sky overscan without showing blank map edges', () => {
+test('shot mode follows the shell with bounded sky and wide overscan', () => {
   const camera = new Camera();
   const actors = [
     { x: 240, y: 389, alive: true },
@@ -202,8 +202,18 @@ test('shot mode follows the shell and permits sky overscan without showing blank
     width: 844, height: 390, mode: 'shot', actors, activeIndex: 0,
     shot: { x: 900, y: 100, vx: 900, vy: -300 }, dt: 0.016,
   });
-  assert.equal(view.allowSky, true);
-  assert.ok(view.worldLeft >= 0);
-  assert.ok(view.worldLeft + view.viewW <= WORLD.width + 1e-6);
+  assert.equal(view.allowSky, true, '飞弹视角允许天空 overscan');
   assert.ok(view.worldTop < 0);
+
+  // 依据（2026-11-28 实测）：v33 起 shot 模式使用独立的 lockedShotZoom
+  // （本例 zoom=0.4465、viewW=1890.26 > WORLD.width=1843），
+  // camera.js 的 _desired() 明确设置 allowWide=true，让镜头跟随飞弹时
+  // 不被地图边界夹住。旧断言 worldLeft+viewW <= WORLD.width 与该设计冲突，
+  // 属过时期望；改为约束 overscan 有界，并保留「锁人与缩放独立、不放大地图」。
+  assert.equal(view.allowWide, true, '飞弹视角允许横向宽视野');
+  assert.ok(view.worldLeft >= 0, '左边界不得越出世界');
+  assert.ok(view.viewW <= WORLD.width * 1.2, '视野宽度不得远超地图，不能把地图放得过大');
+  assert.ok(view.worldLeft + view.viewW <= WORLD.width * 1.2 + 1e-6,
+    '横向 overscan 必须有限，不能无限露出地图外');
+  assert.ok(view.zoom < 1, 'shot 模式为缩小视野，不是锁人放大');
 });

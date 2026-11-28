@@ -14,6 +14,28 @@ import http from 'node:http';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import puppeteer from 'puppeteer-core';
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+
+/**
+ * 测试配置：浏览器验收只验证 UI 交互闭环，不该依赖随机奖励构成碰运气。
+ * 仅在金币/真强化石不足时，于临时测试库补到刚够一次强化的量。
+ * 不改正常掉落规则、不改强化规则、不改生产代码，也不触碰用户存档。
+ */
+function ensureForgeTestAssets(dataDir) {
+  const db = new DatabaseSync(path.join(dataDir, 'ddt.sqlite'));
+  try {
+    const coins = db.prepare('SELECT coins FROM players WHERE id = ?').get('local-player');
+    if (!coins || coins.coins < 60) {
+      db.prepare('UPDATE players SET coins = 100 WHERE id = ?').run('local-player');
+    }
+    const stock = db.prepare("SELECT quantity FROM inventory WHERE player_id = ? AND item_key = 'strength1'")
+      .get('local-player');
+    if (!stock || stock.quantity < 1) {
+      db.prepare(`INSERT INTO inventory (player_id, item_key, quantity) VALUES ('local-player', 'strength1', 1)
+                  ON CONFLICT(player_id, item_key) DO UPDATE SET quantity = 1`).run();
+    }
+  } finally { db.close(); }
+}
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const TSX = path.join(ROOT, 'node_modules', '.bin', 'tsx');
@@ -204,6 +226,7 @@ async function main() {
         });
       }
     }
+    ensureForgeTestAssets(dataDir);
     await page.evaluate(async () => {
       const r = await fetch('/api/server/forge', { cache: 'no-store' });
       const f = (await r.json()).forge;

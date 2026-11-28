@@ -165,6 +165,10 @@ export function createApiRouter({ store, session }: Deps): Router {
       weaponInstanceId: req.body?.weaponInstanceId,
       itemKey: req.body?.itemKey,
       requestId: req.body?.requestId,
+      /** 原版三强化石槽与两个符槽；省略时由服务端按库存自动挑选。 */
+      slots: req.body?.slots,
+      luckyCharm: req.body?.luckyCharm,
+      godCharm: req.body?.godCharm,
     });
     res.json(result);
   }));

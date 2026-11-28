@@ -1800,7 +1800,12 @@ svg { display: block; }
 .ddt-forge-balance b { color: var(--amber); font-size: 18px; }
 .ddt-mat-pick { cursor: pointer; width: 58px; }
 .ddt-mat-pick.is-active { border-color: var(--amber); box-shadow: 0 0 0 2px rgba(255,211,106,.2); }
+.ddt-forge-materials { max-height: 300px; overflow-y: auto; padding-right: 4px; }
+.ddt-mat.is-compose { opacity: .55; }
+.ddt-mat.is-compose small { color: var(--muted); }
 .ddt-forge-rule { margin-top: 14px; font-size: 10px; color: var(--muted); line-height: 1.6; }
+.ddt-forge-rule-top { margin: 8px 0 12px; font-size: 11px; line-height: 1.7; color: var(--muted); }
+.ddt-forge-rule-top b { color: var(--amber); font-weight: 700; }
 .ddt-detail-name { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
 .ddt-forge-detail dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 10px; margin: 0 0 12px; font-size: 12px; }
 .ddt-forge-detail dt { color: var(--muted); }

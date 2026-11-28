@@ -115,7 +115,15 @@ test('服务端版完整业务闭环 + 事务防重 + 重启存档', async (t) =
   assert.equal(room.maps.length, 12, '应有约 10 张以上已检出地图');
   assert.ok(room.weapons.length >= 10, '应有多把已有武器');
   assert.equal(room.wallet.coins, 0);
-  assert.equal(room.wallet.items.length, 5, '原版玄武石 1~5 级均已登记');
+  // 002 迁移后物品目录按原版分类：6 强化石 + 20 四圣兽合成石 + 4 幸运符 + 1 神恩符。
+  const kinds = room.wallet.items.reduce((m, i) => { m[i.kind] = (m[i.kind] || 0) + 1; return m; }, {});
+  assert.equal(kinds['strength-stone'], 6, 'Đá cường hóa 1~6 原版强化石均已登记');
+  assert.equal(kinds['compose-stone'], 20, '四圣兽合成石 4 系 × 5 级');
+  assert.equal(kinds['lucky-charm'], 4);
+  assert.equal(kinds['god-charm'], 1);
+  assert.equal(room.wallet.items.length, 31);
+  assert.ok(room.wallet.items.filter((i) => i.itemKey.startsWith('xuanwu'))
+    .every((i) => i.kind === 'compose-stone'), '玄武石应纠正为合成石，不能作为强化材料');
 
   const unmatched = await api.get('/api/server/player');
   assert.equal(unmatched.status, 200);

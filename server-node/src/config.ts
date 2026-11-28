@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ORIGINAL_CONSTANTS, ORIGINAL_RULE_TRACE } from './original-data.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(here, '../..');
@@ -48,6 +49,12 @@ function numEnv(name: string, fallback: number): number {
 
 const dataDir = process.env.DDT_DATA_DIR || path.join(REPO_ROOT, 'data');
 
+/**
+ * 单机临时规则每级攻击点数。原版武器攻击成长公式未还原（见 original-data.ts），
+ * 两套规则共用该点数，但 original 分支会在结果里明确标注为 LOCAL_RULE_SUPPLEMENT。
+ */
+const LOCAL_ATTACK_PER_LEVEL = 25;
+
 export const config = {
   host: process.env.DDT_HOST || '127.0.0.1',
   port: intEnv('DDT_PORT', 8100),
@@ -80,24 +87,69 @@ export const config = {
   rewards: {
     cards: 9,
     maxPicks: 3,
-    /** 保证至少 2 张材料卡，避免玩家因随机性卡在「无法强化」的闭环外。 */
+    /**
+     * 单机保底规则（LOCAL_RULE）：盘面保证至少含 2 张材料卡，
+     * 但 9 张卡在服务端整体随机洗牌后落位——**不是固定卡位**，
+     * 玩家点固定位置不会必得固定奖励，也不存在「按领取次序」派发。
+     * 保底只约束「盘面内容构成」，不约束「哪个位置是什么」。
+     */
     guaranteedItemCards: 2,
     stoneChance: numEnv('DDT_REWARD_STONE_CHANCE', 0.34),
+    /**
+     * 正常奖励池**不含**高阶品质武器候选。
+     * 原因：上游越南服物品表无中文「极」命名，中文品质映射待确认，
+     * 按验收要求不把推测武器加入正常掉落。默认 0，且仅 test 池可生成该卡。
+     */
+    extremeChance: 0,
+    /** normal 为正常奖励池；test 为独立的测试奖励池，只用于自动化验证掉落。 */
+    poolMode: (process.env.DDT_REWARD_POOL === 'test' ? 'test' : 'normal') as 'normal' | 'test',
+    /** 奖励池配置版本：写入 reward_boards.pool_version，旧盘不因规则变更重抽。 */
+    poolVersion: 'v3-2026-11-28',
+    testPoolNote: '测试奖励池：强制包含 1 张「高阶品质武器候选」卡，仅用于自动化验证发放防重；中文品质映射待确认，不代表任何官方概率，也不改变正常掉落规则。',
     win: { coins: [80, 260] as [number, number], stoneAmount: [1, 2] as [number, number] },
     lose: { coins: [30, 90] as [number, number], stoneAmount: [1, 1] as [number, number] },
-    /** 原版配置中存在的强化石等级/种类（item_key 见 001_init.sql 种子）。 */
-    stoneItemKeys: ['xuanwu1', 'xuanwu2', 'xuanwu3', 'xuanwu4', 'xuanwu5'],
+    /** 真正的原版强化石 Đá cường hóa 1..6（002 迁移登记），不再是四圣兽合成石。 */
+    stoneItemKeys: ['strength1', 'strength2', 'strength3', 'strength4', 'strength5', 'strength6'],
     ruleSource: 'LOCAL_RULE',
+    guaranteeNote: '前若干张固定构成的设计已移除；保底只保证盘面至少含 2 张材料卡，9 张全部随机洗牌落位（单机保底规则）。',
   },
 
   /**
-   * 铁匠铺：原版 StrengthenMgr / StrengthenInfo 配置未能导出，
-   * 以下为明确标注的单机临时规则，绝不冒称原版。
+   * 铁匠铺：原版规则与单机临时规则分开配置。
+   *  - rules='original'：按 ItemStrengthenHandler / StrengthenMgr / ItemStrengthenList.xml
+   *    移植的核心链路（三强化石槽 + 幸运符 + 神恩符 + 概率 + 等级上限 + 失败后果）。
+   *  - rules='local'：闭合稳定的单机临时规则，保留供对比与回归。
+   * 两套规则共用同一张存档表，历史装备数据由 002/003 迁移兼容。
    */
   forge: {
+    /**
+     * 默认 LOCAL_RULE：原版完整链路尚未还原（属性计算未找到、模板进阶/损毁/VIP/公会/开孔未接线），
+     * 按验收要求不能默认启用并报告「原版强化完成」。设置 DDT_FORGE_RULES=original 时才走
+     * 已核对的原版核心链路（ORIGINAL_PARTIAL），两套规则分开、界面明确显示当前采用哪套。
+     */
+    rules: (process.env.DDT_FORGE_RULES === 'original' ? 'original' : 'local') as 'original' | 'local',
+    /**
+     * 可注入随机源，仅用于自动化测试精确控制成功/失败，不靠反复运行碰概率。
+     * 支持：always-success | always-fail | fixed:<0..1> | sequence:a,b,c；未设置时用单局种子。
+     */
+    randomSource: process.env.DDT_FORGE_RANDOM || '',
+    original: {
+      maxLevel: ORIGINAL_CONSTANTS.maxStrengthenLevel,
+      /**
+       * 原版武器攻击成长公式**未还原**（ORIGINAL_CONSTANTS.weaponAttackGrowth=null）：
+       * itemstrengthendata.xml 只含副手 17003/17004，ItemStrengthenData.xml 在仓库中不存在；
+       * 真正计算在 EquipBag.UpdatePlayerProperties()，本轮未导出。
+       * 为让「强化后下一局属性生效」可验证，此处借用 LOCAL_RULE 的点数，
+       * 并在结果中标记 attackGrowthSource='LOCAL_RULE_SUPPLEMENT'，不声称是原版数值。
+       */
+      attackPerLevel: LOCAL_ATTACK_PER_LEVEL,
+      ruleSource: 'ORIGINAL_PARTIAL',
+      note: '核心链路（三强化石槽/幸运符/神恩符/概率/等级表/失败保护）已按源码移植；属性成长未还原、进阶换模板/损毁/VIP/公会/开孔/绑定未接线。标记为 PARTIAL，不报告「原版强化完成」。',
+    },
+    /** 以下为 LOCAL_RULE，默认生效。 */
     maxLevel: 12,
-    /** 每级增加的原版 attack 属性点数，直接进入 MakeDamage 公式。 */
-    attackPerLevel: 25,
+    /** 每级增加的 attack 属性点数，直接进入 MakeDamage 公式。 */
+    attackPerLevel: LOCAL_ATTACK_PER_LEVEL,
     /** 首级消耗低于单张金币卡下限，保证「翻牌 -> 强化」单机闭环可完成。 */
     coinCostBase: 60,
     coinCostPerLevel: 80,
@@ -131,13 +183,25 @@ export function publicRules() {
       cards: config.rewards.cards,
       maxPicks: config.rewards.maxPicks,
       ruleSource: config.rewards.ruleSource,
-      note: '3x3 每场最多 3 张为单机可配置规则，不代表原版所有模式默认值',
+      guarantee: 'shuffled-pool',
+      poolMode: config.rewards.poolMode,
+      poolVersion: config.rewards.poolVersion,
+      extremeChance: config.rewards.extremeChance,
+      weaponMappingStatus: 'UNCONFIRMED',
+      extremeChanceNote: '正常奖励池不含高阶品质武器候选：上游无中文「极」命名，中文品质映射待确认；仅测试池可生成，且不代表官方概率',
+      note: '3x3 每场最多 3 张为单机可配置规则；保底只约束盘面内容，9 张随机洗牌落位，无固定卡位；旧奖励盘按生成时的 poolVersion 保留原结果',
     },
     forge: {
-      maxLevel: config.forge.maxLevel,
-      attackPerLevel: config.forge.attackPerLevel,
-      ruleSource: config.forge.ruleSource,
-      note: '原版强化配置未导出，当前为单机临时规则，与原版规则分开配置',
+      rules: config.forge.rules,
+      maxLevel: config.forge.rules === 'original' ? config.forge.original.maxLevel : config.forge.maxLevel,
+      attackPerLevel: config.forge.rules === 'original' ? config.forge.original.attackPerLevel : config.forge.attackPerLevel,
+      ruleSource: config.forge.rules === 'original' ? config.forge.original.ruleSource : config.forge.ruleSource,
+      attackGrowthSource: config.forge.rules === 'original' ? 'LOCAL_RULE_SUPPLEMENT（原版属性成长未还原）' : 'LOCAL_RULE',
+      notPorted: config.forge.rules === 'original'
+        ? ORIGINAL_RULE_TRACE.filter((r) => r.status !== 'PORTED').map((r) => `${r.item}: ${r.status}`)
+        : [],
+      mechanics: config.forge.rules === 'original' ? ORIGINAL_RULE_TRACE : [],
+      note: config.forge.rules === 'original' ? config.forge.original.note : '单机临时规则（LOCAL_RULE），与原版规则分开配置；不代表原版成功率与消耗',
     },
   };
 }

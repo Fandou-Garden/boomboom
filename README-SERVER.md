@@ -160,23 +160,41 @@ docs/ASSET_MANIFEST.md    原版代码与素材对应清单
 
 1. **原版铁匠铺 UI 与强化音效未导出**：当前房间内铁匠铺为明确标注的单机临时界面，
    保留 `data-asset-slot="forge-panel"` 替换入口；成功/失败音效用站点版既有音效，不冒称原版。
-2. **原版强化规则未移植**：证据与原因见 `docs/ASSET_MANIFEST.md` 第 6 节；当前为 `LOCAL_RULE`。
+2. **原版强化规则只完成核心链路（`ORIGINAL_PARTIAL`），未完整还原**：
+   属性成长公式未找到，模板进阶 / 失败损毁 / VIP / 公会 / 开孔 / 绑定 / `StoneLevelMin` 服务端校验未接线。
+   逐项证据见 `docs/RULE_EVIDENCE.md`。默认仍为 `LOCAL_RULE`，**不报告「原版强化完成」**。
 3. **「神武石」未匹配**：上游物品表中不存在；已登记 `unmatched`，未编造物品 ID。
-4. **既有测试 1 项失败**：`physics.test.mjs` 镜头边界断言，main 基线同样失败，本轮未改动镜头实现。
-5. **既有文档/代码不一致**（非本轮引入）：Go `server/game/config.go` 体力 100/0，
+4. **中文「极·」武器映射 `UNCONFIRMED`**：上游无中文「极」命名，无法证明 `VIP-` 模板对应中文极武器；
+   候选武器使用上游真实名称，**不在正常奖励池**。见 `docs/WEAPON_MAPPING_EVIDENCE.md`。
+5. **原版音乐与音效未接入**：房间 065、大厅 062、翻牌 048、倒计时 067/014、胜负 063/064、
+   地图 `BackMusic`、`store.swf` 强化结果音效均只有源码证据，未导出/未接入。战前加载无调用证据，不配乐。
+6. **既有文档/代码不一致**（非本轮引入）：Go `server/game/config.go` 体力 100/0，
    JS 引擎 2000/60；部分资源 URL 仍是 `?v=15` 与 `?v=33` 混用。
-6. 未实现商城、公会、聊天、充值、多人匹配、完整副本系统（本轮明确不在范围内）。
-7. 部分 `art-source/` 已导出的逐帧序列（`lightFrame`、`starMc`、`VersusAnimation`、
+7. 未实现商城、公会、聊天、充值、多人匹配、完整副本系统（本轮明确不在范围内）。
+8. 部分 `art-source/` 已导出的逐帧序列（`lightFrame`、`starMc`、`VersusAnimation`、
    `GameMode_*`、房间/大厅 BGM）尚未接入 `dist/`。
+9. 手机横屏控件遮挡检查、多局连续资源/监听器/WebSocket/计时器增长观测：尚未完成实测。
 
 ## 9. 开发分支与推送状态
 
-- 开发分支：`feat/node-server-mode`（基于 `main` @ `cbfe149`），每完成一个可运行阶段都有本地提交；
-  具体提交列表用 `git log --oneline main..HEAD` 查看。
-- 向 `origin` 的推送目前被 GitHub 写凭证阻塞，准确原因与现场记录见
-  `docs/PROGRESS.md`「阻塞」章节。代码不受影响，本地分支可直接使用或由用户配置有效凭证后推送。
-- 04:01 最终复核：匿名 HTTPS 读取正常（`git ls-remote` 返回 `cbfe149`），但推送失败：
-  `~/.git-credentials` 已无 github.com 条目，`git credential fill` 无可用凭证，
-  `gh auth status` 报告 `The token in default is invalid.`。
-  **读通不等于写通**，此处是写权限问题，不是网络或代码问题。
-- 用户侧恢复推送只需一次：配置有效凭证后执行 `git push -u origin feat/node-server-mode`。
+- 开发分支：`feat/node-server-mode`（基于 `main` @ `cbfe149`）。
+- **推送已于 2026-11-28 10:43 成功**：用户提供配置了 `Contents: Read and write` 的
+  fine-grained PAT 后，用环境变量注入凭证、`git push -u origin feat/node-server-mode` 非强制推送一次成功；
+  `git ls-remote` 校验远程分支 SHA 与本地 HEAD 一致（`039b338d68303b15e30ee1ebcd4b14dbfad2cf58`）。
+  此前 403 的原因是 Token 缺少 Contents 权限，**不是账号无权限**（权限保存后同一凭证即可推送）。
+  Token 未写入远程 URL、源码、文档、命令行参数或日志，仅经环境变量传递。
+- 该 Token 为 7 天有效期（约 2026-12-05 过期），过期后需重新配置。
+
+## 10. 阶段 8 更新（2026-11-28，本轮核对与纠错）
+
+| 项 | 内容 |
+| --- | --- |
+| 材料分类纠错 | 玄武石（四圣兽合成石 `Property1=1`）不再作为强化材料；真强化石为 `Đá cường hóa 1..6`（`Property1=2`，11019/11021/11022/11023/11024/11025）。见 `docs/RULE_EVIDENCE.md` |
+| 版本化迁移 | `002_item_classification.sql` / `003_extreme_weapons.sql`：只改分类、不自动兑换/补发/删除、保留玩家资产；备份用 SQLite backup API。见 `docs/MIGRATION_VERIFICATION.md` |
+| 规则分离 | `DDT_FORGE_RULES=local`（默认 `LOCAL_RULE`）与 `=original`（`ORIGINAL_PARTIAL`）；界面顶部显示当前规则、属性成长来源与未还原项 |
+| 奖励盘 | 正常池不含未确认映射的武器候选卡；仅 `DDT_REWARD_POOL=test` 生成 1 张用于发放防重验证；9 张随机洗牌无固定卡位；旧盘按 `pool_version` 保留不重抽 |
+| 可注入随机源 | `DDT_FORGE_RANDOM=always-success\|always-fail\|fixed:<n>\|sequence:a,b,c`，仅测试用 |
+| 镜头断言 | 核实 v33 shot 模式 `allowWide` 设计后更新过时断言（未删测试），`npm test` 61/61 |
+
+新增测试：`tests/server/forge-rules.test.mjs`、`tests/server/migration.test.mjs`、
+`tests/server/build-cards.ts`（测试辅助）。真实截图：`docs/screenshots/2026-11-28-*.png`。

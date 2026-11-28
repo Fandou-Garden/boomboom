@@ -103,6 +103,7 @@ function buildLayer() {
           <button class="ddt-btn ddt-btn-ghost" type="button" data-action="close-forge">关闭，返回房间</button>
         </header>
         <p class="ddt-asset-note">原版铁匠铺 UI 素材未导出 · 以下为明确标注的单机临时界面（保留替换入口），不代表原版界面或原版强化规则</p>
+        <div class="ddt-forge-rule-top" id="ddtForgeRuleTop"></div>
         <div class="ddt-forge-grid">
           <div class="ddt-forge-col">
             <h3>拥有武器</h3>
@@ -197,16 +198,34 @@ function renderForge(forge) {
 
   $('ddtForgeMaterials').innerHTML = `
     <div class="ddt-forge-balance">金币 <b>${fmt(forge.wallet.coins)}</b></div>
-    <div class="ddt-mat-row">${forge.wallet.items.map((i) => `
-      <button class="ddt-mat ddt-mat-pick ${state.selectedForgeItem === i.itemKey ? 'is-active' : ''}" type="button"
-              data-action="forge-item" data-item="${esc(i.itemKey)}" title="TemplateID ${i.templateId ?? '—'}">
-        <img src="${esc(i.icon)}?v=33" alt="" draggable="false"><b>${fmt(i.quantity)}</b><small>${esc(i.name)}</small>
-      </button>`).join('')}</div>
-    <p class="ddt-hint">不选材料时，服务端自动挑选库存中单位值最合适的强化石。</p>`;
+    <div class="ddt-mat-row">${forge.wallet.items.map((i) => {
+      const compose = i.kind === 'compose-stone';
+      return `<button class="ddt-mat ddt-mat-pick ${state.selectedForgeItem === i.itemKey ? 'is-active' : ''} ${compose ? 'is-compose' : ''}" type="button"
+              data-action="forge-item" data-item="${esc(i.itemKey)}"
+              title="${esc(i.name)} · TemplateID ${i.templateId ?? '—'} · ${esc(i.kind)}${compose ? ' · 合成材料，不能作为强化石' : ''}" ${compose ? 'disabled' : ''}>
+        <img src="${esc(i.icon)}?v=33" alt="" draggable="false"><b>${fmt(i.quantity)}</b><small>${compose ? '合成石' : esc(i.name)}</small>
+      </button>`;
+    }).join('')}</div>
+    <p class="ddt-hint">四圣兽石（玄武/青龙/白虎/朱雀）是合成材料，不能作为强化石；服务端同样拒绝。不选材料时由服务端自动挑选库存中的真强化石。</p>`;
 
+  const isOriginal = forge.rules === 'original';
+  const unported = forge.notPorted || [];
+  // 顶部摘要始终可见（材料区可滚动，详细规则在材料列下方）。
+  $('ddtForgeRuleTop').innerHTML = `
+    <b>当前规则：${esc(forge.activeRuleLabel || forge.ruleSource)}</b>
+    <span> · 规则来源 ${esc(forge.ruleSource)}</span>
+    <span> · 属性成长 ${esc(forge.attackGrowthSource || '—')}</span>
+    ${unported.length ? `<span> · 未还原/未接线 ${unported.length} 项（详见下方）</span>` : ''}
+    <span> · 武器映射 ${esc(forge.weaponMappingStatus || '—')}</span>`;
   $('ddtForgeRule').innerHTML = `
-    <div class="ddt-label">规则来源：${esc(forge.ruleSource)}（单机临时规则）</div>
-    <p>${esc(forge.ruleNote)}</p>`;
+    <div class="ddt-label">当前规则：${esc(forge.activeRuleLabel || forge.ruleSource)}</div>
+    <p>${esc(forge.ruleNote)}</p>
+    <p class="ddt-hint">属性成长来源：${esc(forge.attackGrowthSource || '—')}</p>
+    ${unported.length ? `<p class="ddt-hint">未还原 / 未接线：${esc(unported.join('、'))}</p>` : ''}
+    ${forge.weaponMappingStatus ? `<p class="ddt-hint">武器映射：${esc(forge.weaponMappingStatus)}</p>` : ''}
+    ${forge.composeStoneNote ? `<p class="ddt-hint">${esc(forge.composeStoneNote)}</p>` : ''}
+    ${isOriginal ? '<p class="ddt-hint">原版链路不扣金币，只消耗槽位材料（ItemStrengthenHandler.cs:113）。三强化石槽 + 幸运符 + 神恩符由服务端校验。</p>' : ''}
+    <p class="ddt-asset-note">原版铁匠铺 UI 与音效尚未导出，以下为明确标注的单机临时界面（保留替换入口），不代表原版界面或原版强化规则已还原。</p>`;
 
   if (weapon) {
     const cost = weapon.cost;
@@ -217,9 +236,10 @@ function renderForge(forge) {
         <dt>当前攻击</dt><dd>${fmt(weapon.attack)}</dd>
         <dt>强化后攻击</dt><dd class="is-good">${fmt(cost.nextAttack)}（成功时）</dd>
         <dt>消耗金币</dt><dd>${fmt(cost.coins)}</dd>
-        <dt>材料单位</dt><dd>${fmt(cost.requiredUnits)} 点</dd>
-        <dt>成功率</dt><dd>${Math.round(cost.successRate * 100)}%</dd>
+        <dt>材料要求</dt><dd>${isOriginal ? `${fmt(cost.requiredUnits)} 个槽位（1~3 颗强化石，Rock ${fmt(cost.rock ?? 0)}）` : `${fmt(cost.requiredUnits)} 点`}</dd>
+        <dt>成功率</dt><dd>${isOriginal ? '由槽位材料决定' : `${Math.round(cost.successRate * 100)}%`}</dd>
         <dt>上限</dt><dd>+${weapon.maxLevel}</dd>
+        <dt>规则版本</dt><dd>${esc(weapon.ruleVersion || 'LOCAL_RULE')}</dd>
       </dl>`;
   }
 }
@@ -312,6 +332,12 @@ async function doStrengthen(button) {
       : `强化失败：等级保持 +${result.weapon.levelAfter}，金币与材料已按规则扣除`;
     renderForge(await dataApi.getForge());
     renderRoom(await dataApi.getRoom());
+  } catch (error) {
+    // 服务端拒绝（金币/材料不足、上限、版本冲突）必须明确显示，不能静默。
+    const message = error?.message || '服务端拒绝该请求';
+    panel.classList.add('is-fail');
+    $('ddtForgeResult').textContent = `强化未完成：${message}`;
+    setStatus(`强化未完成：${message}`, true);
   } finally {
     button.disabled = false;
   }

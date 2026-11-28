@@ -115,7 +115,13 @@
 
 ## 当前任务
 
-已完成。最终回归通过、本地提交完成；推送被凭证失效阻塞，等待用户提供有效凭证。
+**阶段 8 已完成并本地提交推送**（材料分类纠错 / 原版强化链路核对 / 极武器映射撤回 /
+迁移验证 / 奖励盘版本化 / 规则测试 / 镜头断言修复）。详见文末「阶段 8」与
+`docs/RULE_EVIDENCE.md`、`docs/WEAPON_MAPPING_EVIDENCE.md`、`docs/MIGRATION_VERIFICATION.md`。
+
+**阶段 9 待开始（未完成，不得写成已完成）**：原版红金色铁匠铺 UI 资源导出与真实交互、
+原版音乐与音效接入、极武器专属素材、多局资源增长观测。当前仍是 `LOCAL_RULE` 临时界面，
+**明确未还原原版铁匠铺**，不能写成「原版还原已完成」。
 
 ## 验证结果（2026-11-28 全部实测，不把估算写成实测）
 
@@ -181,7 +187,11 @@
 
 ## 阻塞
 
-1. **【权限失败，待用户处理】推送开发分支失败（2026-11-28 实测）**。
+> **状态更新（2026-11-28 10:43 之后）**：下列第 1 条「推送凭证失效」已解除；
+> 第 2 条「镜头断言失败」已在阶段 8 修复。以下保留当时诊断原文作为历史记录，
+> 结论以本段与文末「阶段 8」为准。
+
+1. **【已解决】推送开发分支失败（2026-11-28 早期实测，历史记录）**。
    - `git push -u origin feat/node-server-mode` 返回
      `remote: Invalid username or token. Password authentication is not supported for Git operations.`
    - 诊断：`credential.helper=store`，`~/.git-credentials` 内含一条 40 字符 `ghp_` 前缀 classic PAT
@@ -210,18 +220,159 @@
      （合理推断：先前数次鉴权失败后 Git 的 `credential reject` 清除了 store 中失效的 PAT；
      此为机制推断，非实测结论）。即凭证链当前为空 + `gh` token 失效，
      **写权限确实不可用，不再重试**。
-2. **既有测试 1 项失败（非本轮引入）**：`tests/physics.test.mjs` 的
+2. **【已修复】既有测试 1 项失败（非本轮引入）**：`tests/physics.test.mjs` 的
    「shot mode follows the shell and permits sky overscan」边界断言
    `view.worldLeft + view.viewW <= WORLD.width + 1e-6`。
    已在干净的 `main` 基线工作树上复现同样失败（v33 允许天空 overscan 后断言未同步）。
    本轮未修改 `camera.js` / `physics.js`；镜头锁定与缩放分离由既有 `camera.js` 提供。
+   **阶段 8 处理**：实测 `WORLD.width=1843`、`viewW≈1890.26`、`allowWide=true`，
+   确认 v33 shot 模式设计上允许有界横向宽视野跟随飞弹，旧断言与该设计冲突。
+   改为有界 overscan 断言（左边界不越界、`viewW <= WORLD.width*1.2`、
+   `worldLeft+viewW <= WORLD.width*1.2`、`zoom<1`），**未删除测试**，
+   测试名同步为「shot mode follows the shell with bounded sky and wide overscan」。
+   `npm test` 由 60/61 变为 **61/61 通过**。
 3. 主参考仓库 404 已按约定切换到上游 `phucdz2kk4/Gunny`，不构成阻塞。
 
-## 下一步（剩余工作）
+## 下一步（阶段 9 及剩余工作，均未完成）
 
-1. ~~最终提交并再尝试一次推送~~ **已完成**：04:01 复验全部通过，最后一次推送尝试已记录准确原因
-   （见「阻塞」第 1 条），不重复盲试。
-2. 【待用户处理】配置有效的 GitHub 凭证（新的 PAT / `gh auth login` / SSH）后执行
-   `git push -u origin feat/node-server-mode`；本地分支与全部提交已就绪，无需重做开发。
-3. 可选后续（不影响本轮闭环）：导出并接入原版铁匠铺 UI / 强化音效、移植原版强化规则、
-   接入 `art-source/` 中已导出但未接线的逐帧序列与 BGM、同步 `physics.test.mjs` 的镜头断言。
+1. **原版红金色铁匠铺 UI**：先导出并查看 `Source Flash/FlashSV1/` 实际 store 模块资源与
+   旧版对照 `inetpub/wwwroot/gunny/ui/vietnam/swf/store.swf`，记录与用户截图的差异，
+   再实现三个强化石槽 / 幸运符槽 / 神恩符槽 / 装备栏 / 道具栏 / 成功率区域。
+   禁止用背景截图覆盖交互；槽位、物品、拖放或点选、按钮必须真实可用。
+2. **原版音乐与音效接入**：按 `LoadMapsItems.xml` 的 `BackMusic` 字段映射地图音乐，
+   不默认「音乐编号 = 地图编号」；战前加载音乐需先找到独立调用证据再接线。
+   处理用户手势解锁、循环、切换、音量、静音、资源释放。
+3. **原版强化规则剩余项**：属性成长公式（`ItemStrengthenData.xml` 上游仓库缺失）、
+   模板进阶、失败损毁、VIP / 公会 / 开孔 / 绑定、`StoneLevelMin` 服务端校验。
+   查不到的机制保持未实现，界面明确显示 `ORIGINAL_PARTIAL` 未还原项。
+4. **中文「极·」武器映射**：保持 `UNCONFIRMED`，不进入正常奖励池；
+   专属持武逐帧 / 弹丸 / 爆炸素材待导入，当前复用基础武器弹道。
+5. **性能与多局观测**：区分 Node RSS、浏览器 JS 堆、浏览器进程内存、
+   Canvas / 图片 / 音频占用；多局连续检查资源、监听器、WebSocket、计时器是否持续增长。
+6. **文档同步**：`docs/ASSET_MANIFEST.md`、`docs/AUDIO_MAPPING.md` 按本轮新证据更新；
+   手机横屏控件遮挡检查。
+7. 不以「业务闭环已通」代替「原版还原已完成」；逐阶段提交并推送，校验远程 SHA。
+
+---
+
+## 阶段 8（2026-11-28）：材料分类纠错、原版强化链路核对、映射撤回与迁移验证
+
+本阶段按用户新增的 7 条约束执行「先核对、不重做已有成果」。所有结论均为实测或源码逐行核对，
+**未确认部分明确标记**，不写成「原版已还原」。
+
+### 8.1 材料分类（最高优先级，已完成）
+
+| 类别 | 上游判据 | 模板 | 处理 |
+| --- | --- | --- | --- |
+| 强化石 | `CategoryID=11 && Property1=2` | `Đá cường hóa 1..6`（`strength1/2/3/4/9/11`） | 登记为 `strength-stone`，可用于强化 |
+| 四圣兽合成石 | `CategoryID=11 && Property1=1`、`FusionType=2` | `xuanwu/qinglong/baihu/zhuque` 各 1..5（20 件） | 从错误的 `strength-stone` 改为 `compose-stone`，用途是合成加四维；**禁止当强化材料** |
+| 幸运符 | `Property1=3` | `symbol1..4`（4 件） | 槽位 4 |
+| 神恩符 | `Property1=7` | `symbol5`（1 件） | 槽位 3 |
+| 神武石 | 上游零命中 | — | 继续保持 `unmatched`，不编造 |
+
+逐件「模板 ID → 名称 → 类别 → 用途 → Pic → 图标路径 → 处理方法」见
+`docs/RULE_EVIDENCE.md`。图标导出到 `dist/assets/items/`（共 31 件）。
+
+### 8.2 原版强化链路（ORIGINAL_PARTIAL，非「原版已完成」）
+
+沿「客户端提交 → `ItemStrengthenHandler.cs` → `StrengthenMgr.cs` → XML 配置 →
+材料验证 → 概率/经验/进阶 → 属性更新 → 扣费 → 返回」逐项核对，证据表见 `docs/RULE_EVIDENCE.md`。
+
+已按源码移植：三强化石槽 `GetItemAt(0/1/2)` 累加 `RateItems[Level-1]`、幸运符 C# 整数除法
+`num2 += probability + (Property2/100)`（15/25/50 档为 0，100 档为 1）、神恩符失败保护、
+概率公式 `num5=probability*100/Rock`、`num6=num2*100/Rock`、
+`num7=floor((num5+num6+num4+num3)*100)`、`num8=RandomSafe.Next(10000)`、`num7>num8` 成功、
+`GetNeedRate()` 读 `ItemStrengthenList.xml` 的 `Rock`、原版**无金币扣费**只有 `ClearBag()` 消耗槽位物品。
+
+**未还原（保持未实现，不按截图或常识补写）**：武器属性成长公式（上游 `ItemStrengthenData.xml`
+仓库中不存在，只有副手 `itemstrengthendata.xml`，调用点 `EquipBag.UpdatePlayerProperties()`）、
+模板进阶、失败损毁、VIP / 公会 / 开孔 / 绑定、`StoneLevelMin` 服务端校验。
+
+规则分离：默认 `DDT_FORGE_RULES=local` 使用 `LOCAL_RULE`；
+`DDT_FORGE_RULES=original` 才启用 `ORIGINAL_PARTIAL`，其攻击成长点数明确标注
+`LOCAL_RULE_SUPPLEMENT（原版属性成长未还原）`。铁匠铺顶部常驻规则摘要，
+显示当前规则、来源、属性成长来源、未还原项数、武器映射状态。
+
+### 8.3 中文「极·」武器映射撤回（UNCONFIRMED）
+
+`TemplateAlllist.xml` 中中文「极」出现 **0 次**，`VIP-` 出现 **78 次**，
+`QualityType.QUALITY_STRING` 无「极」品质档。撤回上一版把 `7006..7014` 直接命名
+「极·烈火」等的推测：改称 `HIGH_QUALITY_WEAPONS`，使用上游真实名称（`VIP-Pháo` 等），
+`mappingStatus='UNCONFIRMED'`，标注「中文品质映射待确认」。
+`70061/70062/70064` 是 `GainEquip` 强化进阶形态，不是另一套「极」品质。
+**正常奖励池 `extremeChance=0`，候选武器卡仅在 `DDT_REWARD_POOL=test` 生成 1 张**，
+仅用于发放防重验证。证据表见 `docs/WEAPON_MAPPING_EVIDENCE.md`。
+
+### 8.4 奖励盘版本化与领取防重（已完成）
+
+- `reward_boards` 增加 `pool_version` / `rules_version`，生成时固化配置；旧盘保持 `legacy-v1`，
+  **修改奖励池后旧盘不重新抽取**。
+- 3×3 卡面整体洗牌，**无固定卡位必得固定奖励的隐含机制**；「前 3 张固定构成」明确标注为单机保底规则。
+- 未翻开内容不返回前端。
+- 极武器领取与武器实例创建在**同一事务**；`weapon_grants` 的 `UNIQUE(request_id)` 与
+  `UNIQUE(battle_id, card_index)` 防重复发武器；重复请求返回同一实例。
+- `claimCard()` 重放检查绑定 `board_id + card_index`，同一 `requestId` 换卡位返回 `409 request-id-reused`。
+
+### 8.5 旧存档迁移（已完成，资产不变）
+
+`002_item_classification.sql` 重写：移除上一版「玄武石 1:1 自动补发真强化石」的
+`INSERT ... SELECT`。**只改分类，不自动兑换、不补发、不删除、不合并、不重算 `weapon_instances.attack`**。
+`003_extreme_weapons.sql` 只加列 / 建表 / 补元数据，不新增玩家资产；
+`rule_version` 默认 `LOCAL_RULE` 保留旧武器规则版本，避免属性再次叠加。
+
+`tests/server/migration.test.mjs` 用 Python `sqlite3.Connection.backup()`（SQLite backup API）
+在 **WAL 模式下做安全副本**，不在运行中直接复制主库文件。构造 001 时代旧库 →
+启动真实服务触发 002/003 → 二次启动验证幂等。实测：
+
+```text
+旧金币=1234 新金币=1234 背包=[{"item_key":"xuanwu1","quantity":3},{"item_key":"xuanwu3","quantity":2}] 武器attack=175 幂等=true
+```
+
+金币、背包数量、武器实例、强化等级、领取记录、旧奖励盘 `cards_json`、`schema_migrations`
+逐项对照见 `docs/MIGRATION_VERIFICATION.md`。
+
+### 8.6 测试补全（可注入随机源，不靠碰概率）
+
+`DDT_FORGE_RANDOM=always-success | always-fail | fixed:<0..1> | sequence:a,b,c`。
+`tests/server/forge-rules.test.mjs` 覆盖：槽位数量与互不重复校验、幸运符 / 神恩符实际生效、
+成功 / 失败 / 等级上限 / 金币不足 / 材料不足、合成石拒绝、同一 `requestId` 重复与并发、
+旧存档迁移与重启恢复、装备后下一场战斗属性与 `baseWeaponId` 弹道表现。
+`tests/server/e2e.test.mjs` 旧断言 `items.length===5` 更新为按 `kind` 分类断言
+（6 强化石 / 20 合成石 / 4 幸运符 / 1 神恩符 = 31），**未删测试**。
+`browser-e2e.mjs` 增加 `ensureForgeTestAssets()` 仅在临时测试库补足一次强化所需金币与
+`strength1`，**不改正常掉落规则、不改生产代码、不触碰用户存档**；
+`doStrengthen()` 补 `catch`，服务端拒绝时明确显示错误而非静默超时。
+
+### 8.7 真实截图
+
+`docs/screenshots/2026-11-28-settlement.png`（结算九宫格）、
+`2026-11-28-forge.png`（铁匠铺顶部规则摘要 + 材料区 + 强化结果）、
+`2026-11-28-room-after-reload.png`（刷新后存档保留）。归档自最新浏览器验收临时目录。
+
+### 8.8 推送诊断纠正（按用户反馈）
+
+此前把 403 写成「账号无权限」是**错误结论**。用户指出截图已证明 Token 缺少
+`Contents: Read and write`。用户保存该权限后，用同一 Token、经环境变量 + 临时
+credential.helper 注入（**Token 未写入远程 URL / 源码 / 文档 / 命令行参数 / 日志**），
+`git push -u origin feat/node-server-mode` 非强制推送一次成功；
+`git ls-remote` 校验远程 SHA `039b338d68303b15e30ee1ebcd4b14dbfad2cf58` 与本地 HEAD 一致。
+
+### 8.9 阶段 8 全量验证结果（2026-11-28 实测，代码为阶段 8 工作树）
+
+| 项目 | 结果 |
+| --- | --- |
+| `npm run typecheck:server` | 通过，0 错误 |
+| `npm test` | **61 / 61 通过**（镜头断言已按设计更新，未删测试） |
+| `npm run test:server` | **6 / 6 通过**：业务闭环 + ORIGINAL 槽位/幸运符/成功/重放/并发/下一局 + 失败降级/神恩符/上限/损毁未接线 + LOCAL_RULE 金币/材料/合成石/扣费 + 奖励池对照与领取防重 + 旧存档迁移幂等 |
+| `npm run test:server:browser` | **11 项 UI 验收 + offline 回归通过**，页面无 JS 错误 |
+| `npm run test:server:perf` | 通过；后端空闲 RSS **108.39 MB**（heap 12.37 MB）、战斗中 **121.88 MB**（heap 16.38 MB）、浏览器 JS 堆 **2.08 MB**、DOM 1492、监听 173、首屏 170 请求 / encoded **3.04 MB**、`dist/` **30.46 MB** |
+| 凭证泄漏扫描 | 待提交文件中 `github_pat_` / `ghp_` / `x-access-token` **0 命中** |
+
+### 8.10 阶段 8 明确未完成（不得写成已完成）
+
+- 原版红金色铁匠铺 UI 与真实拖放交互 —— **未实现**，当前仍是标注的 `LOCAL_RULE` 临时界面。
+- 原版强化完整规则（属性成长 / 模板进阶 / 损毁 / VIP 等）—— **未还原**，保持 `ORIGINAL_PARTIAL`。
+- 原版音乐与音效 —— **未接入**（含 `BackMusic` 映射、战前加载音乐证据待查）。
+- 中文「极·」武器映射 —— **UNCONFIRMED**，正常池不含候选卡，专属素材未导入。
+- 手机横屏遮挡检查、多局连续资源 / 监听器 / WebSocket / 计时器增长观测 —— **未做**。
+- `docs/ASSET_MANIFEST.md`、`docs/AUDIO_MAPPING.md` —— 未按本轮证据同步。
