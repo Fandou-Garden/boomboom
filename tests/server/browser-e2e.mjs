@@ -124,6 +124,7 @@ async function main() {
   let browser;
   let staticServer;
   const results = [];
+  const errors = [];
   const pass = (name) => { results.push(`  ✓ ${name}`); };
   try {
     browser = await puppeteer.launch({
@@ -132,7 +133,6 @@ async function main() {
     });
     const page = await browser.newPage();
     await page.setViewport({ width: 1366, height: 768 });
-    const errors = [];
     page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
     page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
 
@@ -209,12 +209,41 @@ async function main() {
     assert(continueVisible, '未翻完的奖励盘应给出继续领取入口');
     pass('未翻完离开保留奖励盘，房间给出继续翻牌入口');
 
-    // 房间内打开铁匠铺
+    // 房间内打开铁匠铺：原版 store.swf 素材 + 真实 DOM 槽位
     await page.click('[data-action="open-forge"]');
-    await page.waitForFunction(() => !document.getElementById('ddtForge').hidden, { timeout: 10000 });
-    const forgeText = await page.evaluate(() => document.querySelector('.ddt-asset-note')?.textContent || '');
-    assert(forgeText.includes('原版铁匠铺 UI 素材未导出'), '铁匠铺必须明确标注临时界面，不冒充原版');
-    pass('房间内打开铁匠铺（原版素材缺失已标注）');
+    await page.waitForFunction(() => !document.getElementById('ddtForge').hidden
+      && document.querySelectorAll('.ddt-slot').length === 6, { timeout: 15000 });
+    const forgeUi = await page.evaluate(() => ({
+      note: document.querySelector('.ddt-asset-note')?.textContent || '',
+      rule: document.getElementById('ddtForgeRuleTop')?.textContent || '',
+      slots: [...document.querySelectorAll('.ddt-slot')].map((el) => ({
+        index: Number(el.dataset.slot), accept: el.dataset.accept,
+        x: el.style.getPropertyValue('--sx'), y: el.style.getPropertyValue('--sy'),
+      })),
+      bg: document.querySelector('.ddt-strength-bg')?.getAttribute('src') || '',
+      rate: document.getElementById('ddtSuccessRate')?.textContent || '',
+      bagCount: document.querySelectorAll('.ddt-bag-item').length,
+    }));
+    assert(forgeUi.note.includes('原版 store.swf') && forgeUi.note.includes('真实可交互 DOM'),
+      '铁匠铺必须标明素材来源与真实交互，不冒充原版强化规则');
+    assert.equal(forgeUi.slots.length, 6, '六个原版槽位齐全');
+    assert.deepEqual(forgeUi.slots.map((s) => s.accept),
+      ['strength-stone', 'strength-stone', 'strength-stone', 'god-charm', 'lucky-charm', 'weapon'],
+      '槽位类型须与 StoreIIStrengthBG.as 的 StoreCell 顺序一致');
+    assert.equal(forgeUi.slots[0].x, '106px', 'Strengthpoint0 x 应与 store.xml 一致');
+    assert.equal(forgeUi.slots[0].y, '-6px', 'Strengthpoint0 y 应与 store.xml 一致');
+    assert(forgeUi.bg.includes('store-strength-bg.jpg'), '必须使用导出的原版红金色强化台底图');
+    assert(forgeUi.rate.includes('成功率'), '成功率区域必须真实渲染');
+    assert(forgeUi.rule.includes('LOCAL_RULE'), '界面必须显示当前采用的规则版本');
+    assert(forgeUi.bagCount >= 31, '道具栏应展示全部登记材料');
+    pass('房间内打开原版素材铁匠铺（6 个真实槽位 / 装备栏 / 道具栏 / 成功率区）');
+
+    // 音效场景映射：地图音乐编号不等于地图编号
+    const audioMap = await page.evaluate(() => window.__GUNNY_HOOKS__?.audioDebug?.().sceneMap || null);
+    assert(audioMap, '必须暴露原版 BGM 映射供验收');
+    assert.equal(audioMap.mapBackMusic['1157'], '1071', '地图 1157 的 BackMusic 应为 1071');
+    assert.equal(audioMap.mapBackMusic['1049'], '1032', '地图 1049 的 BackMusic 应为 1032');
+    pass('原版 BGM 映射按 LoadMapsItems.xml 的 BackMusic，不默认等于地图编号');
 
     // 先补翻两张卡以保证强化材料充足，再强化
     const room = await get(base, '/api/server/room');
@@ -227,11 +256,75 @@ async function main() {
       }
     }
     ensureForgeTestAssets(dataDir);
+    // 刷新铁匠铺数据后，用真实点选把强化石放入 0 号槽，验证交互不是背景截图。
     await page.evaluate(async () => {
       const r = await fetch('/api/server/forge', { cache: 'no-store' });
-      const f = (await r.json()).forge;
-      window.__DDT_FORGE_BEFORE__ = f;
+      window.__DDT_FORGE_BEFORE__ = (await r.json()).forge;
     });
+    await page.click('[data-action="close-forge"]');
+    await page.click('[data-action="open-forge"]');
+    await page.waitForFunction(() => document.querySelectorAll('.ddt-bag-item').length >= 31, { timeout: 10000 });
+    const stoneKey = await page.evaluate(async () => {
+      const r = await fetch('/api/server/forge', { cache: 'no-store' });
+      const f = (await r.json()).forge;
+      const stock = (f.materials?.strengthStones || []).find((i) => Number(i.quantity) > 0);
+      return stock?.itemKey || null;
+    });
+    assert(stoneKey, '测试库应有可用的真强化石');
+    const stoneBox = await page.evaluate((key) => {
+      const el = document.querySelector(`.ddt-bag-item[data-item="${key}"]`);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      const s = getComputedStyle(el);
+      el.scrollIntoView({ block: 'center' });
+      return { w: r.width, h: r.height, x: r.x, y: r.y, display: s.display, visibility: s.visibility, disabled: el.disabled };
+    }, stoneKey);
+    assert(stoneBox && stoneBox.w > 0 && stoneBox.h > 0, `可用强化石必须可见可点击：${JSON.stringify(stoneBox)}`);
+    await page.click(`.ddt-bag-item[data-item="${stoneKey}"]`);
+    const slotPlaced = await page.evaluate(() => ({
+      filled: document.querySelector('.ddt-slot[data-slot="0"]')?.classList.contains('is-filled'),
+      label: document.querySelector('.ddt-slot[data-slot="0"]')?.textContent || '',
+      rate: document.getElementById('ddtSuccessRate')?.textContent || '',
+    }));
+    assert(slotPlaced.filled, '点选道具必须真实放入 0 号强化石槽');
+    assert(slotPlaced.rate.includes('成功率'), '放入材料后成功率区仍须渲染');
+    pass('点选道具真实放入强化石槽，成功率区同步更新');
+
+    // 拖放：原版 StoreDragInArea / DragManager 的交互路径也必须真实可用。
+    const dragPlaced = await page.evaluate((key) => {
+      const item = document.querySelector(`.ddt-bag-item[data-item="${key}"]`);
+      const slot = document.querySelector('.ddt-slot[data-slot="1"]');
+      if (!item || !slot) return { ok: false, reason: '槽位或道具不存在' };
+      const dt = new DataTransfer();
+      item.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+      slot.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+      slot.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+      // placeIntoS() 会 renderForge() 重绘槽位，必须重新查询 DOM，不能持有旧节点。
+      const fresh = document.querySelector('.ddt-slot[data-slot="1"]');
+      return { ok: !!fresh && fresh.classList.contains('is-filled'), payload: dt.getData('text/plain') };
+    }, stoneKey);
+    assert(dragPlaced.ok, `拖放道具必须真实放入 1 号槽：${JSON.stringify(dragPlaced)}`);
+    await page.click('.ddt-slot[data-slot="1"]');
+    assert(!(await page.evaluate(() =>
+      document.querySelector('.ddt-slot[data-slot="1"]').classList.contains('is-filled'))),
+    '点击已填充槽位应移除材料');
+    pass('拖放道具真实放入槽位，点击槽位可移除（交互不依赖背景截图）');
+
+    // 音频资源实际可达，避免把「文件已导出」误当作「运行时能播放」。
+    const audioFiles = await page.evaluate(async () => {
+      const urls = [
+        'assets/audio/bgm-room-065.mp3', 'assets/audio/bgm-map-1071.mp3',
+        'assets/audio/bgm-map-1032.mp3', 'assets/audio/sound-014-countdown.mp3',
+        'assets/audio/sound-067-countdown.mp3',
+      ];
+      return Promise.all(urls.map(async (u) => {
+        const r = await fetch(u, { headers: { Range: 'bytes=0-3' } });
+        return { u, ok: r.ok, status: r.status };
+      }));
+    });
+    assert(audioFiles.every((x) => x.ok), `原版 BGM / 倒计时音效必须可访问：${JSON.stringify(audioFiles)}`);
+    pass('阶段 9 导出的 BGM 与倒计时音效资源实际可达');
+
     await page.click('[data-action="strengthen"]');
     await page.waitForFunction(() => {
       const el = document.getElementById('ddtForgeResult');
@@ -250,6 +343,7 @@ async function main() {
     assert.equal(forgeResult.level, 1, '强化等级 +1');
     assert.equal(forgeResult.attack, 125, '强化后攻击 125');
     pass('铁匠铺强化成功，等级与攻击属性由服务端更新');
+    await sleep(1800); // 结果特效 1.6s 后消失，交付截图需完整展示 6 个槽位
     await page.screenshot({ path: path.join(dataDir, 'forge.png') });
 
     // 关闭铁匠铺回到同一个房间
@@ -307,6 +401,9 @@ async function main() {
     console.log(`截图：${dataDir}/settlement.png, forge.png, room-after-reload.png`);
   } catch (error) {
     console.error('\n[ddt-browser-e2e] 失败：', error.message);
+    console.error('阶段：', results.at(-1) || '(首个断言前)');
+    if (error.stack) console.error('调用栈：\n' + error.stack.split('\n').slice(0, 8).join('\n'));
+    if (errors.length) console.error('页面错误：\n' + errors.slice(-20).join('\n'));
     console.error('服务端日志：\n', server.logs().slice(-3000));
     process.exitCode = 1;
   } finally {

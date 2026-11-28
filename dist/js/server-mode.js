@@ -8,8 +8,11 @@
  * 素材说明：
  *  - 房间背景 / 角色 / 地图框 / 结算卡片：均为仓库已导出的原版 room.swf、
  *    gameover.swf 素材（dist/assets/ui/、dist/assets/map-*-thumb.jpg）。
- *  - 铁匠铺原版 UI 素材未导出，面板明确标注「单机临时界面」并保留
- *    data-asset-slot="forge-panel" 替换入口，不冒充原版界面。
+ *  - 铁匠铺：阶段 9 起使用旧版对照库 store.swf 导出的原版红金色素材
+ *    （dist/assets/forge/），按 store.xml 的 Strengthpoint0..5 点位摆放
+ *    **真实 DOM 槽位**，支持点选 / 拖放，背景图不覆盖任何交互。
+ *    界面素材为原版，但强化规则另由服务端规则版本决定（LOCAL_RULE /
+ *    ORIGINAL_PARTIAL），界面明确标注，不冒充「原版强化规则已还原」。
  */
 import { dataApi } from './data-api.js?v=33';
 
@@ -23,6 +26,10 @@ const state = {
   currentBattleId: null,
   selectedForgeWeapon: null,
   selectedForgeItem: '',
+  /** 原版 StoreBag 槽位 0/1/2 强化石、3 神恩符、4 幸运符、5 待强化装备。 */
+  forgeSlots: [null, null, null, null, null, null],
+  activeSlot: null,
+  forgeResult: null,
   cardTimer: 0,
   forgeOpen: false,
 };
@@ -49,7 +56,7 @@ export function paintWalletChips(wallet) {
   if (coins) coins.textContent = fmt(coinCount);
   if (stones) stones.textContent = fmt(stoneCount);
   $('walletCoinsChip')?.setAttribute('aria-label', `金币 ${coinCount}`);
-  $('walletStonesChip')?.setAttribute('aria-label', `玄武石 ${stoneCount}`);
+  $('walletStonesChip')?.setAttribute('aria-label', `材料 ${stoneCount}`);
   dataApi.wallet = wallet;
 }
 
@@ -97,36 +104,91 @@ function buildLayer() {
     </section>
 
     <section class="ddt-forge" id="ddtForge" aria-label="铁匠铺" hidden>
-      <div class="ddt-forge-panel" data-asset-slot="forge-panel">
+      <div class="ddt-forge-frame" data-asset-slot="forge-panel">
         <header class="ddt-forge-head">
-          <h2>铁匠铺 · 武器强化</h2>
-          <button class="ddt-btn ddt-btn-ghost" type="button" data-action="close-forge">关闭，返回房间</button>
+          <div><h2>铁匠铺 · 武器强化</h2>
+            <p class="ddt-asset-note">原版 store.swf 红金色素材 · 槽位/按钮为真实可交互 DOM · 规则版本见下方，不代表原版强化规则已还原</p></div>
+          <div class="ddt-forge-head-actions">
+            <button class="ddt-btn ddt-btn-ghost" type="button" data-action="forge-volume" data-volume="0.12">音量 低</button>
+            <button class="ddt-btn ddt-btn-ghost" type="button" data-action="forge-volume" data-volume="0.22">音量 中</button>
+            <button class="ddt-btn ddt-btn-ghost" type="button" data-action="forge-volume" data-volume="0">静音</button>
+            <button class="ddt-btn ddt-btn-ghost" type="button" data-action="close-forge">关闭，返回房间</button>
+          </div>
         </header>
-        <p class="ddt-asset-note">原版铁匠铺 UI 素材未导出 · 以下为明确标注的单机临时界面（保留替换入口），不代表原版界面或原版强化规则</p>
         <div class="ddt-forge-rule-top" id="ddtForgeRuleTop"></div>
-        <div class="ddt-forge-grid">
-          <div class="ddt-forge-col">
-            <h3>拥有武器</h3>
-            <div class="ddt-forge-weapons" id="ddtForgeWeapons"></div>
+        <div class="ddt-forge-body">
+          <div class="ddt-strength-stage" id="ddtStrengthStage">
+            <img class="ddt-strength-bg" src="assets/forge/store-strength-bg.jpg?v=34" alt="原版强化台背景" draggable="false">
+            <div class="ddt-strength-cells" id="ddtStrengthCells"></div>
+            <div class="ddt-success-rate" id="ddtSuccessRate"></div>
+            <button class="ddt-strength-btn" type="button" data-action="strengthen" id="ddtStrengthBtn"
+                    aria-label="确认强化" title="确认强化（原版 store.StrengthBtn）">
+              <img src="assets/forge/btn-strength.png?v=34" alt="">
+            </button>
+            <div class="ddt-forge-result-art" id="ddtForgeResultArt" hidden></div>
           </div>
-          <div class="ddt-forge-col">
-            <h3>强化材料与规则</h3>
-            <div class="ddt-forge-materials" id="ddtForgeMaterials"></div>
-            <div class="ddt-forge-rule" id="ddtForgeRule"></div>
-          </div>
-          <div class="ddt-forge-col ddt-forge-detail">
-            <h3>强化预览</h3>
-            <div id="ddtForgeDetail"></div>
-            <button class="ddt-btn ddt-btn-start" type="button" data-action="strengthen">确认强化</button>
-            <p class="ddt-forge-result" id="ddtForgeResult"></p>
-          </div>
+          <aside class="ddt-forge-side">
+            <div class="ddt-forge-col">
+              <h3><img src="assets/forge/tab-equip.png?v=34" alt="">装备栏（点击放入 5 号槽）</h3>
+              <div class="ddt-forge-weapons" id="ddtForgeWeapons"></div>
+            </div>
+            <div class="ddt-forge-col">
+              <h3><img src="assets/forge/tab-prop.png?v=34" alt="">道具栏（点击放入选中槽 / 拖到槽位）</h3>
+              <div class="ddt-forge-bag" id="ddtForgeBag"></div>
+            </div>
+            <div class="ddt-forge-col ddt-forge-detail">
+              <h3>强化预览</h3>
+              <div id="ddtForgeDetail"></div>
+              <div class="ddt-forge-rule" id="ddtForgeRule"></div>
+            </div>
+          </aside>
         </div>
+        <p class="ddt-forge-result" id="ddtForgeResult"></p>
       </div>
     </section>
   `;
   document.body.appendChild(layer);
   state.layer = layer;
   layer.addEventListener('click', onLayerClick);
+  // 原版 StoreDragInArea / DragManager：道具栏可拖放到槽位。
+  layer.addEventListener('dragstart', (event) => {
+    const item = event.target.closest('[data-action="forge-bag-item"], [data-action="forge-weapon"]');
+    if (!item || item.disabled) { event.preventDefault(); return; }
+    const payload = item.dataset.action === 'forge-weapon'
+      ? { kind: 'weapon', key: item.dataset.weapon }
+      : { kind: item.dataset.kind, key: item.dataset.item };
+    event.dataTransfer.setData('text/plain', JSON.stringify(payload));
+    event.dataTransfer.effectAllowed = 'move';
+  });
+  layer.addEventListener('dragover', (event) => {
+    const slot = event.target.closest('.ddt-slot');
+    if (!slot) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    slot.classList.add('is-drop-target');
+  });
+  layer.addEventListener('dragleave', (event) => {
+    event.target.closest('.ddt-slot')?.classList.remove('is-drop-target');
+  });
+  layer.addEventListener('drop', (event) => {
+    const slotEl = event.target.closest('.ddt-slot');
+    if (!slotEl) return;
+    event.preventDefault();
+    slotEl.classList.remove('is-drop-target');
+    let payload;
+    try { payload = JSON.parse(event.dataTransfer.getData('text/plain')); } catch { return; }
+    const index = Number(slotEl.dataset.slot);
+    if (!slotAccepts(index, payload.kind)) {
+      setStatus('该道具不能放入此槽位（槽位类型不匹配）', true);
+      return;
+    }
+    if (!placeIntoS(index, payload.key, state.forge)) {
+      setStatus('放入槽位失败', true);
+      return;
+    }
+    if (payload.kind === 'weapon') state.selectedForgeWeapon = payload.key;
+    setStatus(`已拖入 ${SLOT_LAYOUT[index].label}：${payload.key}`);
+  });
 }
 
 function renderRoom(room) {
@@ -137,7 +199,7 @@ function renderRoom(room) {
 
   $('ddtWallet').innerHTML = `
     <span class="ddt-chip"><img src="assets/ui/icon-gold.png?v=33" alt=""><b>${fmt(room.wallet.coins)}</b><small>金币</small></span>
-    <span class="ddt-chip"><img src="assets/ui/icon-stones.png?v=33" alt=""><b>${fmt(stoneTotal(room.wallet))}</b><small>玄武石</small></span>`;
+    <span class="ddt-chip"><img src="assets/ui/icon-stones.png?v=33" alt=""><b>${fmt(stoneTotal(room.wallet))}</b><small>材料</small></span>`;
 
   $('ddtEquipped').innerHTML = `
     <div class="ddt-label">当前武器</div>
@@ -182,35 +244,133 @@ function renderRoom(room) {
     : `当前地图：${esc(room.mapName)} · ${room.maps.length} 张可选`;
 }
 
+/**
+ * store.xml:215-220 的 Strengthpoint0..5（相对 StoreIIStrengthBG x=65 y=30）。
+ * 0/1/2 强化石、3 神恩符、4 幸运符、5 待强化装备 —— 与
+ * StoreIIStrengthBG.as:133-158 的 StoreCell 创建顺序完全一致。
+ * 坐标是原版实测值，不是按截图目测摆放。
+ */
+const SLOT_LAYOUT = [
+  { index: 0, x: 106, y: -6, kind: 'strength-stone', label: '强化石 1', frame: 'slot-strength.png' },
+  { index: 1, x: 206, y: 95, kind: 'strength-stone', label: '强化石 2', frame: 'slot-strength.png' },
+  { index: 2, x: 106, y: 195, kind: 'strength-stone', label: '强化石 3', frame: 'slot-strength.png' },
+  { index: 3, x: 6, y: 141, kind: 'god-charm', label: '神恩符', frame: 'slot-god.png' },
+  { index: 4, x: 6, y: 49, kind: 'lucky-charm', label: '幸运符', frame: 'slot-lucky.png' },
+  { index: 5, x: 123, y: 111, kind: 'weapon', label: '待强化装备', frame: 'slot-equip.png' },
+];
+
+/** 把 forge.materials 的 rate/property2 等原版字段并回钱包条目。 */
+function forgeItemLookup(forge) {
+  const m = forge.materials || {};
+  const decorated = [
+    ...(m.strengthStones || []), ...(m.luckyCharms || []),
+    ...(m.godCharms || []), ...(m.composeStones || []),
+  ];
+  const byKey = new Map(decorated.map((i) => [i.itemKey, i]));
+  return (key) => {
+    const base = (forge.wallet?.items || []).find((i) => i.itemKey === key);
+    return base ? { ...base, ...(byKey.get(key) || {}) } : null;
+  };
+}
+
+function slotAccepts(index, kind) {
+  return SLOT_LAYOUT[index]?.kind === kind;
+}
+
+function placeIntoS(index, key, forge) {
+  if (!forge || !key) return false;
+  const item = forgeItemLookup(forge)(key);
+  if (item && !slotAccepts(index, item.kind)) return false;
+  state.forgeSlots[index] = key;
+  state.activeSlot = null;
+  renderForge(forge);
+  return true;
+}
+
+function renderSlots(forge) {
+  const get = forgeItemLookup(forge);
+  $('ddtStrengthCells').innerHTML = SLOT_LAYOUT.map((s) => {
+    const val = state.forgeSlots[s.index];
+    let inner = '<span class="ddt-slot-empty">空</span>';
+    if (val && s.kind === 'weapon') {
+      const w = forge.weapons.find((x) => x.id === val);
+      inner = `<span class="ddt-slot-weapon">${esc(w?.label || '装备')}<small>+${w?.level ?? 0}</small></span>`;
+    } else if (val) {
+      const item = get(val);
+      if (item) inner = `<img src="${esc(item.icon)}?v=34" alt=""><span>${esc(item.name)}</span>`;
+    }
+    return `<button class="ddt-slot ${val ? 'is-filled' : ''} ${state.activeSlot === s.index ? 'is-active' : ''}"
+        type="button" data-action="forge-slot" data-slot="${s.index}" data-accept="${s.kind}"
+        style="--sx:${s.x}px;--sy:${s.y}px"
+        title="${esc(s.label)} · store.xml Strengthpoint${s.index} (${s.x}, ${s.y})"
+        aria-label="${esc(s.label)}${val ? '（已放入，点击移除）' : '（点击选中后可放入道具）'}">
+        <img class="ddt-slot-frame" src="assets/forge/${s.frame}?v=34" alt="" draggable="false">
+        <span class="ddt-slot-content">${inner}</span>
+        <span class="ddt-slot-tag">${esc(s.label)}</span>
+      </button>`;
+  }).join('');
+}
+
+function renderBag(forge) {
+  const compose = (i) => i.kind === 'compose-stone';
+  $('ddtForgeBag').innerHTML = (forge.wallet.items || []).map((i) => `
+    <button class="ddt-bag-item ${compose(i) ? 'is-compose' : ''}" type="button"
+            data-action="forge-bag-item" data-item="${esc(i.itemKey)}" data-kind="${esc(i.kind)}"
+            draggable="${compose(i) ? 'false' : 'true'}" ${compose(i) ? 'disabled' : ''}
+            title="${esc(i.name)} · TemplateID ${i.templateId ?? '—'} · ${esc(i.kind)}${compose(i) ? ' · 合成石，不能作为强化材料' : ''}">
+      <img src="${esc(i.icon)}?v=34" alt="" draggable="false"><b>${fmt(i.quantity)}</b>
+      <small>${compose(i) ? '合成石' : esc(i.name)}</small>
+    </button>`).join('');
+}
+
+function renderSuccessRate(forge, weapon) {
+  const isOriginal = forge.rules === 'original';
+  let headline;
+  let detail;
+  if (isOriginal) {
+    const get = forgeItemLookup(forge);
+    const stones = state.forgeSlots.slice(0, 3).filter(Boolean).map(get).filter(Boolean);
+    const probability = stones.reduce((sum, i) => sum + Number(i.rate || 0), 0);
+    const lucky = state.forgeSlots[4] ? get(state.forgeSlots[4]) : null;
+    // 与 services.ts originalRuleFor() 同公式：C# 整数除法 property2/100。
+    const num2 = lucky ? probability + Math.trunc(Number(lucky.property2 || 0) / 100) : 0;
+    const rock = Number(weapon?.cost?.rock
+      || (forge.levelTable || []).find((r) => r.level === Number(weapon?.level || 0) + 1)?.rock || 0);
+    const pct = rock ? Math.min(100, Math.max(0, (probability + num2) / rock * 100)) : 0;
+    headline = `${pct.toFixed(1)}%`;
+    detail = `材料 ${fmt(probability)} + 幸运 ${fmt(num2)} / Rock ${fmt(rock)} · 服务端同公式预览`;
+  } else {
+    headline = `${Math.round(Number(weapon?.cost?.successRate || 0) * 100)}%`;
+    detail = `LOCAL_RULE 固定成功率 · 金币 ${fmt(weapon?.cost?.coins || 0)}`;
+  }
+  $('ddtSuccessRate').innerHTML = `
+    <img src="assets/forge/rate-label.png?v=34" alt="">
+    <div class="ddt-rate-body"><span>成功率</span><b>${headline}</b><small>${esc(detail)}</small></div>`;
+}
+
 function renderForge(forge) {
   if (!forge) return;
   state.forge = forge;
   paintWalletChips(forge.wallet);
-  const selectedId = state.selectedForgeWeapon || forge.weapons.find((w) => w.equipped)?.id || forge.weapons[0]?.id;
+  const selectedId = state.forgeSlots[5] || state.selectedForgeWeapon
+    || forge.weapons.find((w) => w.equipped)?.id || forge.weapons[0]?.id;
   state.selectedForgeWeapon = selectedId;
-  const weapon = forge.weapons.find((w) => w.id === selectedId) || forge.weapons[0];
+  // 装备槽默认显示当前选中的武器（真实槽位，不是文字说明）。
+  if (!state.forgeSlots[5] && selectedId) state.forgeSlots[5] = selectedId;
+  const weapon = forge.weapons.find((w) => w.id === state.forgeSlots[5]) || forge.weapons[0];
 
   $('ddtForgeWeapons').innerHTML = forge.weapons.map((w) => `
-    <button class="ddt-forge-weapon ${w.id === selectedId ? 'is-active' : ''}" type="button"
-            data-action="forge-weapon" data-weapon="${esc(w.id)}">
+    <button class="ddt-forge-weapon ${w.id === state.forgeSlots[5] ? 'is-active' : ''}" type="button"
+            data-action="forge-weapon" data-weapon="${esc(w.id)}" draggable="true">
       <span>${esc(w.label)}</span><small>+${w.level} · 攻击 ${fmt(w.attack)}</small>
     </button>`).join('');
 
-  $('ddtForgeMaterials').innerHTML = `
-    <div class="ddt-forge-balance">金币 <b>${fmt(forge.wallet.coins)}</b></div>
-    <div class="ddt-mat-row">${forge.wallet.items.map((i) => {
-      const compose = i.kind === 'compose-stone';
-      return `<button class="ddt-mat ddt-mat-pick ${state.selectedForgeItem === i.itemKey ? 'is-active' : ''} ${compose ? 'is-compose' : ''}" type="button"
-              data-action="forge-item" data-item="${esc(i.itemKey)}"
-              title="${esc(i.name)} · TemplateID ${i.templateId ?? '—'} · ${esc(i.kind)}${compose ? ' · 合成材料，不能作为强化石' : ''}" ${compose ? 'disabled' : ''}>
-        <img src="${esc(i.icon)}?v=33" alt="" draggable="false"><b>${fmt(i.quantity)}</b><small>${compose ? '合成石' : esc(i.name)}</small>
-      </button>`;
-    }).join('')}</div>
-    <p class="ddt-hint">四圣兽石（玄武/青龙/白虎/朱雀）是合成材料，不能作为强化石；服务端同样拒绝。不选材料时由服务端自动挑选库存中的真强化石。</p>`;
+  renderSlots(forge);
+  renderBag(forge);
+  renderSuccessRate(forge, weapon);
 
   const isOriginal = forge.rules === 'original';
   const unported = forge.notPorted || [];
-  // 顶部摘要始终可见（材料区可滚动，详细规则在材料列下方）。
   $('ddtForgeRuleTop').innerHTML = `
     <b>当前规则：${esc(forge.activeRuleLabel || forge.ruleSource)}</b>
     <span> · 规则来源 ${esc(forge.ruleSource)}</span>
@@ -218,14 +378,14 @@ function renderForge(forge) {
     ${unported.length ? `<span> · 未还原/未接线 ${unported.length} 项（详见下方）</span>` : ''}
     <span> · 武器映射 ${esc(forge.weaponMappingStatus || '—')}</span>`;
   $('ddtForgeRule').innerHTML = `
-    <div class="ddt-label">当前规则：${esc(forge.activeRuleLabel || forge.ruleSource)}</div>
+    <div class="ddt-label">规则证据（不是原版强化已完成）</div>
     <p>${esc(forge.ruleNote)}</p>
     <p class="ddt-hint">属性成长来源：${esc(forge.attackGrowthSource || '—')}</p>
     ${unported.length ? `<p class="ddt-hint">未还原 / 未接线：${esc(unported.join('、'))}</p>` : ''}
     ${forge.weaponMappingStatus ? `<p class="ddt-hint">武器映射：${esc(forge.weaponMappingStatus)}</p>` : ''}
     ${forge.composeStoneNote ? `<p class="ddt-hint">${esc(forge.composeStoneNote)}</p>` : ''}
     ${isOriginal ? '<p class="ddt-hint">原版链路不扣金币，只消耗槽位材料（ItemStrengthenHandler.cs:113）。三强化石槽 + 幸运符 + 神恩符由服务端校验。</p>' : ''}
-    <p class="ddt-asset-note">原版铁匠铺 UI 与音效尚未导出，以下为明确标注的单机临时界面（保留替换入口），不代表原版界面或原版强化规则已还原。</p>`;
+    <p class="ddt-asset-note">界面素材来自旧版对照库 store.swf（见 docs/FORGE_UI_EVIDENCE.md）；槽位与按钮为真实 DOM，原版强化规则仍未还原完成。</p>`;
 
   if (weapon) {
     const cost = weapon.cost;
@@ -237,11 +397,12 @@ function renderForge(forge) {
         <dt>强化后攻击</dt><dd class="is-good">${fmt(cost.nextAttack)}（成功时）</dd>
         <dt>消耗金币</dt><dd>${fmt(cost.coins)}</dd>
         <dt>材料要求</dt><dd>${isOriginal ? `${fmt(cost.requiredUnits)} 个槽位（1~3 颗强化石，Rock ${fmt(cost.rock ?? 0)}）` : `${fmt(cost.requiredUnits)} 点`}</dd>
-        <dt>成功率</dt><dd>${isOriginal ? '由槽位材料决定' : `${Math.round(cost.successRate * 100)}%`}</dd>
         <dt>上限</dt><dd>+${weapon.maxLevel}</dd>
         <dt>规则版本</dt><dd>${esc(weapon.ruleVersion || 'LOCAL_RULE')}</dd>
       </dl>`;
   }
+  const btn = $('ddtStrengthBtn');
+  if (btn) btn.disabled = !weapon?.canStrengthen;
 }
 
 async function onLayerClick(event) {
@@ -267,6 +428,8 @@ async function onLayerClick(event) {
       state.forgeOpen = true;
       $('ddtRoom').hidden = true;
       $('ddtForge').hidden = false;
+      // 原版 BaseStoreView 进商店 pauseMusic()，没有独立铁匠铺 BGM。
+      window.__GUNNY_HOOKS__?.audioPause?.();
       renderForge(await dataApi.getForge());
       return;
     }
@@ -275,17 +438,45 @@ async function onLayerClick(event) {
       state.forgeOpen = false;
       $('ddtForge').hidden = true;
       $('ddtRoom').hidden = false;
+      window.__GUNNY_HOOKS__?.audioResume?.();
       renderRoom(await dataApi.getRoom());
       return;
     }
     if (action === 'forge-weapon') {
+      // 装备栏点击 = 放入 5 号槽（原版 StreangthItemCell）。
       state.selectedForgeWeapon = target.dataset.weapon;
+      state.forgeSlots[5] = target.dataset.weapon;
       renderForge(state.forge);
       return;
     }
-    if (action === 'forge-item') {
-      state.selectedForgeItem = state.selectedForgeItem === target.dataset.item ? '' : target.dataset.item;
+    if (action === 'forge-slot') {
+      const index = Number(target.dataset.slot);
+      if (state.forgeSlots[index]) {
+        state.forgeSlots[index] = null; // 已放入 -> 点击移除
+      } else {
+        state.activeSlot = state.activeSlot === index ? null : index;
+      }
       renderForge(state.forge);
+      return;
+    }
+    if (action === 'forge-bag-item') {
+      const key = target.dataset.item;
+      const kind = target.dataset.kind;
+      let slot = state.activeSlot;
+      if (slot == null || !slotAccepts(slot, kind)) {
+        slot = SLOT_LAYOUT.findIndex((s) => s.index < 5 && s.kind === kind && !state.forgeSlots[s.index]);
+      }
+      if (slot >= 0 && placeIntoS(slot, key, state.forge)) {
+        setStatus(`已放入 ${SLOT_LAYOUT[slot].label}：${key}`);
+      } else {
+        setStatus('该道具不能放入当前槽位（合成石不可用于强化）', true);
+      }
+      return;
+    }
+    if (action === 'forge-volume') {
+      const v = Number(target.dataset.volume);
+      window.__GUNNY_HOOKS__?.audioVolume?.(v);
+      setStatus(v === 0 ? '背景音乐已静音' : `背景音乐音量 ${Math.round(v * 100)}%`);
       return;
     }
     if (action === 'strengthen') {
@@ -312,24 +503,43 @@ function setStatus(text, alert = false) {
 
 async function doStrengthen(button) {
   const forge = state.forge;
-  const weapon = forge?.weapons.find((w) => w.id === state.selectedForgeWeapon);
+  const slots = state.forgeSlots;
+  const weaponId = slots[5] || state.selectedForgeWeapon;
+  const weapon = forge?.weapons.find((w) => w.id === weaponId);
   if (!weapon) return;
   if (!weapon.canStrengthen) { setStatus('武器已达强化上限', true); return; }
+  const strengthSlots = slots.slice(0, 3).filter(Boolean);
   button.disabled = true;
   const panel = $('ddtForge');
   panel.classList.remove('is-success', 'is-fail');
   try {
     const result = await dataApi.strengthen({
       weaponInstanceId: weapon.id,
-      itemKey: state.selectedForgeItem || undefined,
+      // LOCAL_RULE 用 itemKey 折算单位；ORIGINAL 用三个真实槽位。
+      itemKey: strengthSlots[0] || state.selectedForgeItem || undefined,
+      slots: strengthSlots,
+      luckyCharm: slots[4] || undefined,
+      godCharm: slots[3] || undefined,
       requestId: dataApi.newRequestId(),
     });
     panel.classList.add(result.success ? 'is-success' : 'is-fail');
-    // 站点版既有音效（原版强化音效未导出，不冒充原版音效）。
+    // 强化结果沿用原版 063/064（StoreTips 内部封装，源码未提供，标注未确认）。
     window.__GUNNY_HOOKS__?.playSound?.(result.success ? 'win' : 'lose');
+    const art = $('ddtForgeResultArt');
+    if (art) {
+      art.hidden = false;
+      art.style.backgroundImage = `url("assets/forge/${result.success ? 'result-success' : 'result-fail'}.png?v=34")`;
+      // 原版结果特效只作短暂反馈，1.6s 后移除，避免长期遮挡槽位交互。
+      window.clearTimeout(state.forgeResult);
+      state.forgeResult = window.setTimeout(() => { art.hidden = true; }, 1600);
+    }
     $('ddtForgeResult').textContent = result.success
       ? `强化成功：+${result.weapon.levelBefore} → +${result.weapon.levelAfter}，攻击 ${result.weapon.attackBefore} → ${result.weapon.attackAfter}`
       : `强化失败：等级保持 +${result.weapon.levelAfter}，金币与材料已按规则扣除`;
+    // 材料已被消耗，清空材料槽；装备槽保留当前武器。
+    state.forgeSlots = [null, null, null, null, null, weapon.id];
+    state.activeSlot = null;
+    state.selectedForgeWeapon = weapon.id;
     renderForge(await dataApi.getForge());
     renderRoom(await dataApi.getRoom());
   } catch (error) {
@@ -348,6 +558,9 @@ async function startBattle(button) {
   try {
     const result = await dataApi.startBattle();
     state.currentBattleId = result.battleId;
+    // 原版 GameViewBase 按 LoadMapsItems.xml 的 BackMusic 播放战斗音乐；
+    // 地图编号 ≠ 音乐编号（如 1157 -> 1071），映射见 audio-scenes.js。
+    window.__GUNNY_HOOKS__?.audioScene?.('battle', state.room?.mapId);
     hideLayer();
     setStatus('', false);
     window.__GUNNY_HOOKS__?.playSound?.('008');
@@ -362,6 +575,8 @@ function showLayer() {
   $('ddtForge').hidden = true;
   $('ddtRoom').hidden = false;
   state.forgeOpen = false;
+  // 原版 BaseRoomState.as: playMusic("065")。
+  window.__GUNNY_HOOKS__?.audioScene?.('room');
 }
 
 function hideLayer() {
@@ -479,9 +694,9 @@ export async function renderServerCards({ resultData, sound, showToast }) {
   }
 
   const refresh = () => {
-    if (sumEl) sumEl.textContent = `已翻开 ${picksUsed}/${MAX} · 金币 +${fmt(tally.coins)} · 玄武石 +${fmt(tally.stones)}`;
+    if (sumEl) sumEl.textContent = `已翻开 ${picksUsed}/${MAX} · 金币 +${fmt(tally.coins)} · 材料 +${fmt(tally.stones)}`;
     if (balanceEl && board.wallet) {
-      balanceEl.textContent = `存档余额：金币 ${fmt(board.wallet.coins)} · 玄武石 ${fmt(stoneTotal(board.wallet))}`;
+      balanceEl.textContent = `存档余额：金币 ${fmt(board.wallet.coins)} · 材料 ${fmt(stoneTotal(board.wallet))}`;
     }
   };
 
@@ -506,9 +721,12 @@ export async function renderServerCards({ resultData, sound, showToast }) {
   } else {
     let remaining = 5;
     if (timer) timer.textContent = `翻牌倒计时 ${remaining}s`;
+    // 原版 CardCountDown.as：067 起始提示 + 014 每秒滴答。
+    sound?.play?.('067');
     state.cardTimer = window.setInterval(() => {
       remaining -= 1;
       if (timer) timer.textContent = `翻牌倒计时 ${Math.max(0, remaining)}s`;
+      if (remaining > 0) sound?.play?.('014');
       if (remaining <= 0) finish(true);
     }, 1000);
   }
@@ -534,7 +752,7 @@ export async function renderServerCards({ resultData, sound, showToast }) {
       board.wallet = result.wallet;
       paintWalletChips(result.wallet);
       refresh();
-      if (balanceEl) balanceEl.textContent = `存档余额：金币 ${fmt(result.wallet.coins)} · 玄武石 ${fmt(stoneTotal(result.wallet))}`;
+      if (balanceEl) balanceEl.textContent = `存档余额：金币 ${fmt(result.wallet.coins)} · 材料 ${fmt(stoneTotal(result.wallet))}`;
       if (closed) {
         for (const c of cards) if (!c.classList.contains('is-flipped')) c.classList.add('is-disabled');
         window.clearInterval(state.cardTimer);

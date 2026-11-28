@@ -194,7 +194,7 @@
 1. **【已解决】推送开发分支失败（2026-11-28 早期实测，历史记录）**。
    - `git push -u origin feat/node-server-mode` 返回
      `remote: Invalid username or token. Password authentication is not supported for Git operations.`
-   - 诊断：`credential.helper=store`，`~/.git-credentials` 内含一条 40 字符 `ghp_` 前缀 classic PAT
+   - 诊断：`credential.helper=store`，`~/.git-credentials` 内含一条 40 字符 classic PAT
      （另有 gitlab 条目）；`gh auth status` 亦报告 `The token in default is invalid.`；
      SSH `git@github.com:22` 连接超时（网络侧阻断，非密钥问题）。匿名 HTTPS **读取**正常，
      仅写操作认证失败。
@@ -366,7 +366,7 @@ credential.helper 注入（**Token 未写入远程 URL / 源码 / 文档 / 命�
 | `npm run test:server` | **6 / 6 通过**：业务闭环 + ORIGINAL 槽位/幸运符/成功/重放/并发/下一局 + 失败降级/神恩符/上限/损毁未接线 + LOCAL_RULE 金币/材料/合成石/扣费 + 奖励池对照与领取防重 + 旧存档迁移幂等 |
 | `npm run test:server:browser` | **11 项 UI 验收 + offline 回归通过**，页面无 JS 错误 |
 | `npm run test:server:perf` | 通过；后端空闲 RSS **108.39 MB**（heap 12.37 MB）、战斗中 **121.88 MB**（heap 16.38 MB）、浏览器 JS 堆 **2.08 MB**、DOM 1492、监听 173、首屏 170 请求 / encoded **3.04 MB**、`dist/` **30.46 MB** |
-| 凭证泄漏扫描 | 待提交文件中 `github_pat_` / `ghp_` / `x-access-token` **0 命中** |
+| 凭证泄漏扫描 | 待提交文件中 GitHub PAT 与凭证助手用户名字样 **0 命中** |
 
 ### 8.10 阶段 8 明确未完成（不得写成已完成）
 
@@ -376,3 +376,101 @@ credential.helper 注入（**Token 未写入远程 URL / 源码 / 文档 / 命�
 - 中文「极·」武器映射 —— **UNCONFIRMED**，正常池不含候选卡，专属素材未导入。
 - 手机横屏遮挡检查、多局连续资源 / 监听器 / WebSocket / 计时器增长观测 —— **未做**。
 - `docs/ASSET_MANIFEST.md`、`docs/AUDIO_MAPPING.md` —— 未按本轮证据同步。
+
+## 9. 阶段 9（2026-11-28）：原版铁匠铺 UI 与原版音频接入
+
+### 9.1 开工前 7 条核对（不重做已有成果）
+
+用户再次给出 7 条核对要求；逐项复核**阶段 8 已落地的实现**，确认无需重做：
+
+| 核对项 | 复核结果 | 证据 |
+| --- | --- | --- |
+| 1 极武器映射 | `HIGH_QUALITY_WEAPONS` 全部 `mappingStatus: 'UNCONFIRMED'`，使用上游真实名称（如 `VIP-Pháo（中文品质映射待确认）`）；正常池 `extremeChance=0`、不含候选卡，仅 `DDT_REWARD_POOL=test` 生成 1 张 | `server-node/src/original-data.ts:208+`、`config.ts:103`、`docs/WEAPON_MAPPING_EVIDENCE.md`（逐件含模板 ID / 品质 / 基础伤害 / 四维 / `Pic` / 强化前后模板关系） |
+| 2 原版强化执行链 | 默认 `LOCAL_RULE`；`DDT_FORGE_RULES=original` 才走 `ORIGINAL_PARTIAL`；三槽 / 幸运符 / 神恩符 / 概率 / 等级表逐项有源码证据，属性成长等未还原项保持未实现并在界面顶部显示 | `config.ts:126-165`、`docs/RULE_EVIDENCE.md`、`server-mode.js:374-388` |
+| 3 迁移 | `002` 只把 `xuanwu1..5` 改为 `compose-stone`，**无任何 `INSERT ... SELECT` 发放语句**；`003` 加 `rule_version DEFAULT 'LOCAL_RULE'`、不重算 `attack`；迁移测试用 Python `sqlite3.Connection.backup()`（SQLite backup API，WAL 安全） | `migrations/002_*.sql:13-15`、`003_*.sql:16`、`tests/server/migration.test.mjs:29-36,208-209` |
+| 4 奖励盘 | `reward_boards.pool_version / rules_version` 固化；`weapon_grants` 有 `UNIQUE(request_id)` + `UNIQUE(battle_id, card_index)`；领取与实例创建同事务，重放返回同一 `weaponInstanceId` | `003_*.sql:37,46-47`、`services.ts:596-636` |
+| 5 测试 | `forge-rules.test.mjs` 4 组 + `migration.test.mjs` + `e2e.test.mjs`；可注入随机源 `always-success / always-fail / fixed: / sequence:` | `server-node/src/services.ts:53-70`、`docs/RULE_EVIDENCE.md` 第 4 节 |
+| 6 阶段交付 | 阶段 8 已提交 `a639b72534559f692d3d23ad04aa095c701700b8`（57 文件）并推送，远程 SHA 一致；未写成「原版已还原」 | 本文件 8.8 / 8.9 / 8.10 |
+| 7 推送归因 | `README-SERVER.md` 已明确「403 的原因是 Token 缺少 Contents 权限，**不是账号无权限**」 | `README-SERVER.md:181-184` |
+
+**新 Token 复核**：`GET https://api.github.com/user` → `200 / login Orlandoo24`，凭证有效；
+fine-grained PAT 不返回 `X-OAuth-Scopes` 头，写权限只能以实际非强制推送结果判定，
+不预先归因于账号无权限。Token 仅经临时 credential helper 文件（chmod 600）传递，
+未写入远程 URL / 源码 / 文档 / 命令行参数 / 日志。
+
+### 9.2 原版铁匠铺 UI（阶段 8 的「未完成」项之一，本阶段实现）
+
+- 资源：`/tmp/gunny-30/.../ui/vietnam/swf/store.swf`（762,769 B）经 FFDec `-export image,symbolClass`
+  导出 125 个符号 / 124 张图；按符号名映射 23 张到 `dist/assets/forge/`，
+  附 `SOURCE_MANIFEST.json`（字节数 + SHA-256）。
+- 布局：`/tmp/gunny-30/.../xml/xml/store.xml` 的 `Strengthpoint0..5`
+  （`(106,-6) (206,95) (106,195) (6,141) (6,49) (123,111)`）、
+  `StrengthBtn x=72 y=322`、`StoreBagView x=405 y=59`；
+  `StoreIIStrengthBG.as:137-151` 定义 0/1/2 强化石、3 神恩符、4 幸运符、5 装备。
+- 实现：红金色 `strengthBG` 只作装饰底纹；6 个 `<button class="ddt-slot">` 为真实 DOM，
+  支持点选放入、拖放入槽、点击移除；装备栏 / 道具栏 / 成功率区 / 强化按钮均真实可用。
+  强化按钮不再叠加中文于原版越南文之上，结果特效 1.6 s 后隐藏。
+- 规则透明：顶部常驻当前规则（`LOCAL_RULE` / `ORIGINAL_PARTIAL`）、属性成长来源、
+  未还原项数、武器映射状态；界面明确标注「素材来自原版，规则未还原完成」。
+- 逐项证据与**明确不是原版还原的部分**（越南文底图占位、购买按钮未接线、
+  强化结果音未确认等）见 `docs/FORGE_UI_EVIDENCE.md`。
+
+### 9.3 原版音乐与音效（阶段 8 的「未接入」项，本阶段接入）
+
+- `LoadMapsItems.xml` 的 `BackMusic`：**1157 → 1071、1049 → 1032**，
+  证明音乐编号不等于地图编号；`audio-scenes.js` 按字段解析，不默认相等。
+- 从 `Resource/sound/*.flv` 用 FLV tag 解析**无损抽出内嵌 MP3 帧**（不重编码，
+  `afinfo` 校验）得到 14 条 BGM（房间 065 / 大厅 062 / 12 张地图）；
+  从 `audio.swf` 导出 `Sound014` / `Sound067`（Nellymoser）并用静态 FFmpeg 解码为倒计时音效。
+  `1156.flv`（1.53 MB）在旧版对照库中存在，已补齐此前记录的缺失项。
+- 运行时：场景切换淡出并 `disconnect()` 旧 source/gain，解码 buffer LRU 上限 3 条；
+  手势解锁、循环、音量、静音、`releaseBgm()` 均接入；翻牌倒计时 067 起始 + 014 每秒。
+- **未确认项如实保留**：原版铁匠铺**没有独立 BGM**（`BaseStoreView.as:452/466` 只
+  `pauseMusic` / `resumeMusic`）；战前加载无独立音乐调用证据，沿用同一条 BGM 压低音量；
+  强化结果音封装在 `StoreTips`，上游检出无该 AS 源码，SoundID 未确认。
+  见 `docs/AUDIO_EVIDENCE.md`。
+
+### 9.4 文档与资源同步
+
+- 新建 `docs/AUDIO_EVIDENCE.md`（118 行）、`docs/FORGE_UI_EVIDENCE.md`（107 行）。
+- 更新 `docs/AUDIO_MAPPING.md`（修正过时的「固定 1001 BGM」描述并补阶段 9 章节），
+  同步 `dist/docs/AUDIO_MAPPING.md`；更新 `docs/ASSET_MANIFEST.md` 第 7–9 节。
+- `SOURCE_MANIFEST.sha256` 从 261 条更新到 **307 条**（新增 14 BGM + 2 音效 +
+  24 forge 资源 + 新 js / 文档），`shasum -a 256 -c` 全部 OK。
+- 真实截图：`docs/screenshots/2026-11-28-stage9-{forge,settlement,room-after-reload}.png`
+  （铁匠铺截图在结果特效消失后拍摄，6 槽完整可见）。
+- `tests/server/browser-e2e.mjs` 新增 2 项断言：拖放入槽 + 点击移除、
+  BGM/倒计时音效资源实际可达（HTTP Range 请求）。
+- **修复既有 e2e 偶发失败（未删测试）**：`tests/server/e2e.test.mjs` 原固定翻
+  0/1/2 卡位，但服务端 9 张卡整体洗牌（无固定卡位），有概率三张皆非材料卡，
+  导致「原版强化石已入库」偶发失败。改为**白盒测试夹具**：从隔离临时库读
+  `cards_json`，挑「≥1 张材料卡 + ≥1 张金币卡」的 3 个卡位，并把宽松的 `>=`
+  断言升级为「金币 / 材料**严格等于**已翻卡面之和」+「夹具须足够一次强化」。
+  不改正常掉落规则与奖励池配置、不经过前端下发未翻卡内容、不删任何原有断言。
+
+### 9.5 阶段 9 全量验证（2026-11-28 实测）
+
+| 项目 | 结果 |
+| --- | --- |
+| `npm run typecheck:server` | 通过，0 错误 |
+| `npm test` | **61 / 61 通过** |
+| `npm run test:server` | **6 / 6 通过**；迁移测试实测 `旧金币=1234 新金币=1234 背包=[xuanwu1:3, xuanwu3:2] 武器attack=175 幂等=true` |
+| `npm run test:server:browser` | **15 项全通过**（新增拖放与音频资源可达），页面无 JS 错误；offline 静态托管回退通过 |
+| `npm run test:server:perf` | 通过；Node 空闲 RSS **108.55 MB**（heap 12.42 MB）、战斗中 **96.91 MB**（heap 16.91 MB）；浏览器 JS 堆 **2.05 MB**、DOM 1523、监听 177、首屏 177 请求 / encoded **3.14 MB**；`dist/` **41.13 MB**（较阶段 8 增加约 10.7 MB，为新增原版音频与铁匠铺素材） |
+| 凭证泄漏扫描 | 待提交文件中 GitHub PAT 与凭证助手用户名字样 **0 命中** |
+
+### 9.6 推送状态
+
+阶段 9 提交后使用用户提供的新 Token 经临时 credential helper
+**非强制推送开发分支一次**，`git ls-remote` 校验远程 SHA 与本地 HEAD；
+实际结果按成功 / 具体报错如实记录，不重复空转，不自动合并 `main`。
+
+### 9.7 阶段 9 之后仍未完成（不得写成「原版已还原」）
+
+- 原版强化完整规则：属性成长公式、模板进阶、失败损毁、VIP / 公会 / 开孔 / 绑定、
+  `StoneLevelMin` 服务端校验 —— 仍未还原，保持 `ORIGINAL_PARTIAL`。
+- 中文「极·」武器映射 —— 仍 `UNCONFIRMED`，正常奖励池不发放；专属逐帧 / 弹丸素材未导入。
+- 铁匠铺购买按钮（幸运符 / 神恩符 / 强化石 / 礼包）与商城、公会系统 —— 未接线。
+- 强化成功 / 失败原版音效 SoundID —— 未确认（`StoreTips` 源码缺失）。
+- 手机横屏控件遮挡检查、多局连续资源 / 事件监听 / WebSocket / 计时器增长观测 —— 未实测。
+- `art-source/` 已导出的 `lightFrame` / `starMc` / `VersusAnimation` / `GameMode_*` 逐帧序列 —— 未接入。

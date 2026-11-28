@@ -10,6 +10,7 @@ import { MAPS, getMap, resolveMapId } from './maps.js?v=33';
 import { MAP_MANIFEST, EXTRA_IDS, LOADED_KEY_PREFIX, mapAssetUrls, isCoreMap } from './map-manifest.js?v=33';
 import { loadSave, claimReward, hasClaimed, resetSave, formatAmount } from './save.js?v=33';
 import { dataApi } from './data-api.js?v=33';
+import { bgmFileFor, MAP_BACK_MUSIC, audioSceneDebug } from './audio-scenes.js?v=34';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -132,15 +133,21 @@ class SoundEngine {
     this.buffers = new Map();
     this.sampleLoading = null;
     this.sampleError = '';
-    // BGM: original map-1001 theme (Tank.Flash/resource/v1.1/sound/1001.flv,
-    // LoadMapsItems.xml BackMusic="1001"), transcoded to loopable mp3.
-    this.bgmUrl = 'assets/audio/bgm-map1001.mp3';
+    // BGM: 原版按场景切换。房间 065 / 大厅 062 / 战斗按 LoadMapsItems.xml
+    // 的 BackMusic（不是地图编号本身）。证据与映射见 audio-scenes.js 与
+    // docs/AUDIO_EVIDENCE.md。decode 后的 buffer 带 LRU 上限，切场景会释放旧的。
+    this.scene = 'battle';
+    this.sceneMapId = currentMapId;
+    this.bgmUrl = bgmFileFor('battle', currentMapId);
+    this.bgmBuffers = new Map();
+    this.bgmLoadingByUrl = new Map();
+    this.bgmCacheLimit = 3;
     this.bgmBuffer = null;
     this.bgmGain = null;
     this.bgmSource = null;
-    this.bgmLoading = null;
     this.bgmVolume = 0.22;
     this.bgmWanted = false;
+    this.bgmPaused = false;
     // Original IDs extracted from flash/audio.swf; see docs/AUDIO_MAPPING.md.
     // Fire/explosion are per weapon: BallList.xml ShootSound/BombSound of the
     // Common ball referenced by BombConfig.xml.
@@ -166,6 +173,11 @@ class SoundEngine {
       'turn-enemy': '038',
       win: '063',
       lose: '064',
+      // 048 = LuckyCard.play() 翻牌；067 / 014 = CardCountDown 倒计时。
+      // 048 之前只有 sampleFiles 条目、没有 sampleMap，play('048') 实际静音。
+      '048': '048',
+      '067': '067',
+      '014': '014',
     };
     this.fireSamples = {
       axe: '033', bow: '021', gun: '031', goldgun: '031', fire: '025',
@@ -191,6 +203,8 @@ class SoundEngine {
       '039': 'assets/audio/sound-039-item.mp3',
       '042': 'assets/audio/sound-042-death.mp3',
       '048': 'assets/audio/sound-048-card-flip.mp3',
+      '014': 'assets/audio/sound-014-countdown.mp3',
+      '067': 'assets/audio/sound-067-countdown.mp3',
       '063': 'assets/audio/sound-063-win.mp3',
       '064': 'assets/audio/sound-064-lose.mp3',
       '087': 'assets/audio/sound-087-boom-flame.mp3',
@@ -288,35 +302,50 @@ class SoundEngine {
     return this.sampleLoading;
   }
 
-  /** Decode the looping BGM once. Independent of the one-shot SFX buffers. */
-  async loadBgm() {
-    if (this.bgmLoading) return this.bgmLoading;
+  /**
+   * Decode a looping BGM by URL. Buffers are cached with an LRU cap so that
+   * switching scenes does not keep every map theme resident (资源释放).
+   */
+  async loadBgm(url = this.bgmUrl) {
     if (!this.ctx) return null;
-    this.bgmLoading = (async () => {
+    if (this.bgmBuffers.has(url)) return this.bgmBuffers.get(url);
+    if (this.bgmLoadingByUrl.has(url)) return this.bgmLoadingByUrl.get(url);
+    const pending = (async () => {
       try {
-        const response = await fetch(this.bgmUrl, { cache: 'force-cache' });
+        const response = await fetch(url, { cache: 'force-cache' });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.arrayBuffer();
-        this.bgmBuffer = await new Promise((resolve, reject) => {
+        const buffer = await new Promise((resolve, reject) => {
           this.ctx.decodeAudioData(data, resolve, reject);
         });
-        return this.bgmBuffer;
+        this.bgmBuffers.set(url, buffer);
+        // 只保留最近 3 条；旧 buffer 断开引用由 GC 回收。
+        while (this.bgmBuffers.size > this.bgmCacheLimit) {
+          const oldest = this.bgmBuffers.keys().next().value;
+          this.bgmBuffers.delete(oldest);
+        }
+        return buffer;
       } catch {
         return null;
+      } finally {
+        this.bgmLoadingByUrl.delete(url);
       }
     })();
-    return this.bgmLoading;
+    this.bgmLoadingByUrl.set(url, pending);
+    return pending;
   }
 
-  /** Start (or resume) the background music loop. Safe before user gesture. */
-  async startBgm() {
+  /** Start (or resume) the BGM loop for the current scene. Safe before gesture. */
+  async startBgm(force = false) {
     this.bgmWanted = true;
     if (!this.enabled || !this.ctx) return false;
-    if (!this.bgmBuffer) await this.loadBgm();
-    if (!this.bgmBuffer) return false;
-    if (this.bgmSource) {
+    const url = this.bgmUrl;
+    const buffer = this.bgmBuffers.get(url) || await this.loadBgm(url);
+    if (!buffer) return false;
+    this.bgmBuffer = buffer;
+    if (this.bgmSource && !force) {
       // Already playing (or scheduled); just make sure gain is up.
-      this._fadeBgm(this.bgmDuck ?? this.bgmVolume);
+      this._fadeBgm(this.bgmPaused ? 0.0001 : (this.bgmDuck ?? this.bgmVolume));
       return true;
     }
     if (!this._ensureGraph()) return false;
@@ -324,21 +353,81 @@ class SoundEngine {
     this.bgmGain.gain.value = 0.0001;
     this.bgmGain.connect(this.master);
     const source = this.ctx.createBufferSource();
-    source.buffer = this.bgmBuffer;
+    source.buffer = buffer;
     source.loop = true;
     source.connect(this.bgmGain);
     source.start();
     this.bgmSource = source;
-    this._fadeBgm(this.bgmDuck ?? this.bgmVolume);
+    this._fadeBgm(this.bgmPaused ? 0.0001 : (this.bgmDuck ?? this.bgmVolume));
     return true;
+  }
+
+  /** Stop just the current source node; keep the decoded buffer cache. */
+  _stopBgmSource(seconds = 0.25) {
+    if (!this.bgmSource) return;
+    this._fadeBgm(0.0001, seconds);
+    const source = this.bgmSource;
+    const gain = this.bgmGain;
+    this.bgmSource = null;
+    this.bgmGain = null;
+    const stopAt = this.ctx ? this.ctx.currentTime + seconds + 0.05 : 0;
+    try { source.stop(stopAt); } catch { /* already stopped */ }
+    window.setTimeout(() => {
+      try { source.disconnect(); } catch { /* no-op */ }
+      try { gain?.disconnect(); } catch { /* no-op */ }
+    }, (seconds + 0.1) * 1000);
+  }
+
+  /**
+   * 场景切换：房间 065 / 大厅 062 / 战斗按地图 BackMusic。
+   * 切换时淡出旧 loop 并释放 source/gain 节点，避免多局叠加与监听器增长。
+   */
+  async setScene(scene, mapId = null) {
+    const url = bgmFileFor(scene, mapId ?? this.sceneMapId);
+    this.scene = scene;
+    if (mapId != null) this.sceneMapId = mapId;
+    if (url === this.bgmUrl) return true;
+    this.bgmUrl = url;
+    if (!this.enabled || !this.ctx) return true; // 解锁后按当前 url 起播
+    this._stopBgmSource(0.22);
+    return this.startBgm(true);
+  }
+
+  /** 原版 BaseStoreView 进商店 pauseMusic() / 退出 resumeMusic()。 */
+  pauseBgm() {
+    this.bgmPaused = true;
+    this._fadeBgm(0.0001, 0.25);
+    return true;
+  }
+
+  resumeBgm() {
+    this.bgmPaused = false;
+    this._fadeBgm(this.bgmDuck ?? this.bgmVolume, 0.35);
+    return true;
+  }
+
+  setBgmVolume(value) {
+    const v = Math.min(1, Math.max(0, Number(value) || 0));
+    this.bgmVolume = v;
+    if (!this.bgmPaused) this._fadeBgm(this.bgmDuck ?? v, 0.2);
+    return v;
+  }
+
+  /** 释放全部 BGM 资源（测试 / 页面卸载用）。 */
+  releaseBgm() {
+    this._stopBgmSource(0.1);
+    this.bgmBuffers.clear();
+    this.bgmLoadingByUrl.clear();
+    this.bgmBuffer = null;
+    this.bgmWanted = false;
   }
 
   /**
    * Loading-screen hand-off. The original has no dedicated "loading" SoundID
-   * in audio.swf (SoundManager only maps 001-130 plus the 1001 BGM loop), so
-   * the entry cue is the original map-1001 BGM ducked to 45% and lifted back to
-   * battle level once the match starts — no extra clip is invented and nothing
-   * overlaps the battle BGM because it is the same loop.
+   * in audio.swf (SoundManager only maps 001-130 plus the 1001 BGM loop), and
+   * no independent loading-music call was found in GameViewBase / MapView.
+   * So the entry cue is the *same* current scene BGM ducked to 45% and lifted
+   * back once the match starts — no extra clip is invented, nothing overlaps.
    */
   enterBattleLoading() {
     this.bgmDuck = this.bgmVolume * 0.45;
@@ -365,12 +454,7 @@ class SoundEngine {
   /** Stop the BGM loop (used on mute). */
   stopBgm() {
     this.bgmWanted = false;
-    if (!this.bgmSource) return;
-    this._fadeBgm(0.0001, 0.25);
-    const source = this.bgmSource;
-    this.bgmSource = null;
-    const stopAt = this.ctx ? this.ctx.currentTime + 0.3 : 0;
-    try { source.stop(stopAt); } catch { /* already stopped */ }
+    this._stopBgmSource(0.25);
   }
 
   async ready() {
@@ -432,6 +516,7 @@ class SoundEngine {
       fire: 0.95, explosion: 1, heal: 0.7, pow: 0.8, death: 0.9,
       select: 0.55, 'skill-select': 0.55, 'pow-select': 0.55,
       'turn-self': 0.62, 'turn-enemy': 0.5, win: 0.7, lose: 0.7,
+      '048': 0.75, '067': 0.6, '014': 0.55,
     };
     source.buffer = buffer;
     gain.gain.value = volumes[name] ?? 0.8;
@@ -523,7 +608,13 @@ class SoundEngine {
       enabled: this.enabled,
       userMuted: this.userMuted,
       state: this.ctx?.state ?? 'none',
-      bgm: { wanted: this.bgmWanted, playing: !!this.bgmSource, loaded: !!this.bgmBuffer, volume: this.bgmVolume },
+      bgm: {
+        wanted: this.bgmWanted, playing: !!this.bgmSource, loaded: !!this.bgmBuffer,
+        volume: this.bgmVolume, url: this.bgmUrl, scene: this.scene,
+        mapId: this.sceneMapId, paused: this.bgmPaused,
+        cached: [...this.bgmBuffers.keys()],
+      },
+      sceneMap: audioSceneDebug(),
       samples: [...this.buffers.keys()],
       sampleError: this.sampleError,
       events: this.events.map((event) => ({ ...event })),
@@ -1385,9 +1476,12 @@ function setupResultCards(win, resultData = {}) {
     if (timer) timer.textContent = '本局奖励已领取';
     refreshSum();
   } else {
+    // SOURCE CardCountDown.as: 067 起始提示 + 014 每秒滴答（用户提供的原码证据）。
+    sound.play('067');
     resultCardTimer = window.setInterval(() => {
       remaining -= 1;
       if (timer) timer.textContent = `翻牌倒计时 ${Math.max(0, remaining)}s`;
+      if (remaining > 0) sound.play('014');
       if (remaining <= 0) finish(true);
     }, 1000);
   }
@@ -2993,4 +3087,11 @@ window.__GUNNY_HOOKS__ = {
   restartMatch,
   showToast,
   playSound: (name, weapon = null) => sound.play(name, weapon),
+  /** 原版按场景切换 BGM；战前加载无独立音乐，只用同一条 loop 压低音量。 */
+  audioScene: (scene, mapId = null) => sound.setScene(scene, mapId),
+  audioPause: () => sound.pauseBgm(),
+  audioResume: () => sound.resumeBgm(),
+  audioVolume: (value) => sound.setBgmVolume(value),
+  audioRelease: () => sound.releaseBgm(),
+  audioDebug: () => sound.debug(),
 };

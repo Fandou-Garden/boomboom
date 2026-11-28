@@ -1779,41 +1779,88 @@ svg { display: block; }
 .ddt-status { min-height: 28px; margin: 8px 0 0; font-size: 10px; color: var(--muted); }
 .ddt-status.is-alert { color: var(--coral); }
 
-/* 铁匠铺：临时界面，明确标注，保留替换入口 */
+/* 铁匠铺（阶段 9）：原版 store.swf 红金色强化台 + 真实 DOM 槽位。
+   背景图只作装饰，6 个槽位/按钮/成功率区都是可交互 DOM（store.xml 点位）。 */
 .ddt-forge { display: flex; align-items: center; justify-content: center; }
-.ddt-forge-panel { width: min(980px, 96vw); max-height: 90vh; overflow: auto; padding: 18px;
-  border-radius: 16px; background: #082634; border: 1px solid var(--line); box-shadow: var(--shadow); }
-.ddt-forge-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.ddt-forge-head h2 { margin: 0; font-size: 20px; }
-.ddt-asset-note { margin: 10px 0 14px; padding: 8px 10px; border-radius: 8px; font-size: 11px;
+.ddt-forge-frame { width: 100%; max-height: 92vh; overflow: auto; padding: 14px;
+  border-radius: 16px; background: #082634; border: 1px solid #d9a441; box-shadow: var(--shadow); }
+.ddt-forge-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ddt-forge-head h2 { margin: 0 0 4px; font-size: 20px; }
+.ddt-forge-head-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.ddt-forge-head-actions .ddt-btn { padding: 4px 9px; font-size: 11px; }
+.ddt-asset-note { margin: 8px 0 10px; padding: 7px 10px; border-radius: 8px; font-size: 11px;
   color: var(--amber); background: rgba(217,133,40,.12); border: 1px dashed rgba(255,211,106,.5); }
-.ddt-forge-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-.ddt-forge-col { min-height: 240px; padding: 12px; border-radius: 12px; background: var(--panel-soft); border: 1px solid var(--line); }
-.ddt-forge-col h3 { margin: 0 0 10px; font-size: 14px; }
-.ddt-forge-weapons { display: flex; flex-direction: column; gap: 5px; max-height: 260px; overflow: auto; }
-.ddt-forge-weapon { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 9px;
-  border-radius: 8px; cursor: pointer; font-size: 12px; color: var(--cream);
+.ddt-forge-body { display: grid; grid-template-columns: 710px minmax(260px, 1fr); gap: 14px; align-items: start; }
+.ddt-strength-stage { position: relative; width: 710px; height: 402px; border-radius: 10px;
+  overflow: hidden; border: 2px solid #d9a441; }
+.ddt-strength-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* Strengthpoint0 的 y=-6，整体下移 14px 让负坐标槽位完整可见。 */
+.ddt-strength-cells { position: absolute; left: 14px; top: 14px; width: 100%; height: 100%; }
+.ddt-slot { position: absolute; left: var(--sx); top: var(--sy); width: 80px; height: 80px;
+  padding: 0; border: 0; background: transparent; cursor: pointer; border-radius: 8px; }
+.ddt-slot-frame { position: absolute; inset: 0; width: 80px; height: 80px; border-radius: 8px; }
+.ddt-slot-content { position: relative; z-index: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px; width: 100%; height: 100%;
+  font-size: 9px; color: #3a1c05; text-align: center; }
+.ddt-slot-content img { width: 32px; height: 32px; object-fit: contain; }
+.ddt-slot-content span { max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ddt-slot-empty { color: rgba(58,28,5,.55); font-size: 11px; }
+.ddt-slot-weapon { display: flex; flex-direction: column; font-weight: 700; color: #3a1c05; }
+.ddt-slot-tag { position: absolute; left: 0; right: 0; bottom: -15px; font-size: 10px;
+  color: #ffd36a; text-shadow: 0 1px 2px #000; }
+.ddt-slot.is-active { outline: 2px solid #56e0d2; outline-offset: 2px; }
+.ddt-slot.is-filled .ddt-slot-frame { opacity: .5; }
+.ddt-slot.is-drop-target { outline: 3px solid #ffd36a; outline-offset: 2px; }
+.ddt-success-rate { position: absolute; right: 16px; top: 12px; display: flex; align-items: center;
+  gap: 8px; padding: 7px 11px; border-radius: 8px; background: rgba(30,10,4,.74);
+  border: 1px solid #d9a441; color: #ffd36a; z-index: 2; }
+.ddt-success-rate > img { width: 39px; height: 23px; object-fit: contain; }
+.ddt-rate-body { display: flex; flex-direction: column; line-height: 1.3; }
+.ddt-rate-body span { font-size: 10px; }
+.ddt-rate-body b { font-size: 20px; }
+.ddt-rate-body small { font-size: 9px; opacity: .85; max-width: 215px; }
+.ddt-strength-btn { position: absolute; left: 72px; top: 322px; width: 160px; height: 46px;
+  padding: 0; border: 0; background: transparent; cursor: pointer; z-index: 2; }
+.ddt-strength-btn img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ddt-strength-btn:disabled { opacity: .5; cursor: not-allowed; }
+.ddt-forge-result-art { position: absolute; left: 50%; top: 43%; transform: translate(-50%, -50%);
+  width: 505px; height: 124px; background-position: center; background-size: contain;
+  background-repeat: no-repeat; pointer-events: none; z-index: 3; }
+.ddt-forge-side { display: flex; flex-direction: column; gap: 9px; max-height: 402px; overflow: auto; }
+.ddt-forge-col { padding: 9px; border-radius: 10px; background: var(--panel-soft); border: 1px solid var(--line); }
+.ddt-forge-col h3 { margin: 0 0 7px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.ddt-forge-col h3 img { height: 18px; }
+.ddt-forge-weapons { display: flex; flex-direction: column; gap: 4px; max-height: 118px; overflow: auto; }
+.ddt-forge-weapon { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 9px;
+  border-radius: 8px; cursor: grab; font-size: 12px; color: var(--cream);
   background: rgba(4,24,33,.65); border: 1px solid var(--line); }
 .ddt-forge-weapon small { color: var(--amber); font-size: 10px; }
 .ddt-forge-weapon.is-active { border-color: var(--teal); background: rgba(86,224,210,.16); }
-.ddt-forge-balance { font-size: 13px; margin-bottom: 8px; }
-.ddt-forge-balance b { color: var(--amber); font-size: 18px; }
+.ddt-forge-bag { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; max-height: 152px; overflow: auto; }
+.ddt-bag-item { position: relative; display: flex; flex-direction: column; align-items: center;
+  padding: 3px 1px; border-radius: 7px; cursor: grab; font-size: 9px; color: var(--cream);
+  background: rgba(4,24,33,.65); border: 1px solid var(--line); }
+.ddt-bag-item img { width: 30px; height: 30px; object-fit: contain; }
+.ddt-bag-item b { position: absolute; right: 2px; top: 0; font-size: 9px; color: #ffd36a; }
+.ddt-bag-item small { max-width: 52px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 8px; }
+.ddt-bag-item:hover { border-color: var(--amber); }
+.ddt-bag-item.is-compose { opacity: .4; cursor: not-allowed; }
 .ddt-mat-pick { cursor: pointer; width: 58px; }
 .ddt-mat-pick.is-active { border-color: var(--amber); box-shadow: 0 0 0 2px rgba(255,211,106,.2); }
 .ddt-forge-materials { max-height: 300px; overflow-y: auto; padding-right: 4px; }
 .ddt-mat.is-compose { opacity: .55; }
 .ddt-mat.is-compose small { color: var(--muted); }
-.ddt-forge-rule { margin-top: 14px; font-size: 10px; color: var(--muted); line-height: 1.6; }
-.ddt-forge-rule-top { margin: 8px 0 12px; font-size: 11px; line-height: 1.7; color: var(--muted); }
+.ddt-forge-rule { margin-top: 10px; font-size: 10px; color: var(--muted); line-height: 1.6; }
+.ddt-forge-rule-top { margin: 6px 0 10px; font-size: 11px; line-height: 1.7; color: var(--muted); }
 .ddt-forge-rule-top b { color: var(--amber); font-weight: 700; }
-.ddt-detail-name { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
-.ddt-forge-detail dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 10px; margin: 0 0 12px; font-size: 12px; }
+.ddt-detail-name { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+.ddt-forge-detail dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin: 0 0 10px; font-size: 11px; }
 .ddt-forge-detail dt { color: var(--muted); }
 .ddt-forge-detail dd { margin: 0; text-align: right; }
 .ddt-forge-detail dd.is-good { color: var(--teal); }
-.ddt-forge-result { min-height: 36px; margin: 10px 0 0; font-size: 11px; color: var(--amber); }
-.ddt-forge.is-success .ddt-forge-panel { animation: ddt-forge-ok 700ms ease-out; }
-.ddt-forge.is-fail .ddt-forge-panel { animation: ddt-forge-fail 700ms ease-out; }
+.ddt-forge-result { min-height: 30px; margin: 8px 0 0; font-size: 11px; color: var(--amber); }
+.ddt-forge.is-success .ddt-forge-frame { animation: ddt-forge-ok 700ms ease-out; }
+.ddt-forge.is-fail .ddt-forge-frame { animation: ddt-forge-fail 700ms ease-out; }
 @keyframes ddt-forge-ok { 0% { box-shadow: 0 0 0 0 rgba(86,224,210,.8); } 100% { box-shadow: 0 0 0 22px rgba(86,224,210,0); } }
 @keyframes ddt-forge-fail { 0%, 60% { transform: translateX(0); } 20% { transform: translateX(-5px); } 40% { transform: translateX(5px); } }
 
@@ -1829,7 +1876,8 @@ svg { display: block; }
   .ddt-panel { min-height: 0; }
   .ddt-map-grid { grid-template-columns: repeat(6, 1fr); }
   .ddt-map img { height: 46px; }
-  .ddt-forge-grid { grid-template-columns: 1fr 1fr; }
-  .ddt-forge-detail { grid-column: 1 / -1; min-height: 0; }
+  .ddt-forge-body { grid-template-columns: 1fr; }
+  .ddt-forge-side { max-height: none; }
+  .ddt-strength-stage { max-width: 100%; }
   .ddt-portrait img { width: 90px; }
 }

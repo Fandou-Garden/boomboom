@@ -16,6 +16,7 @@ import path from 'node:path';
 import net from 'node:net';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import WebSocket from 'ws';
+import { DatabaseSync } from 'node:sqlite';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const TSX = path.join(ROOT, 'node_modules', '.bin', 'tsx');
@@ -189,37 +190,66 @@ test('服务端版完整业务闭环 + 事务防重 + 重启存档', async (t) =
   assert.equal(board.picksUsed, 0);
   assert.ok(board.cards.every((c) => !c.revealed), '未翻卡不得下发奖励内容');
 
+  // 白盒测试夹具：服务端 9 张卡整体洗牌后落位（没有固定卡位），固定翻 0/1/2
+  // 有概率三张都不是材料卡，会让后续强化闭环偶发失败。这里直接读**隔离的临时库**
+  // cards_json 来挑选卡位：不经过前端、不下发未翻卡内容、不改正常掉落规则与奖励池配置，
+  // 也不删任何原有断言。生产代码与正常掉落规则完全不变。
+  const boardDb = new DatabaseSync(path.join(dataDir, 'ddt.sqlite'));
+  let storedCards;
+  try {
+    const row = boardDb.prepare('SELECT cards_json FROM reward_boards WHERE battle_id = ?').get(battleId);
+    assert.ok(row?.cards_json, '临时库应已保存本局奖励盘');
+    storedCards = JSON.parse(row.cards_json);
+  } finally {
+    boardDb.close();
+  }
+  assert.equal(storedCards.length, 9, '服务端奖励盘应为 9 张');
+  const itemIndex = storedCards.findIndex((c) => c.kind === 'item');
+  const coinIndex = storedCards.findIndex((c) => c.kind === 'coin');
+  assert.ok(itemIndex >= 0 && coinIndex >= 0, '保底规则应同时产生材料卡与金币卡');
+  const picked = [itemIndex, coinIndex, ...storedCards.map((_, i) => i)
+    .filter((i) => i !== itemIndex && i !== coinIndex)].slice(0, 3);
+  const unclaimed = storedCards.map((_, i) => i).find((i) => !picked.includes(i));
+  const expectedCoins = picked.reduce((s, i) =>
+    s + (storedCards[i].kind === 'coin' ? Number(storedCards[i].amount) : 0), 0);
+  const expectedStones = picked.reduce((s, i) =>
+    s + (storedCards[i].kind === 'item' ? Number(storedCards[i].amount) : 0), 0);
+  assert.ok(expectedCoins >= 60, '夹具所选金币卡须足够一次强化，保证闭环不靠碰概率');
+  assert.ok(expectedStones >= 1, '夹具所选卡位须含材料卡，保证强化材料闭环');
+
   const req1 = 'e2e-request-1';
-  const pick1 = await api.post(`/api/server/battles/${battleId}/rewards/claim`, { cardIndex: 0, requestId: req1 });
+  const pick1 = await api.post(`/api/server/battles/${battleId}/rewards/claim`, { cardIndex: picked[0], requestId: req1 });
   assert.equal(pick1.status, 200);
   assert.ok(pick1.body.reward, '奖励由服务端返回');
 
-  const replay = await api.post(`/api/server/battles/${battleId}/rewards/claim`, { cardIndex: 0, requestId: req1 });
+  const replay = await api.post(`/api/server/battles/${battleId}/rewards/claim`, { cardIndex: picked[0], requestId: req1 });
   assert.equal(replay.status, 200);
   assert.deepEqual(replay.body, pick1.body, '同一 requestId 重试必须返回完全相同的已存结果');
 
   const duplicate = await api.post(`/api/server/battles/${battleId}/rewards/claim`, {
-    cardIndex: 0, requestId: 'e2e-request-duplicate',
+    cardIndex: picked[0], requestId: 'e2e-request-duplicate',
   });
   assert.equal(duplicate.status, 409, '同一张卡不能重复领');
   assert.equal(duplicate.body.code, 'card-already-picked');
 
-  await api.post(`/api/server/battles/${battleId}/rewards/claim`, { cardIndex: 1, requestId: 'e2e-request-2' });
-  const pick3 = await api.post(`/api/server/battles/${battleId}/rewards/claim`, { cardIndex: 2, requestId: 'e2e-request-3' });
+  await api.post(`/api/server/battles/${battleId}/rewards/claim`, { cardIndex: picked[1], requestId: 'e2e-request-2' });
+  const pick3 = await api.post(`/api/server/battles/${battleId}/rewards/claim`, { cardIndex: picked[2], requestId: 'e2e-request-3' });
   assert.equal(pick3.status, 200);
   assert.equal(pick3.body.status, 'closed');
 
   const tooMany = await api.post(`/api/server/battles/${battleId}/rewards/claim`, {
-    cardIndex: 3, requestId: 'e2e-request-4',
+    cardIndex: unclaimed, requestId: 'e2e-request-4',
   });
   assert.equal(tooMany.status, 409, '超过 3 张必须拒绝');
 
   const walletAfterCards = (await api.get('/api/server/player')).body.wallet;
   assert.ok(walletAfterCards.coins >= 60, '翻牌金币已入库');
+  assert.equal(walletAfterCards.coins, expectedCoins, '金币严格按已翻卡面入库，不重复发放');
   const totalStones = walletAfterCards.items.reduce((s, i) => s + i.quantity, 0);
   assert.ok(totalStones >= 1, '原版强化石已入库');
+  assert.equal(totalStones, expectedStones, '材料严格按已翻卡面入库，不重复发放');
   // 重复请求没有造成二次发奖
-  await api.post(`/api/server/battles/${battleId}/rewards/claim`, { cardIndex: 0, requestId: req1 });
+  await api.post(`/api/server/battles/${battleId}/rewards/claim`, { cardIndex: picked[0], requestId: req1 });
   const walletAfterReplay = (await api.get('/api/server/player')).body.wallet;
   assert.equal(walletAfterReplay.coins, walletAfterCards.coins, '重放不重复发金币');
   assert.equal(

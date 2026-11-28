@@ -110,16 +110,32 @@
 
 ## 7. 缺失项与可替换入口（不冒充原版）
 
-| 缺失项 | 状态 | 替换入口 |
-| --- | --- | --- |
-| 原版铁匠铺 UI（`StoreIIStrengthBG`、`StreangthItemCell`、`StrengthStone`、`StrengthTips` 等） | **未导出** | `dist/js/server-mode.js` 中 `data-asset-slot="forge-panel"`；界面已标注「原版铁匠铺 UI 素材未导出 · 单机临时界面」 |
-| 原版强化成功 / 失败音效 | **未导出** | 暂用站点版既有 `win` / `lose` 音效（`docs/AUDIO_MAPPING.md`），不冒称原版强化音效 |
-| `lightFrame` / `vipCardMc` / `starMc` / `Hexagram` / `VersusAnimation` / `GameMode_*` 逐帧序列 | 已在 `art-source/` 导出，`dist/` **未接入** | `art-source/README.md` 帧清单 + `dist/styles.css` 动画 |
-| `art-source/audio/room-bgm-065.mp3`、`hall-bgm-062.mp3` | 已导出**未接线** | `art-source/AUDIO.md` |
-| 房间 / 铁匠铺的原版界面布局 | 原版为 Flash/AS3，仓库无对应导出 | 房间布局为服务端版新增，界面内已明确标注 |
-| 「神武石」 | **未匹配** | `unmatched_items` 表 + 本文件第 5 节 |
+> **阶段 9 更新（2026-11-28）**：下表前两行与 BGM 行的状态已变化，以本节为准；
+> 原始历史状态保留在 `docs/PROGRESS.md` 的阶段 8 记录中，不回写。
 
-## 8. 规则配置入口
+| 缺失项 | 状态（阶段 9 复核） | 替换入口 / 证据 |
+| --- | --- | --- |
+| 原版铁匠铺 UI（`StoreIIStrengthBG`、`StreangthItemCell`、`StrengthStone` 等） | **已从 `store.swf` 导出并按 `store.xml` 布局接入**（红金色 `strengthBG` 底纹 + 6 个真实槽位 + 装备栏 + 道具栏 + 成功率区，支持点选与拖放）。**不等于原版规则已还原**：强化仍按 `LOCAL_RULE` / `ORIGINAL_PARTIAL` 分离显示 | `dist/assets/forge/`（24 个素材 + `SOURCE_MANIFEST.json`）、`dist/js/server-mode.js`、`docs/FORGE_UI_EVIDENCE.md` |
+| 原版强化成功 / 失败音效 | **未确认**：结果音封装在上游 `StoreTips`，本次检出无该 AS 源码，无法确认 SoundID | 暂用站点版既有 `win` / `lose`；`docs/AUDIO_EVIDENCE.md` |
+| `lightFrame` / `vipCardMc` / `starMc` / `Hexagram` / `VersusAnimation` / `GameMode_*` 逐帧序列 | 已在 `art-source/` 导出，`dist/` **未接入** | `art-source/README.md` 帧清单 + `dist/styles.css` 动画 |
+| 房间 / 大厅 / 地图 BGM 与 014 / 067 倒计时音效 | **已接线**：14 条原版长音乐 + 2 条短音效，从 `Resource/sound/*.flv` 与 `audio.swf` 导出 | `dist/assets/audio/`、`dist/js/audio-scenes.js`、`docs/AUDIO_MAPPING.md` |
+| 房间 / 铁匠铺的原版界面布局 | 铁匠铺布局已按 `store.xml` 还原；**房间**仍为服务端版新增布局（原版 Flash/AS3 无对应导出），界面内已明确标注 | `docs/FORGE_UI_EVIDENCE.md` |
+| 「神武石」 | **未匹配**（保持不变，不编造） | `unmatched_items` 表 + 本文件第 5 节 |
+
+## 8. 阶段 9 新增素材溯源
+
+| 目录 | 数量 | 原版来源 | 导出方式 |
+| --- | --- | --- | --- |
+| `dist/assets/forge/` | 23 张图 + 1 份 `SOURCE_MANIFEST.json` | `/tmp/gunny-30/inetpub/wwwroot/gunny/ui/vietnam/swf/store.swf`（762,769 B） | FFDec `-export image,symbolClass`，共 125 个符号 / 124 张图；按符号名逐一映射，清单内记录字节数与 SHA-256 |
+| `dist/assets/audio/bgm-*.mp3` | 14 条 | `/tmp/gunny-30/inetpub/wwwroot/Resource/sound/<id>.flv` | FLV tag 解析无损抽出内嵌 MP3 帧（不重编码） |
+| `dist/assets/audio/sound-014-countdown.mp3`、`sound-067-countdown.mp3` | 2 条 | `/tmp/gunny-30/inetpub/wwwroot/gunny/audio.swf` → `Sound014` / `Sound067` | FFDec `-export sound` 得 FLV（Nellymoser），静态 FFmpeg 解码为 44.1 kHz 单声道 MP3 |
+
+布局坐标来自 `/tmp/gunny-30/inetpub/wwwroot/gunny/ui/vietnam/xml/xml/store.xml`
+（`Strengthpoint0..5`、`StrengthBtn x=72 y=322`、`StoreBagView x=405 y=59` 等），
+逐项证据见 `docs/FORGE_UI_EVIDENCE.md`。**上游 UI 与用户提供的红金色截图差异、
+以及未确认项，均在该文档中如实标注，未写成「原版界面已完全还原」。**
+
+## 9. 规则配置入口
 
 - 机器人 / 翻牌 / 强化数值：`server-node/src/config.ts`（全部服务端权威）
 - 物品登记：`server-node/migrations/001_init.sql` 与 `server-node/src/services.ts` 的 `ITEM_SEED`

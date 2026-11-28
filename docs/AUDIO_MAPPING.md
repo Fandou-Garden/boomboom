@@ -99,8 +99,12 @@ ffmpeg -i in.mp3 -af "volume=+0.9dB" -codec:a libmp3lame -b:a 128k out.mp3
 
 | 场景 | 使用音频 | 处理 |
 | --- | --- | --- |
-| 战斗加载过场 | 原版地图 1001 BGM（`assets/audio/bgm-map1001.mp3`） | 音量压到 45% 播放，进入战斗后 0.5 s 内升回 `bgmVolume`；同一条 loop，不会与战斗 BGM 叠加 |
-| 首次冷启动 | 同上 | 受浏览器手势限制，加载卡片提供“点击开启音效”，点击后才解锁；未点击则静默 |
+| 战斗加载过场 | **当前场景的同一条原版 BGM**（由 `dist/js/audio-scenes.js` 的 `bgmFileFor()` 解析，不再固定 1001） | 音量压到 45% 播放，进入战斗后 0.5 s 内升回 `bgmVolume`；同一条 loop，不会与战斗 BGM 叠加 |
+| 首次冷启动 | 当前场景 BGM | 受浏览器手势限制，加载卡片提供「点击开启音效」，点击后才解锁；未点击则静默 |
+
+> **阶段 9 更正**：旧版描述「固定使用 `assets/audio/bgm-map1001.mp3`」已过时。
+> 地图音乐按 `LoadMapsItems.xml` 的 `BackMusic` 字段解析（见下节）；旧文件
+> `bgm-map1001.mp3` 仅保留为站点版历史资源，运行时改用 `bgm-map-<BackMusic>.mp3`。
 
 ## 048（翻卡翻开音）来源
 
@@ -112,3 +116,56 @@ ffmpeg -i in.mp3 -af "volume=+0.9dB" -codec:a libmp3lame -b:a 128k out.mp3
 - 转换：`ffmpeg -i 7_Sound048.flv -ar 44100 -codec:a libmp3lame -b:a 128k
   sound-048-card-flip.mp3`，时长 0.56 s。
 - 只在结算翻牌时播放；加载过场没有原版加载音，**不要**拿 048 顶替。
+
+## 阶段 9：原版长音乐 BGM 与倒计时音效（2026-11-28 实测接入）
+
+完整证据（源码行号、FLV 编码、映射差异）见 `docs/AUDIO_EVIDENCE.md`。
+
+### 音乐编号 ≠ 地图编号
+
+`Tank.Request/LoadMapsItems.xml`（zlib 压缩，解压后 454 条 `<Item>`）的 `BackMusic` 字段：
+
+| 本站地图 ID | `BackMusic` | 说明 |
+| --- | --- | --- |
+| 1157 | **1071** | 明确不等于地图编号 |
+| 1049 | **1032** | 旧版对照库 `gunny-30` 的 `LoadMapsItems.xml:63` 同为 1032 |
+| 1001 / 1002 / 1003 / 1008 / 1014 / 1035 / 1038 / 1156 / 1190 / 1192 | 同编号 | 恰好相等，但**不是**「默认相等」规则 |
+
+非战斗场景：`BaseRoomState.as` → `playMusic("065")`（房间），
+`HallStateView.as` → `playMusic("062")`（大厅）。
+`SoundManager.as:395` 的实际播放地址是 `SITE_MAIN + "sound/" + id + ".flv"`。
+
+### 已导出并接入的音频
+
+| 资源 | 原版来源 | 用途 |
+| --- | --- | --- |
+| `bgm-room-065.mp3` | `Resource/sound/065.flv` | 房间 BGM |
+| `bgm-hall-062.mp3` | `Resource/sound/062.flv` | 大厅 BGM |
+| `bgm-map-*.mp3`（12 条，含 1032 / 1071 / 1156） | `Resource/sound/<BackMusic>.flv` | 战斗地图 BGM |
+| `sound-067-countdown.mp3` | `audio.swf` → `Sound067.flv`（Nellymoser） | 翻牌倒计时起始提示 |
+| `sound-014-countdown.mp3` | `audio.swf` → `Sound014.flv`（Nellymoser） | 翻牌倒计时每秒滴答 |
+
+长音乐 FLV 内嵌的是标准 MPEG Layer III 帧，本项目用 FLV tag 解析**无损抽出 MP3 帧**
+（不重编码，`afinfo` 校验可播放）；两个短音效为 Nellymoser，用静态 FFmpeg 解码为 MP3。
+`1156.flv` 在旧版对照库中确实存在（1.53 MB），已补齐此前记录的「缺失」项。
+
+### 运行时处理
+
+- 场景切换：`setScene(scene, mapId)` 淡出旧 loop → `source.disconnect()` / `gain.disconnect()`
+  → 起播新 BGM，解码 buffer 用 LRU 缓存（上限 3 条），避免多局战斗常驻增长。
+- 手势解锁：未解锁前只记录 `bgmWanted`，用户点击开启音效后才创建 `AudioContext` 并起播。
+- 循环 / 音量 / 静音：`source.loop = true`、`setBgmVolume()`、静音走 `stopBgm()`；
+  所有音量变化用 `_fadeBgm()` 斜坡，避免爆音。
+- 铁匠铺：`BaseStoreView.as:452/466` 只 `pauseMusic()` / `resumeMusic()`，
+  **原版没有铁匠铺独立 BGM**；本项目对应 `audioPause()` / `audioResume()`。
+- 战前加载：**未找到独立音乐调用证据**，`audio.swf` 也没有对应 SoundID，
+  继续沿用「同一条场景 BGM 压低音量」，不凭印象新增配乐。
+
+### 仍未确认 / 未接线
+
+- 强化成功 / 失败音效封装在原版 `StoreTips` 内，本次上游检出未提供该 AS 源码，
+  **未确认具体 SoundID**；界面暂用站点版既有 `win` / `lose`，不冒称原版强化音效。
+- `063` / `064` / `1001` 在 `BaseStoreView.as` 中是开孔提示与通用按钮音，
+  不是铁匠铺专属 BGM。
+- `gunny-30` 与 `ddt-research` 两份 `LoadMapsItems.xml` 条目集不同（111 vs 456 行），
+  1157 只存在于后者；本项目按后者（含 12 张本站地图）解析，差异已记录。

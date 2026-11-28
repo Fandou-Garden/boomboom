@@ -1,0 +1,117 @@
+{
+  "store-strength-bg.jpg": {
+    "symbol": "asset.store.strengthBG",
+    "bytes": 41001,
+    "sha256": "137f64bb89617cdb23ed6d8d6d1d0f2f8077636d5d6ea2438b52773493febe0f"
+  },
+  "store-frame-bg.png": {
+    "symbol": "asset.store.StoreBG",
+    "bytes": 2318,
+    "sha256": "bd745c41cfe26e66d508357adc46ae94c7594adfe091594e9a1aed83e105ff9d"
+  },
+  "slot-strength.png": {
+    "symbol": "asset.store.StrengthStoneBG",
+    "bytes": 14274,
+    "sha256": "16ffedc0188ac89401e5107a53b09c52366a41c16d9686792b9a22c40f2b794e"
+  },
+  "slot-lucky.png": {
+    "symbol": "asset.store.LuckyBG",
+    "bytes": 14595,
+    "sha256": "61e8e4e56653faed6e63f19a3ddf62e35157dfce3a9bac678cb3f3f9518420d9"
+  },
+  "slot-god.png": {
+    "symbol": "asset.store.GodBG",
+    "bytes": 13814,
+    "sha256": "e933e5136b4d505f08d706e5285551789c733d7c6445a4bd4825c25082ca5a87"
+  },
+  "slot-equip.png": {
+    "symbol": "asset.store.EquipBG",
+    "bytes": 21930,
+    "sha256": "6bfdb283e9cfb046c27d738db2e01e10c4c712b8cce11f372bfb1a006977f246"
+  },
+  "cell-equip.png": {
+    "symbol": "asset.store.EquipCellBG",
+    "bytes": 93,
+    "sha256": "c3a1fc4f8084550a3b7629605af11481fa4d4273e7b544a2249d70a9a21d49be"
+  },
+  "cell-blank.png": {
+    "symbol": "asset.store.BlankCellBG",
+    "bytes": 113,
+    "sha256": "3e67f083bc746acfc3def7dd4ac7cb386ebc3760b495821de8441e833e4e3b6a"
+  },
+  "btn-strength.png": {
+    "symbol": "asset.store.StrengthBtn",
+    "bytes": 20215,
+    "sha256": "55cbd90b8ebc355549396a2d6356a1735483c8d078c1661c3d4735e09afc1fe9"
+  },
+  "rate-label.png": {
+    "symbol": "asset.store.SuccessRates",
+    "bytes": 1002,
+    "sha256": "297fccf3925bd1b080ecaec69050eac14d17481b13a2221a1962bb7b5740a2f9"
+  },
+  "rate-text-bg.png": {
+    "symbol": "asset.store.BaiFengTxtBG",
+    "bytes": 716,
+    "sha256": "3655160113488b58679f069a870af66a0fb270b4c2e93ce35e29b60b27325d58"
+  },
+  "tip-start.png": {
+    "symbol": "asset.store.StartStrengthTip",
+    "bytes": 11563,
+    "sha256": "8953bdf742d286754ee123fd1dc71a048ae62bb9c52783d4834dee9becc27124"
+  },
+  "btn-help.png": {
+    "symbol": "asset.store.StrengthNodeBtn",
+    "bytes": 986,
+    "sha256": "66ab419c6eceee34224e1db8ccbf45750bd228f510fe4f0fc16186f061a8b480"
+  },
+  "tab-strength.png": {
+    "symbol": "asset.store.strengthBtn",
+    "bytes": 11061,
+    "sha256": "382c0a649c859de3d6bb83a06de22c9fc64aff51351ae6ff6ebc769980f36f1f"
+  },
+  "bag-bg.png": {
+    "symbol": "asset.store.bagBGI",
+    "bytes": 6477,
+    "sha256": "7ac0542654b02f326ea1b839ad214d18bc4577493fe7264db562f8d4b0738338"
+  },
+  "tab-equip.png": {
+    "symbol": "asset.store.bagEquip",
+    "bytes": 1211,
+    "sha256": "5ab078ea2617d3d7590bd1fd76a7ceebb91dff644ca6147e78743d924ce18266"
+  },
+  "tab-prop.png": {
+    "symbol": "asset.store.bagProp",
+    "bytes": 994,
+    "sha256": "a741f45c222cca199246e0e125d6b34abcaec5fd91294351acbb0fa6b562cf4a"
+  },
+  "bag-strength.png": {
+    "symbol": "asset.store.bagStrengthI",
+    "bytes": 5856,
+    "sha256": "92604f9084aff998287af626365f3c7f24f09d76e45a906b16e2feaea5c35cbf"
+  },
+  "result-success.png": {
+    "symbol": "store.StoreIISuccessBitAsset",
+    "bytes": 64063,
+    "sha256": "f3369f727f7e7980a091853881f71be7306b671ee237e6844a074b1683432dc6"
+  },
+  "result-fail.png": {
+    "symbol": "store.StoreIIFailBitAsset",
+    "bytes": 31913,
+    "sha256": "2622c5e4d17ca4e3d871647c6b753b6c581cadf50c9a9c57baddf0ea3211e487"
+  },
+  "buy-lucky.png": {
+    "symbol": "asset.store.BuyLuckyBG",
+    "bytes": 2395,
+    "sha256": "ca7e7dcfdbf95a11dab5096fa25e1a988842eb423d1d822565873c845397e2be"
+  },
+  "buy-god.png": {
+    "symbol": "asset.store.BuyGodBG",
+    "bytes": 2268,
+    "sha256": "a08ca09fc791fe53ef00331f7f286aa5998d1759a5b73f5c1278e76db9ac8e87"
+  },
+  "buy-stone.png": {
+    "symbol": "asset.store.BuyStrengthStoneBG",
+    "bytes": 1861,
+    "sha256": "89753689d1ae297e20d6dbca83b68a33ef8d50f7b95e1672009d48c94910fb85"
+  }
+}
