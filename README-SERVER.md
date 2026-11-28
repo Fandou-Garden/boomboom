@@ -214,6 +214,9 @@ Node RSS 在两次采样间受 GC 与采样时机影响（空闲值甚至可能�
 ## 9. 开发分支与推送状态
 
 - 开发分支：`feat/node-server-mode`（基于 `main` @ `cbfe149`）。
+- **当前状态（2026-11-28 17:17）**：`feat/node-server-mode` 已快进合并到 `main`；
+  本地与远程 `main`、`feat/node-server-mode` 均指向
+  `d435875479f1a6727ccc789e81436d9c334eee5e`，工作区干净。下面阶段条目为当时历史记录。
 - **推送已于 2026-11-28 10:43 成功**：用户提供配置了 `Contents: Read and write` 的
   fine-grained PAT 后，用环境变量注入凭证、`git push -u origin feat/node-server-mode` 非强制推送一次成功；
   `git ls-remote` 校验远程分支 SHA 与本地 HEAD 一致（`039b338d68303b15e30ee1ebcd4b14dbfad2cf58`）。
@@ -221,7 +224,7 @@ Node RSS 在两次采样间受 GC 与采样时机影响（空闲值甚至可能�
   Token 未写入远程 URL、源码、文档、命令行参数或日志，仅经环境变量传递。
 - **阶段 8 提交已推送**：`a639b72534559f692d3d23ad04aa095c701700b8`（57 个文件），
   用同一凭证非强制推送成功，`git ls-remote` 校验远程 SHA 与本地 HEAD 一致；
-  `main` 保持 `cbfe149` **未合并**。
+  `main` 当时保持 `cbfe149` **未合并**（历史记录，当前见 12.10）。
 - **2026-11-28 用户提供的新 Token 复核**：`GET https://api.github.com/user` 返回
   `200 / login Orlandoo24`，凭证本身有效；fine-grained PAT 不返回 `X-OAuth-Scopes`，
   写权限只能以**实际非强制推送结果**判定，不预先归因于账号无权限。
@@ -373,7 +376,7 @@ npm run start:server
   `db5b892849e6abf667d4b4acf9fbdbe238187340`。
 - 非强制推送 `ad8d6d3..db5b892` 成功；`git ls-remote` 返回
   `db5b892849e6abf667d4b4acf9fbdbe238187340`，与推送时本地 HEAD 一致。
-- `main` 未合并、未改动：`cbfe149bed07f0568680bf20af89843aaea71305`。
+- `main` 当时未合并、未改动：`cbfe149bed07f0568680bf20af89843aaea71305`（历史记录，当前见 12.10）。
 - Token 未写入远程 URL、源码、文档、命令行参数或日志；经临时 `GIT_ASKPASS` 注入，
   临时文件推送后已删除。凭证有效性以 `/user` 与仓库 `permissions.push` 实测判定，
   首次交互提示未归因于账号无权限。详细记录见 `docs/PROGRESS.md` 10.9。
@@ -384,7 +387,7 @@ npm run start:server
 
 - 最终提交 `ba3a045216d0597896b4ec775c70336b8956fa5e`，非强制推送
   `ef2bd52..ba3a045` 成功，`git ls-remote origin refs/heads/feat/node-server-mode`
-  与本地 HEAD 均为该 SHA；`main` 仍为 `cbfe149bed07f0568680bf20af89843aaea71305`。
+  与本地 HEAD 均为该 SHA；`main` 当时仍为 `cbfe149bed07f0568680bf20af89843aaea71305`（历史记录，当前见 12.10）。
 - 本提交修复强化字段接入（`baseDamage` 而非 `attack`）、引擎 `expected:null` 崩溃，
   新增真实玩家流程 / 存档备份恢复 / 10 局稳定性测试与 5 张真实截图；
   `docs/PROGRESS.md` 第 11 节为逐项记录。Token 未写入任何文件或日志。
@@ -407,5 +410,20 @@ npm run start:server
   `docs/screenshots/2026-11-28-turn-feedback-battle.png`（正常战斗，回合大字不遮挡 HUD）。
 - **推送**：功能提交 `e1bdca9bcfc988451130d4d5c48d22ff43b6754e`，全量推送（所有分支 + 标签，
   非强制）成功：`1cb0f1f..e1bdca9  feat/node-server-mode`；`git ls-remote` 返回远程 SHA
-  与本地 HEAD 一致，`main` 保持 `cbfe149bed07f0568680bf20af89843aaea71305`。
+  与本地 HEAD 一致，`main` 当时保持 `cbfe149bed07f0568680bf20af89843aaea71305`（历史状态，当前见 12.10）。
   远程 URL 无内嵌凭证，Token 未写入源码 / 文档 / 参数 / 日志。
+
+### 12.10 合并进 main（2026-11-28）
+
+- 用户确认最新 14 个提交此前都在 `feat/node-server-mode` 后，执行
+  `git checkout main && git merge --ff-only feat/node-server-mode && git push origin main`。
+- `merge-base` 为 `cbfe149bed07f0568680bf20af89843aaea71305`，`main` 直接快进
+  `cbfe149..d435875`（14 个提交，150 个文件变更）；远端非强制推送返回
+  `cbfe149..d435875  main -> main`。
+- 核验：`git ls-remote origin refs/heads/main refs/heads/feat/node-server-mode`
+  两条均返回 `d435875479f1a6727ccc789e81436d9c334eee5e`；本地 `HEAD`、`main`、
+  `feat/node-server-mode` 三者 SHA 相同，`git status --short --branch` 显示
+  `## main...origin/main`（无 ahead/behind，工作区干净）。
+- 现在拉取与部署应以 `main` 为准：`git clone https://github.com/Fandou-Garden/boomboom.git`，
+  `cd boomboom && git checkout main && npm install && npm run start:server`，
+  访问 `http://127.0.0.1:8100/`。
