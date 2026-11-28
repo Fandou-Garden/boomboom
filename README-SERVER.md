@@ -378,3 +378,12 @@ npm run start:server
   首次交互提示未归因于账号无权限。详细记录见 `docs/PROGRESS.md` 10.9。
 - 本节 SHA 补记为追加文档提交（其 SHA 无法自引用），分支 tip 以最终交付说明为准。
 
+
+### 12.8 最终收尾提交（2026-11-28）
+
+- 最终提交 `ba3a045216d0597896b4ec775c70336b8956fa5e`，非强制推送
+  `ef2bd52..ba3a045` 成功，`git ls-remote origin refs/heads/feat/node-server-mode`
+  与本地 HEAD 均为该 SHA；`main` 仍为 `cbfe149bed07f0568680bf20af89843aaea71305`。
+- 本提交修复强化字段接入（`baseDamage` 而非 `attack`）、引擎 `expected:null` 崩溃，
+  新增真实玩家流程 / 存档备份恢复 / 10 局稳定性测试与 5 张真实截图；
+  `docs/PROGRESS.md` 第 11 节为逐项记录。Token 未写入任何文件或日志。

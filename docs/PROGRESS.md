@@ -6,8 +6,9 @@
 
 ## 当前状态（2026-11-28，最终收尾）
 
-- 分支 `feat/node-server-mode`，HEAD / 远程均为 `ef2bd52f5f8b75255745a4795c3d9c1faba22b0b`（已 `git ls-remote` MATCH）；
-  `main` 保持 `cbfe149bed07f0568680bf20af89843aaea71305`，未合并。工作区干净。
+- 分支 `feat/node-server-mode`，最终提交 / HEAD / 远程均为
+  `ba3a045216d0597896b4ec775c70336b8956fa5e`（已 `git ls-remote` MATCH，非强制推送
+  `ef2bd52..ba3a045`）；`main` 保持 `cbfe149bed07f0568680bf20af89843aaea71305`，未合并。
 - **阶段 8**（`a639b72534559f692d3d23ad04aa095c701700b8`）已提交并推送：材料分类纠错、原版链路证据、
   极武器映射撤回、迁移与奖励盘版本化、规则测试、**镜头断言修复**（`npm test` 由 60/61 → 61/61）。
 - **阶段 9**（`ad8d6d3ae29112ee7bcc84054e9e5bfecf766cec`）已提交并推送：原版红金铁匠铺 UI（真实 DOM 6 槽位，
