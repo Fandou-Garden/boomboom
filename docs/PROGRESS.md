@@ -10,11 +10,13 @@
   倒计时 067/014 复用原版采样；功能提交 `e1bdca9bcfc988451130d4d5c48d22ff43b6754e`，
   `git ls-remote` 远程 feat 分支 SHA 与本地 HEAD MATCH；`node tests/server/turn-feedback.mjs`
   8/8 通过，两张真实截图归档。详见下方第 12 节。
-- **当前分支 `main`**：本地与远程 `main`、`feat/node-server-mode` 均为
-  `d435875479f1a6727ccc789e81436d9c334eee5e`；`feat/node-server-mode` 已于 17:17
+- **当前分支 `main`**：已包含全部 14 个特性提交；`feat/node-server-mode` 已于 17:17
   以 `--ff-only` 快进合并进 `main` 并推送（14 个提交，150 个文件变更），工作区干净。
-  此前收尾提交 `ba3a045216d0597896b4ec775c70336b8956fa5e` 与
-  `e1bdca9bcfc988451130d4d5c48d22ff43b6754e` 均为该 HEAD 的祖先；详见第 13 节。
+  合并完成时本地与远程 `main`、`feat/node-server-mode` 同为
+  `d435875479f1a6727ccc789e81436d9c334eee5e`；之后文档记录提交只推进 `main` tip，
+  最终以 `git ls-remote origin refs/heads/main` 为准。此前收尾提交
+  `ba3a045216d0597896b4ec775c70336b8956fa5e` 与
+  `e1bdca9bcfc988451130d4d5c48d22ff43b6754e` 均为该合并 HEAD 的祖先；详见第 13 节。
 - **阶段 8**（`a639b72534559f692d3d23ad04aa095c701700b8`）已提交并推送：材料分类纠错、原版链路证据、
   极武器映射撤回、迁移与奖励盘版本化、规则测试、**镜头断言修复**（`npm test` 由 60/61 → 61/61）。
 - **阶段 9**（`ad8d6d3ae29112ee7bcc84054e9e5bfecf766cec`）已提交并推送：原版红金铁匠铺 UI（真实 DOM 6 槽位，
@@ -821,8 +823,9 @@ tracked 文件（清单自身除外）。凭证模式扫描 staged 文件 **0 �
   `git merge-base main feat/node-server-mode` 返回 `cbfe149…`，`feat..main` 为 0。
 - 操作：`git checkout main && git merge --ff-only feat/node-server-mode && git push origin main`。
   快进 `cbfe149..d435875`，远端返回 `cbfe149..d435875  main -> main`（非强制）。
-- 核验：`git ls-remote origin refs/heads/main refs/heads/feat/node-server-mode`
+- 核验（合并完成时）：`git ls-remote origin refs/heads/main refs/heads/feat/node-server-mode`
   两条均为 `d435875479f1a6727ccc789e81436d9c334eee5e`；本地 `HEAD`、`main`、
   `feat/node-server-mode` 三者 SHA 相同；`git status --short --branch` 为
-  `## main...origin/main`，无 ahead/behind。
+  `## main...origin/main`，无 ahead/behind。其后文档记录提交只推进 `main` tip，
+  最终 SHA 以 `git ls-remote` 为准。
 - 现在拉取、部署与运行统一以 `main` 为准；旧文档里「main 未合并」的表述均指当时历史状态。

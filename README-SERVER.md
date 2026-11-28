@@ -214,9 +214,10 @@ Node RSS 在两次采样间受 GC 与采样时机影响（空闲值甚至可能�
 ## 9. 开发分支与推送状态
 
 - 开发分支：`feat/node-server-mode`（基于 `main` @ `cbfe149`）。
-- **当前状态（2026-11-28 17:17）**：`feat/node-server-mode` 已快进合并到 `main`；
-  本地与远程 `main`、`feat/node-server-mode` 均指向
-  `d435875479f1a6727ccc789e81436d9c334eee5e`，工作区干净。下面阶段条目为当时历史记录。
+- **当前状态（2026-11-28 17:17）**：`feat/node-server-mode` 已快进合并到 `main`，
+  本地 `main` 已包含全部特性提交。合并完成时远程 `main` 与 `feat/node-server-mode`
+  同为 `d435875479f1a6727ccc789e81436d9c334eee5e`；之后文档记录提交会继续推进
+  `main` tip，最终以 `git ls-remote origin refs/heads/main` 为准。下面阶段条目为当时历史记录。
 - **推送已于 2026-11-28 10:43 成功**：用户提供配置了 `Contents: Read and write` 的
   fine-grained PAT 后，用环境变量注入凭证、`git push -u origin feat/node-server-mode` 非强制推送一次成功；
   `git ls-remote` 校验远程分支 SHA 与本地 HEAD 一致（`039b338d68303b15e30ee1ebcd4b14dbfad2cf58`）。
@@ -420,10 +421,11 @@ npm run start:server
 - `merge-base` 为 `cbfe149bed07f0568680bf20af89843aaea71305`，`main` 直接快进
   `cbfe149..d435875`（14 个提交，150 个文件变更）；远端非强制推送返回
   `cbfe149..d435875  main -> main`。
-- 核验：`git ls-remote origin refs/heads/main refs/heads/feat/node-server-mode`
+- 核验（合并完成时）：`git ls-remote origin refs/heads/main refs/heads/feat/node-server-mode`
   两条均返回 `d435875479f1a6727ccc789e81436d9c334eee5e`；本地 `HEAD`、`main`、
   `feat/node-server-mode` 三者 SHA 相同，`git status --short --branch` 显示
-  `## main...origin/main`（无 ahead/behind，工作区干净）。
+  `## main...origin/main`（无 ahead/behind，工作区干净）。其后文档记录提交只推进
+  `main` tip，最终 SHA 以 `git ls-remote` 为准。
 - 现在拉取与部署应以 `main` 为准：`git clone https://github.com/Fandou-Garden/boomboom.git`，
   `cd boomboom && git checkout main && npm install && npm run start:server`，
   访问 `http://127.0.0.1:8100/`。
