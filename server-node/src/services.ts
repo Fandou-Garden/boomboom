@@ -375,6 +375,7 @@ export class GameStore {
             battleId: existing.id, mapId: existing.map_id, weaponId: existing.weapon_id,
             weaponLevel: Number(existing.weapon_level),
             weaponAttack: Number(existing.weapon_attack_precise ?? existing.weapon_attack),
+            weaponDamageScale: 1 + config.forge.attackMultiplierPerLevel * Number(existing.weapon_level),
             botAttack: Number(existing.bot_attack), seed: Number(existing.seed), resumed: true,
             weaponLabel: null, variant: existing.variant || 'normal',
           };
@@ -402,6 +403,7 @@ export class GameStore {
       return {
         battleId, mapId: current.map_id, weaponId: ballisticsId,
         weaponLevel: Number(w.level), weaponAttack: Number(w.attack_precise ?? w.attack),
+        weaponDamageScale: this.attackForLevel(this.baseAttackOf(w), Number(w.level)) / this.baseAttackOf(w),
         botAttack, seed, resumed: false,
         weaponLabel: w.label, variant: w.variant || 'normal',
       };

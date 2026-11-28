@@ -427,7 +427,8 @@ test('SIMPLE_LOCAL_V1：重复提交不重复扣费 / requestId 绑定 / 并发�
       const started = await precise.a.post('/api/server/room/start', {});
       assert.equal(started.status, 200);
       const state = (await precise.a.get('/api/state')).body;
-      assert.equal(state.actors[0].attack, 104.5, '属性精度保留到战斗引擎，最终伤害取整由引擎处理');
+      assert.equal(state.actors[0].baseDamage, 396, '武器基础伤害 95×1.10=104.5（倍率 1.1）→ engine baseDamage 360×1.1=396');
+      assert.equal(state.actors[0].attack, 100, '四维攻击保持原版，不被强化误改');
       const battle = readDb(precise.dbPath, (db) => db.prepare(
         'SELECT weapon_attack_precise, weapon_attack, weapon_id FROM battles WHERE id = ?',
       ).get(started.body.battleId));
@@ -600,7 +601,8 @@ test('奖励池与武器领取：正常池无固定卡位 / 旧盘不重抽 / �
     const started = await a2.post('/api/server/room/start', {});
     assert.equal(started.status, 200);
     const state = (await a2.get('/api/state')).body;
-    assert.equal(state.actors[0].attack, attackAt(reward.attack, 1), '下一局使用该武器强化后的属性');
+    assert.equal(state.actors[0].baseDamage, 396, '下一局基础伤害 = 360 × 1.10 = 396（倍率来自武器强化）');
+    assert.equal(state.actors[0].attack, 100, '四维攻击保持原版 100');
     const battle = readDb(ctx.dbPath, (db) => db.prepare(
       'SELECT weapon_id, weapon_attack_precise, variant FROM battles WHERE id = ?',
     ).get(started.body.battleId));

@@ -2,7 +2,10 @@
  * 战斗引擎宿主：把站点版纯 JS 权威引擎跑在 Node 里。
  *
  * - 按需加载当前地图的碰撞位图并缓存（不每帧读盘、不向前端发送整张地图）。
- * - 开局冻结本局武器属性（attack 进入原版 MakeDamage 公式），战斗中改装备不影响本局。
+ * - 开局冻结本局武器属性：强化只按倍率缩放 engine 的 baseDamage（原版 MakeDamage
+ *   的基础伤害基数），actor.attack 保持原版 Player 四维攻击值 100 不变。
+ *   这是「基础伤害 +10%」与「四维攻击 +10%」的关键区别：伤害公式是
+ *   baseDamage * (1 + attack*0.001)，写错字段会只改变约 0.9% 伤害。
  * - 固定弱机器人通过引擎既有的 aiSolver 钩子给出固定角度/力度，
  *   仍走同一套弹道、碰撞、伤害与回合入口，不使用必中或额外伤害。
  */
@@ -16,7 +19,10 @@ export interface BattleSetup {
   mapId: string;
   weaponId: string;
   weaponLevel: number;
+  /** UI / 存档中的武器基础伤害（未强化值 × 强化倍率），仅用于展示与存档。 */
   weaponAttack: number;
+  /** 强化倍率 = 1 + 0.10 × 等级；只乘到 engine 的 baseDamage，不写 actor.attack。 */
+  weaponDamageScale: number;
   botAttack: number;
   seed: number;
 }
@@ -64,15 +70,27 @@ export class EngineHost {
     const m = this.engine.match;
     if (!m) throw new Error('engine match missing after init');
 
-    // 冻结本局双方攻击属性。actor.attack 是原版 Player 属性，
-    // sourceDamage() 用 (1 + attack*0.001) 参与伤害结算。
-    m.actors[0].attack = setup ? setup.weaponAttack : 100;
-    m.actors[1].attack = setup ? setup.botAttack : Math.round(100 * config.bot.attackScale);
-
+    // 先切换武器，再冻结本局属性，避免后续任何命令覆盖强化倍率。
     if (setup && setup.weaponId && m.playerWeaponId !== setup.weaponId) {
       const weaponError = this.engine.command(JSON.stringify({ type: 'select_weapon', weapon: setup.weaponId }));
       if (weaponError) throw new Error(`select weapon failed: ${weaponError}`);
     }
+
+    // 原版 sourceDamage()：baseDamage * (1 + attack*0.001) * 防御减免 * ...
+    // 交付规则是「基础伤害 × (1 + 0.10×等级)」，因此只缩放 baseDamage。
+    // actor.attack 是原版 Player 四维攻击属性，强化不得改写它——否则
+    // 100→110 只会让 (1+attack*0.001) 从 1.10 变 1.11（约 +0.9% 伤害），
+    // 与「基础伤害 +10%」不符，也会误改四维属性。
+    // 基值直接读引擎 init 后的原版 actor，避免硬编码常量漂移。
+    const originalAttack = Number(m.actors[0].attack);
+    const originalBaseDamage = Number(m.actors[0].baseDamage);
+    m.actors[0].attack = originalAttack;
+    // 规整到 6 位，消除 360*1.1=396.00000000000006 这类二进制尾差。
+    m.actors[0].baseDamage = Math.round(
+      originalBaseDamage * (setup ? setup.weaponDamageScale : 1) * 1e6,
+    ) / 1e6;
+    m.actors[1].attack = setup ? setup.botAttack : Math.round(originalAttack * config.bot.attackScale);
+    // 机器人只改四维 attack（既有固定弱机器人规则），基础伤害保持引擎原版值。
 
     // 固定规则弱机器人：等待时间由引擎既有 ENEMY_MOVE/THINK/AIM 阶段提供。
     // aiSolver 返回固定角度/力度；引擎仍会 clamp 到武器角度范围并施加极小扰动，

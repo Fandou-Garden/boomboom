@@ -549,6 +549,21 @@ test('stale async AI results are ignored after reset', async () => {
   assert.equal(m.aiPending, false);
 });
 
+test('enemy-aim event tolerates AI plans without expected sim result', () => {
+  // 服务端固定弱机器人直接给出 angle/force，expected 为 null；aiPlanJson 曾在此处
+  // 调用 simResultJson(null) 导致整局崩溃（真实玩家流程验收捕获）。
+  const m = newMatch(42);
+  m.aiSolver = (_job, done) => done({
+    angle: 42, force: 1180, direction: -1,
+    expected: null, solvedAngle: 42, solvedForce: 1180,
+  });
+  m.endEnemyMoveLocked();
+  for (let i = 0; i < 200 && m.phase !== 'enemy_aim'; i += 1) m.update(PHYSICS_DT);
+  assert.equal(m.phase, 'enemy_aim', 'AI 计划没有 expected 也应正常进入瞄准阶段');
+  const events = m.eventsSince(0);
+  assert.ok(events.some((e) => e.type === 'enemy-aim'), '应发出 enemy-aim 事件且不抛错');
+});
+
 test('worker timeout falls back to a playable default plan', () => {
   const m = newMatch(42);
   m.aiSolver = () => {}; // never answers

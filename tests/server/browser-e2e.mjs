@@ -536,10 +536,11 @@ async function main() {
     // 下一局：同条件攻击实际使用强化后的基础伤害（读服务端权威状态，不靠 UI 文案）。
     assert.equal((await post(base, '/api/server/room/start', {})).status, 200);
     const nextState = await get(base, '/api/state');
-    assert.equal(nextState.actors[0].attack, 110, '下一局引擎内实际使用 110 基础伤害');
+    assert.equal(nextState.actors[0].baseDamage, 396, '下一局引擎 baseDamage = 360 × 1.10 = 396');
+    assert.equal(nextState.actors[0].attack, 100, '四维攻击保持原版 100，强化未误改');
     assert.equal(nextState.actors[1].attack, 35, '机器人属性不受强化影响');
     assert.equal((await post(base, '/api/server/room/leave', {})).status, 200);
-    pass('下一局同条件攻击验证强化增益：玩家 110 / 机器人 35（当前进行中的战斗不受影响）');
+    pass('下一局同条件攻击验证强化增益：baseDamage 360→396 / 四维 attack 保持 100 / 机器人 35');
 
     // 重复提交同一 requestId：返回同一结果，金币与材料只扣一次。
     const forgeBeforeReplay = (await get(base, '/api/server/forge')).forge;

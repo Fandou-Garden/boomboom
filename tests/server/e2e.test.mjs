@@ -152,7 +152,8 @@ test('服务端版完整业务闭环 + 事务防重 + 重启存档', async (t) =
   assert.ok(battleId);
   let state = (await api.get('/api/state')).body;
   assert.equal(state.phase, 'player');
-  assert.equal(state.actors[0].attack, 100, '本局冻结未强化攻击属性');
+  assert.equal(state.actors[0].attack, 100, '原版四维攻击属性不被强化改写');
+  assert.equal(state.actors[0].baseDamage, 360, '未强化时基础伤害为引擎原版 360');
   assert.equal(state.actors[1].attack, 35, '弱机器人攻击倍率 0.35');
 
   // 前端不能提交结果字段 / 不能自行重置引擎
@@ -332,7 +333,8 @@ test('服务端版完整业务闭环 + 事务防重 + 重启存档', async (t) =
   assert.equal(second.status, 200);
   assert.notEqual(second.body.battleId, battleId);
   const state2 = (await api.get('/api/state')).body;
-  assert.equal(state2.actors[0].attack, 110, '下一场战斗实际应用强化后的基础伤害');
+  assert.equal(state2.actors[0].baseDamage, 396, '下一局基础伤害 = 360 × 1.10 = 396');
+  assert.equal(state2.actors[0].attack, 100, '四维攻击保持原版，不被强化误改');
   assert.equal(state2.actors[1].attack, 35, '机器人倍率不变');
 
   // 战斗中禁止改装备（本局属性已冻结）

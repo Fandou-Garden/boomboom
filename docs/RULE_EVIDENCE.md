@@ -134,6 +134,7 @@ num8        = RandomSafe.Next(10000)                            // 服务端随�
 | 每次消耗 | 1 颗真强化石（所有已确认等级统一一次机会）+ `100 × 目标等级` 金币 |
 | 成功率 / 等级变化 | 100% / `+1`，不降级、不损毁 |
 | 基础伤害 | 未强化基础值 × `(1 + 0.10 × 强化等级)`；`+1`=110%，`+12`=220% |
+| 引擎接入字段 | 原版 `sourceDamage()`（`dist/js/engine/physics.js`）为 `baseDamage * (1 + attack*0.001)`；`attack` 是 Player 四维属性。倍率只乘 `actor.baseDamage`（原版 360），`actor.attack` 恒 100。证据：`dist/js/engine/match.js` 的 `BASE_DAMAGE/ATTACK` 与 `server-node/src/battle/engine-host.ts` |
 | 精度 | `weapon_instances.attack_precise` 保留 6 位小数，最终伤害取整沿用战斗引擎 |
 | 符咒 / 合成石 | 不参与计算、槽位置灰、物品保留；服务端拒绝作为材料 |
 | 影响范围 | 仅武器基础伤害；不改弹道 / 风力 / 爆炸范围 / 角度范围 |

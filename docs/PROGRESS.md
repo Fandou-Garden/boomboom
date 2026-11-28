@@ -2,6 +2,57 @@
 
 > 本文件按任务准则持续更新：已完成 / 当前任务 / 阻塞 / 下一步 / 验证结果。
 > 不把估算写成实测，不把未完成写成完成。
+> **本文件顶部只写当前状态与最新验证结果；所有阶段性旧结论已移入下方「历史记录」并标注对应提交 SHA。**
+
+## 当前状态（2026-11-28，最终收尾）
+
+- 分支 `feat/node-server-mode`，HEAD / 远程均为 `ef2bd52f5f8b75255745a4795c3d9c1faba22b0b`（已 `git ls-remote` MATCH）；
+  `main` 保持 `cbfe149bed07f0568680bf20af89843aaea71305`，未合并。工作区干净。
+- **阶段 8**（`a639b72534559f692d3d23ad04aa095c701700b8`）已提交并推送：材料分类纠错、原版链路证据、
+  极武器映射撤回、迁移与奖励盘版本化、规则测试、**镜头断言修复**（`npm test` 由 60/61 → 61/61）。
+- **阶段 9**（`ad8d6d3ae29112ee7bcc84054e9e5bfecf766cec`）已提交并推送：原版红金铁匠铺 UI（真实 DOM 6 槽位，
+  可点选/拖放）、原版 BGM 14 条 + 倒计时音效 2 条及场景切换。**不是「阶段 9 待开始」**。
+- **阶段 10**（`db5b892849e6abf667d4b4acf9fbdbe238187340` + 文档补记 `ef2bd52…`）已提交并推送：
+  用户授权简化后的 `SIMPLE_LOCAL_V1` 已落地（+0~+12 / 1 颗真强化石 / 100×目标等级金币 /
+  成功率 100% / 不降级不损毁 / 基础伤害 ×(1+0.10×等级)）。
+- **强化接入字段复核（最终收尾修正）**：引擎 `sourceDamage()` 为 `baseDamage × (1 + attack×0.001)`；
+   `attack` 是原版 Player 四维属性，不能承载“基础伤害 +10%”。现已改为只缩放 `actor.baseDamage`
+   （360 → 396 @ +1），`actor.attack` 恒为 100；未改弹道、风力、爆炸、角度等其他属性。
+- **真实玩家流程验收**：`npm run test:server:real` 在 `DDT_DEBUG=0` 下用合法 `move/aim_absolute/
+  charge_start/charge_release` 完成 8 次发射并由引擎自然判胜（winner=0），
+  `debug_set_hp` 被 403 拒绝；完整经过加载→机器人行动→翻牌→回房间→铁匠铺→再开一局。
+- **真实缺陷修复**：真实流程暴露引擎 `aiPlanJson()` 在 `expected:null` 时调用
+   `simResultJson(null)` 导致整局崩溃（服务端固定弱机器人走 `expected:null` 路径）。
+   `dist/js/engine/json.js` 已加空值防御，`tests/engine/match.test.mjs` 增加回归，62/62 通过。
+- **窄横屏实测**：812×375 下铁匠铺主体在视口内（780×345），强化按钮需滚动 `.ddt-forge-frame`
+   才可见，`scrollIntoView` 后 `btnTop=164` 在视口内，**无遮挡、无横向溢出**；截图已归档。
+- **本轮真实截图**（`docs/screenshots/`）：`2026-11-28-final-room.png`（房间选图/武器）、
+   `2026-11-28-final-battle.png`（真实战斗：角色/地形/力度条/HUD）、
+   `2026-11-28-final-settlement.png`（结算 3×3 九宫格，拍摄于翻牌前，9 张均为卡背）、
+   `2026-11-28-final-forge.png`（红金铁匠铺）、`2026-11-28-final-forge-narrow.png`（812×375 窄横屏）。
+   翻牌后的卡面截图见阶段 10 的 `2026-11-28-stage10-settlement.png`。
+- 当前**不存在**以下旧阻塞：推送凭证失效（已用有效 PAT 非强制推送成功）、镜头断言失败（阶段 8 修复）、
+  阶段 9 UI/音频未实现（阶段 9 已完成）、`LOCAL_RULE` 60 金币 / attack 125（阶段 10 已替换）。
+- 参考仓库可达性记录见下方「历史记录」：其中 `origin_boomboom` / `Gunny` 的 404 是 **2026-11-28 早期**探测，
+  仅说明当时不可达，不代表永久结论；当前原版核对以上游 `phucdz2kk4/Gunny` @ `057c71a` 为准。
+
+## 最新验证结果（2026-11-28 最终收尾，均在独立端口 / 临时库实测）
+
+| 项目 | 结果 |
+| --- | --- |
+| `npm run typecheck:server` | 通过，0 错误 |
+| `npm run test:server` | **7 / 7 通过**（含 `baseDamage` 396 断言、004 迁移幂等） |
+| `npm test` | **62 / 62 通过**（镜头断言未删；本轮新增 1 条 AI `expected:null` 回归） |
+| `npm run test:server:browser` | **19 项全通过**，含服务器模式未回退 offline、强化预览、重复请求防重 |
+| `npm run test:server:real` | **13 项全通过**：`DDT_DEBUG=0`，8 次合法发射自然判胜（无 `debug_*`）、真实翻牌、返回房间、铁匠铺、再开一局 |
+| `npm run test:server:backup` | 通过：运行中 SQLite backup() → 副本恢复 → 重启，金币/背包/13 把武器/迁移 1-4 逐项一致；换 cwd 启动不覆盖存档 |
+| `npm run test:server:stability` | **10 / 10 局自然结算**：Node RSS 首采样 110.96 MB → 末采样 125.07 MB（区间 119.6–126.9 MB，全程无单调增长）；对局/奖励盘/发放流水随局数线性累积，无异常残留对局 |
+| `npm run test:server:perf` | 通过；Node RSS 空闲 107.97 MB / 战斗 95.56 MB、浏览器 JS 堆 2.05 MB、DOM 1506、监听 177 |
+| `SOURCE_MANIFEST.sha256` | 744 条，`shasum -a 256 -c` → 744 OK |
+| 凭证扫描 | staged 内容 0 命中，Token 未写入 URL / 源码 / 文档 / 参数 / 日志 |
+
+> 下方自「任务与来源」至「历史下一步」为**历史记录（阶段 1~7 及更早探测）**，保留当时原文与
+> 对应提交 SHA；其数字与结论**不得**当作当前状态。阶段 8/9/10 的现行结论见文末同名章节。
 
 ## 任务与来源
 
@@ -14,7 +65,7 @@
 - 站点版前端 = 现有 `dist/`（原生 ESM，无打包器），**保留不改造成另一套前端**。
 - 原版 Flash/AS3 客户端仅用于核对、提取与移植素材，不能当作 JS 前端加载。
 
-## 参考仓库可达性（2026-11-28 实测）
+## 历史 · 参考仓库可达性（2026-11-28 早期实测，仅代表当时）
 
 | 仓库 | 结果 |
 | --- | --- |
@@ -26,7 +77,7 @@
 
 按 `源码实现路径.md` 第一节「若主参考地址不可访问，读取上游」，后续原版代码/物品核对以上游仓库为准。
 
-## 基线现状（读取仓库后确认，非推测）
+## 历史 · 基线现状（阶段 0 读取仓库时确认，非当前状态）
 
 - 前端入口 `dist/index.html` 内联脚本探测 `GET /api/state`：返回含 `phase` 的 JSON 即判定为「有后端」，
   走 `RemoteMatch`（SSE `/api/events` + `POST /api/command`）；否则加载 `dist/standalone-api.js`
@@ -106,6 +157,8 @@
 - [x] **阶段 6：强化属性进入下一局**（浏览器与 HTTP 双层验证）。
   - 服务端开局把 `weapon_instances.attack` 冻结进 `actor.attack`，进入原版 MakeDamage 公式；
     +1 级后下一局实测 `attack=125`（未强化为 100），机器人保持 35。
+    **【历史实现 · 阶段 6】**当时的 `LOCAL_RULE` 用 `+25×等级` 且写错字段；
+    现行 `SIMPLE_LOCAL_V1` 改为按倍率缩放 `baseDamage`（360→396 @ +1），`attack` 恒为 100。
 - [x] **阶段 7：原版核对、素材清单、性能实测与交付文档**。
   - 上游 Gunny @ `057c71a`（= `constants.js` 的 `SOURCE_COMMIT`）已只读核对：
     `TemplateAlllist.xml` 解压后 7642 条物品，玄武石 1~5 级 TemplateID 全部证实；
@@ -113,17 +166,12 @@
   - 原版强化机制（Rock / 装备进阶）与本轮规则不同，按准则不混用，保留 `LOCAL_RULE` 并写明证据。
   - `docs/ASSET_MANIFEST.md`（素材对应清单）、`README-SERVER.md`（启动/备份/验收/缺失）已交付。
 
-## 当前任务
+## 历史 · 阶段 1~7 已完成清单（提交 `039b338` 及更早）
 
-**阶段 8 已完成并本地提交推送**（材料分类纠错 / 原版强化链路核对 / 极武器映射撤回 /
-迁移验证 / 奖励盘版本化 / 规则测试 / 镜头断言修复）。详见文末「阶段 8」与
-`docs/RULE_EVIDENCE.md`、`docs/WEAPON_MAPPING_EVIDENCE.md`、`docs/MIGRATION_VERIFICATION.md`。
+以下为阶段 1~7 当时的完成记录；阶段 8/9/10 的更新见文末同名章节，
+**当前状态以文件顶部为准**。
 
-**阶段 9 待开始（未完成，不得写成已完成）**：原版红金色铁匠铺 UI 资源导出与真实交互、
-原版音乐与音效接入、极武器专属素材、多局资源增长观测。当前仍是 `LOCAL_RULE` 临时界面，
-**明确未还原原版铁匠铺**，不能写成「原版还原已完成」。
-
-## 验证结果（2026-11-28 全部实测，不把估算写成实测）
+## 历史 · 验证结果（阶段 1~7，2026-11-28 早期实测，已被顶部最新结果取代）
 
 ### 构建与静态检查
 
@@ -140,6 +188,9 @@
   5 种材料、金币 0、机器人 `42°/1180/0.35`、无待领奖励盘。
 - `/api/server/forge` → 13 把武器；0 级消耗 60 金币 / 1 材料单位 / 成功率 1（首级保底）、
   强化后 attack 125，规则来源 `LOCAL_RULE`。
+  **【历史值 · 已失效】**这是阶段 1~7（`039b338` 及更早）的 `LOCAL_RULE` 数据；
+  现行规则为 `SIMPLE_LOCAL_V1`（`db5b892`）：+0 起、上限 +12、1 颗真强化石 +
+  `100×目标等级` 金币、成功率 100%、基础伤害 ×(1+0.10×等级)，且强化只改 `baseDamage`。
 - 静态资源 `/`、原版物品图标、`data/1156.fore.map` 均 200。
 
 ### 自动化测试
@@ -185,11 +236,13 @@
   与上一轮（108.50 / 109.91 / 2.59 MB）存在正常波动，**两组都是实测值，不互相覆盖**。
 - `npm test`：**60/61 通过**，唯一失败仍是 `tests/physics.test.mjs:207` 的镜头边界断言（v33 既有）。
 
-## 阻塞
+## 历史 · 阻塞（阶段 1~7 原始诊断，均已解除）
 
-> **状态更新（2026-11-28 10:43 之后）**：下列第 1 条「推送凭证失效」已解除；
-> 第 2 条「镜头断言失败」已在阶段 8 修复。以下保留当时诊断原文作为历史记录，
-> 结论以本段与文末「阶段 8」为准。
+> **状态更新（2026-11-28 10:43 之后，最终收尾复核）**：第 1 条「推送凭证失效」**已解除**
+> ——已用有效 PAT 非强制推送 `ad8d6d3 → db5b892 → ef2bd52`，`git ls-remote` MATCH；
+> 第 2 条「镜头断言失败」**已在阶段 8（`a639b72`）修复**，`npm test` 61/61。
+> 第 3 条仓库 404 是 2026-11-28 早期探测，已按约定切换上游，非永久结论。
+> 以下保留当时诊断原文作为历史，不代表当前阻塞；当前状态见文件顶部。
 
 1. **【已解决】推送开发分支失败（2026-11-28 早期实测，历史记录）**。
    - `git push -u origin feat/node-server-mode` 返回
@@ -233,7 +286,11 @@
    `npm test` 由 60/61 变为 **61/61 通过**。
 3. 主参考仓库 404 已按约定切换到上游 `phucdz2kk4/Gunny`，不构成阻塞。
 
-## 下一步（阶段 9 及剩余工作，均未完成）
+## 历史 · 下一步（阶段 8 开工时的计划清单，非当前待办）
+
+> 下列计划中，第 1/2 项已在阶段 9（`ad8d6d3`）完成，第 3 项按用户授权不再追求、
+> 第 4 项已改为「中文品质名称待核对」不阻塞、第 5/6 项部分完成（见顶部与文末阶段 10）。
+> 保留原文仅用于溯源，**当前待办以文件顶部「当前状态」和文末「剩余项」为准**。
 
 1. **原版红金色铁匠铺 UI**：先导出并查看 `Source Flash/FlashSV1/` 实际 store 模块资源与
    旧版对照 `inetpub/wwwroot/gunny/ui/vietnam/swf/store.swf`，记录与用户截图的差异，
@@ -551,7 +608,7 @@ fine-grained PAT 不返回 `X-OAuth-Scopes` 头，写权限只能以实际非强
 | `npm run typecheck:server` | 通过，0 错误 |
 | `npm test` | **61 / 61 通过**（镜头断言未被删除） |
 | `npm run test:server` | **7 / 7 通过**：业务闭环、公式与消耗、三类不足/上限、幂等与并发、+0→+12 全程、奖励池与武器发放、004 迁移幂等 |
-| `npm run test:server:browser` | **19 项全通过**：翻牌真实拿到金币 + 真强化石、6 槽启用/禁用、100% 成功率、完整预览、拖放与禁用槽拒绝、强化成功 +1/110、下一局 110、重复提交不重复扣费、三类提示、刷新保留、offline 回退，页面无 JS 错误 |
+| `npm run test:server:browser` | **19 项全通过**：翻牌真实拿到金币 + 真强化石、6 槽启用/禁用、100% 成功率、完整预览、拖放与禁用槽拒绝、武器基础伤害 +1/110、重复提交不重复扣费、三类提示、刷新保留、offline 回退，页面无 JS 错误（当时断言“下一局 attack=110”，**已在最终收尾更正为 `baseDamage=396` / `attack=100`**，见 10.10） |
 | `npm run test:server:perf` | 通过；Node 空闲 RSS **109.14 MB**（heap 12.31 MB）、战斗中 **121.53 MB**（heap 16.65 MB）；浏览器 JS 堆 **2.07 MB**、DOM 1525、监听 177；首屏 177 请求 / encoded **3.14 MB** / transfer **3.16 MB**；`dist/` **41.13 MB**、CSS **83.2 KB**。**收尾复测**：Node 空闲 RSS 107.97 MB（heap 12.37 MB）/ 战斗中 95.56 MB（heap 16.94 MB）、浏览器 JS 堆 2.05 MB / DOM 1506 / 监听 177、`dist/` 41.14 MB；两次差异来自 GC 与进程采样时机，均如实记录，不取最好值 |
 | 迁移实测 | `旧金币=1234 新金币=1234 背包=[xuanwu1:3, xuanwu3:2] 旧武器 attack=175 → 130 (base=100, Lv3) 超限 Lv15 → 12 幂等=true` |
 
@@ -581,6 +638,18 @@ tracked 文件（清单自身除外）。凭证模式扫描 staged 文件 **0 �
   Canvas / 图片 / 音频 buffer 单独占用：**尚未实测**。
 - `art-source/` 的 `lightFrame` / `starMc` / `VersusAnimation` / `GameMode_*` 逐帧序列未接入。
 
+### 10.10 最终收尾：强化接入字段修正（`attack` → `baseDamage`）
+
+- 复核 `dist/js/engine/physics.js` 的 `sourceDamage()`：`baseDamage * (1 + attack*0.001)`；
+  `BASE_DAMAGE=360`、`ATTACK=100`（`dist/js/engine/constants.js`），`attack` 是 Player 四维属性。
+- 阶段 10 初版把 `weaponAttack` 写入 `m.actors[0].attack`，等于把「基础伤害 +10%」误实现成
+  「四维攻击 +10%」：`100→110` 只让 `(1+attack*0.001)` 从 1.10 变 1.11（约 +0.9% 伤害）。
+- 修正：`BattleSetup` 增加 `weaponDamageScale`，`engine-host.ts` 只缩放 `actor.baseDamage`
+  （`+0`=360、`+1`=396、`+12`=792），`actor.attack` 恒 100；机器人仍用既有 attack=35 弱规则。
+  `baseDamage` 规整到 6 位消除二进制尾差。不改弹道 / 风力 / 爆炸 / 角度。
+- 测试同步：`e2e`、`browser-e2e`、`forge-rules` 断言改为 `baseDamage=396` 且 `attack=100`；
+  `npm run typecheck:server` 0 错误、`npm run test:server` **7/7** 通过。
+
 ### 10.9 提交与推送状态（已核验）
 
 - **开发分支**：`feat/node-server-mode`（不自动合并 `main`）。
@@ -601,3 +670,83 @@ tracked 文件（清单自身除外）。凭证模式扫描 staged 文件 **0 �
 - 本节为推送完成后的**追加文档提交**，其自身 SHA 无法自引用；分支 tip 以
   `git rev-parse HEAD` / `git ls-remote` 与最终交付说明为准。
 
+
+---
+
+## 11. 最终收尾（2026-11-28）：真实流程、存档保护、资源核对
+
+### 11.1 强化只改基础伤害，不改四维攻击
+
+引擎 `sourceDamage()`（`dist/js/engine/physics.js`）为
+`baseDamage * (1 + attack*0.001)`；`BASE_DAMAGE=360`、`ATTACK=100`。
+阶段 10 初版把强化值写入 `actor.attack`，会让「基础伤害 +10%」变成约 +0.9% 伤害，
+且错误改写四维属性。现 `BattleSetup.weaponDamageScale` 只缩放 `actor.baseDamage`：
+`+0`=360、`+1`=396、`+12`=792，`actor.attack` 恒 100。精度规整到 6 位，
+弹道 / 风力 / 爆炸范围 / 角度范围不变；`e2e`、`browser-e2e`、`forge-rules` 断言已同步。
+
+### 11.2 正常玩家流程（`npm run test:server:real`，13 项全通过）
+
+- `DDT_DEBUG=0` 启动当前分支代码，端口/模式正确；浏览器确认 `backend=go` 且房间层可见，**未回退 offline**。
+- 房间真实点击选地图 1156 与武器实例 → 开始战斗 → 加载画面 → 移动 / 调角 / 蓄力 / 释放。
+- **8 次合法发射**，引擎自然判胜 `winner=0`；`debug_set_hp` 在战斗中返回 403，全程未改血量、未改数据库判胜。
+- 结算九宫格可见 → 真实点击两张卡 → `#claimReward` 返回房间（未翻完奖励盘保留）。
+- 房间内铁匠铺 6 槽位真实存在、成功率 100% → 关闭回同一房间 → 再开一局确认服务端属性接入。
+- 真实缺陷修复：`aiPlanJson()` 在 `expected:null` 时崩溃（服务端固定弱机器人正走此路径），
+  `dist/js/engine/json.js` 加空值防御，`tests/engine/match.test.mjs` 补回归，`npm test` 62/62。
+
+### 11.3 存档保护（`npm run test:server:backup`，通过）
+
+- 默认 `data/ddt.sqlite`，路径由 `REPO_ROOT` 推导（`server-node/src/config.ts`），**不随运行目录变化**；
+  `DDT_DATA_DIR` / `DDT_DB_PATH` 可显式指定。`.gitignore` 排除 `data/`、`*.sqlite*`、`.env`。
+- 实测：服务运行中写入金币 777 / 强化石 9 并强化一次 → Python `sqlite3.Connection.backup()`
+  （SQLite backup API，WAL 安全）备份 → 模拟主库损坏 → 从备份恢复到新目录 → 重启服务，
+  金币 677 / 背包 strength1×8 / 13 把武器 / 迁移版本 1,2,3,4 逐项一致。
+- 从另一个 cwd 启动仍使用显式稳定 DB 路径，存档未被覆盖。
+- 004 迁移以 `legacy_weapon_backup` 逐件备份；`WHERE rule_version <> 'SIMPLE_LOCAL_V1'` 保证幂等，
+  迁移失败不会留下半完成数据（事务内建表 + 更新；异常值标记而非删除）。
+- 手工命令见 `README-SERVER.md` 第 4 节与 `docs/MIGRATION_VERIFICATION.md` 第 8 节。
+
+### 11.4 素材 / 音频 / 极武器核对（不重做，只核对）
+
+- **铁匠铺 UI**：阶段 9（`ad8d6d3`）已导出 `store.swf` 的 23 张红金素材，6 个真实 DOM 槽位支持
+  点选 / 拖放 / 移除，1/2/3/4 号槽按单机规则置灰；本轮实测 812×375 窄横屏主体在视口内、
+  强化按钮可滚动到视口内（无横向溢出、无遮挡），截图归档。
+- **音频**：房间 `playMusic("065")`、大厅 `062`、战斗按 `LoadMapsItems.xml` 的 `BackMusic`
+  （1157→1071、1049→1032），结算 063/064、翻牌 048、倒计时 067+014、强化成功沿用 063；
+  **无原码依据的独立 BGM 未编造**（战前加载沿用同一 BGM 压低音量，铁匠铺无独立 BGM）。
+  `SoundEngine.setScene()` 在 URL 变化时先 `_stopBgmSource()` 再 `startBgm(true)`，URL 相同时
+  early-return，因此重复进入不会叠播；解码 buffer 缓存上限 3，手势解锁 / 静音 / 音量 / 暂停已接线。
+  符号与 ID 证据见 `docs/AUDIO_EVIDENCE.md`、`docs/AUDIO_MAPPING.md`。
+- **极武器**：`NAME_PENDING_VERIFY`（中文品质名称待核对），不阻塞。使用上游真实名称 / 模板 ID /
+  四维属性 / Pic，未编造「极·」字。链路已测通：翻牌产生独立武器实例 → 入库 → 房间装备 →
+  铁匠铺强化 → 下一局使用其弹道与属性（`tests/server/forge-rules.test.mjs`）。
+
+### 11.5 十局稳定性（实测，2026-11-28）
+
+`npm run test:server:stability` 连续 10 局，均用合法蓄力发射并由引擎自然判胜（`winner=0`），
+无 `debug_*`、不改库：
+
+| 局 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Node RSS (MB) | 120.8 | 119.6 | 121.5 | 125.9 | 121.0 | 125.4 | 126.9 | 126.5 | 123.8 | 125.1 |
+
+- 首采样（开局前）110.96 MB → 末采样 125.07 MB，**+13.78 MB 但区间平稳（119.6–126.9 MB）**，
+  属于 GC / 缓存预热波动，**无单调持续增长**；不承诺所有设备同样流畅。
+- 对局 / 奖励盘 / 武器发放流水随局数线性累积（正常业务数据），无异常残留对局。
+- SSE 订阅在每次 `/api/state` 短连接后释放；服务端 `setInterval` 为单实例（`unref`），
+  未随局数累积；引擎地图缓存上限 2 张（`loadMapBytes` 的 LRU 淘汰）。
+- 音频：`SoundEngine.setScene()` URL 相同早退、切换先 `_stopBgmSource()`，解码 buffer LRU 上限 3，
+  不会多局叠播；**浏览器进程总内存与 Canvas / 解码图片 / 音频 buffer 单独占用仍未实测**
+  （JS 堆已由 perf 报告给出 2.05 MB）。
+
+### 11.6 剩余项分类
+
+**影响游玩**：无已知阻断项；真实玩家流程、存档保护、多局稳定性均按上述结果通过。
+
+**仅还原差异（不影响稳定可玩）**：
+- 强化算法为单机自定义规则 `SIMPLE_LOCAL_V1`，不是原版强化算法（用户已授权）。
+- 中文「极·」品质名称待核对，当前使用上游真实名称；专属持武逐帧 / 弹丸 / 爆炸素材未导入，
+  复用基础武器弹道。
+- 强化结果原版音效 SoundID 未确认（`StoreTips` 源码缺失）；铁匠铺无独立 BGM；战前加载无独立音乐调用证据。
+- 商城 / 公会 / 购买按钮 / 多人匹配 / 副本系统未接线（不在范围内）。
+- 浏览器进程总内存与 Canvas / 解码图片 / 音频 buffer 单独占用未实测（JS 堆与 Node RSS 已分别实测）。

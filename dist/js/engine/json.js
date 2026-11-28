@@ -38,6 +38,9 @@ export function makeImpact(fields) {
 }
 
 export function simResultJson(r) {
+  // 服务端 aiSolver 直接给出固定角度/力度，没有 expected 模拟结果；
+  // 这里必须容忍 null，否则 enemy-aim 事件会在 AI 回调路径上崩溃整局。
+  if (!r) return null;
   return {
     X: r.x, Y: r.y, Impact: r.impact, Closest: r.closest,
     ClosestX: r.closestX, ClosestY: r.closestY, Age: r.age,
