@@ -405,3 +405,7 @@ npm run start:server
   开战过场与正常战斗两张截图。另有 `npm run typecheck:server` 0 错误、`npm test` 62/62。
 - **截图**：`docs/screenshots/2026-11-28-turn-feedback.png`（开战过场）、
   `docs/screenshots/2026-11-28-turn-feedback-battle.png`（正常战斗，回合大字不遮挡 HUD）。
+- **推送**：功能提交 `e1bdca9bcfc988451130d4d5c48d22ff43b6754e`，全量推送（所有分支 + 标签，
+  非强制）成功：`1cb0f1f..e1bdca9  feat/node-server-mode`；`git ls-remote` 返回远程 SHA
+  与本地 HEAD 一致，`main` 保持 `cbfe149bed07f0568680bf20af89843aaea71305`。
+  远程 URL 无内嵌凭证，Token 未写入源码 / 文档 / 参数 / 日志。

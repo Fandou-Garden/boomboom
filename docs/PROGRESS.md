@@ -6,10 +6,11 @@
 
 ## 当前状态（2026-11-28，最终收尾）
 
-- **本轮新增（尚未提交）**：战斗出手反馈优化——回合大字提示、60 秒默认倒计时、
-  倒计时 067/014 复用原版采样；`node tests/server/turn-feedback.mjs` 8/8 通过，
-  两张真实截图归档。详见下方第 12 节。
-- 分支 `feat/node-server-mode`，最终提交 / HEAD / 远程均为
+- **本轮新增（已提交并全量推送）**：战斗出手反馈优化——回合大字提示、60 秒默认倒计时、
+  倒计时 067/014 复用原版采样；功能提交 `e1bdca9bcfc988451130d4d5c48d22ff43b6754e`，
+  `git ls-remote` 远程 feat 分支 SHA 与本地 HEAD MATCH；`node tests/server/turn-feedback.mjs`
+  8/8 通过，两张真实截图归档。详见下方第 12 节。
+- 分支 `feat/node-server-mode`；上一个收尾提交 / 远程为
   `ba3a045216d0597896b4ec775c70336b8956fa5e`（已 `git ls-remote` MATCH，非强制推送
   `ef2bd52..ba3a045`）；`main` 保持 `cbfe149bed07f0568680bf20af89843aaea71305`，未合并。
 - **阶段 8**（`a639b72534559f692d3d23ad04aa095c701700b8`）已提交并推送：材料分类纠错、原版链路证据、
@@ -800,3 +801,13 @@ tracked 文件（清单自身除外）。凭证模式扫描 staged 文件 **0 �
 - 067/014 原版调用点是翻牌倒计时；战斗回合没有找到专属 SoundID，本轮明确复用并标注。
 - 到时只显示「超时」，不自动开炮；若需要严格强制 60 秒回合，应另做服务端超时与防重放，
   属范围外改动。
+
+### 12.5 提交与全量推送（已核验）
+
+- 功能提交 `e1bdca9bcfc988451130d4d5c48d22ff43b6754e`（15 个文件，含 2 张截图与 1 个测试脚本）。
+- 执行 `git push --all` + `git push --tags`（非强制）：`1cb0f1f..e1bdca9  feat/node-server-mode`；
+  标签与 `main` 均 `Everything up-to-date`。
+- `git ls-remote origin refs/heads/feat/node-server-mode` 返回 `e1bdca9…`，与本地 HEAD 一致；
+  `git status --short --branch` 显示 `## feat/node-server-mode...origin/feat/node-server-mode`（无 ahead/behind）。
+- 远程 URL 无内嵌凭证；Token 未写入源码、文档、参数或日志。文档回填产生的新提交 SHA 无法自引用，
+  分支 tip 以最终交付说明为准。
