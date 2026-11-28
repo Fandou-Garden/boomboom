@@ -89,7 +89,8 @@ export const ENEMY_MOVE_SECONDS = 0.72;
 export const ENEMY_MOVE_SPEED = 64.8;
 export const ENEMY_THINK_SECONDS = 0.9;
 export const ENEMY_AIM_SECONDS = 0.48;
-export const COUNTDOWN_SECONDS = 30.0;
+// 出手时间：原版战斗约 15 秒；本项目按用户要求放宽到 60 秒。
+export const COUNTDOWN_SECONDS = 60.0;
 export const MAX_FLIGHT_SECONDS = 14.0;
 
 export const FIXED_WIND = true;

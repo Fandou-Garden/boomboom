@@ -6,6 +6,9 @@
 
 ## 当前状态（2026-11-28，最终收尾）
 
+- **本轮新增（尚未提交）**：战斗出手反馈优化——回合大字提示、60 秒默认倒计时、
+  倒计时 067/014 复用原版采样；`node tests/server/turn-feedback.mjs` 8/8 通过，
+  两张真实截图归档。详见下方第 12 节。
 - 分支 `feat/node-server-mode`，最终提交 / HEAD / 远程均为
   `ba3a045216d0597896b4ec775c70336b8956fa5e`（已 `git ls-remote` MATCH，非强制推送
   `ef2bd52..ba3a045`）；`main` 保持 `cbfe149bed07f0568680bf20af89843aaea71305`，未合并。
@@ -49,7 +52,7 @@
 | `npm run test:server:backup` | 通过：运行中 SQLite backup() → 副本恢复 → 重启，金币/背包/13 把武器/迁移 1-4 逐项一致；换 cwd 启动不覆盖存档 |
 | `npm run test:server:stability` | **10 / 10 局自然结算**：Node RSS 首采样 110.96 MB → 末采样 125.07 MB（区间 119.6–126.9 MB，全程无单调增长）；对局/奖励盘/发放流水随局数线性累积，无异常残留对局 |
 | `npm run test:server:perf` | 通过；Node RSS 空闲 107.97 MB / 战斗 95.56 MB、浏览器 JS 堆 2.05 MB、DOM 1506、监听 177 |
-| `SOURCE_MANIFEST.sha256` | 744 条，`shasum -a 256 -c` → 744 OK |
+| `SOURCE_MANIFEST.sha256` | 755 条（本轮新增 2 截图 + 1 测试脚本），`shasum -a 256 -c` → 755 OK |
 | 凭证扫描 | staged 内容 0 命中，Token 未写入 URL / 源码 / 文档 / 参数 / 日志 |
 
 > 下方自「任务与来源」至「历史下一步」为**历史记录（阶段 1~7 及更早探测）**，保留当时原文与
@@ -751,3 +754,49 @@ tracked 文件（清单自身除外）。凭证模式扫描 staged 文件 **0 �
 - 强化结果原版音效 SoundID 未确认（`StoreTips` 源码缺失）；铁匠铺无独立 BGM；战前加载无独立音乐调用证据。
 - 商城 / 公会 / 购买按钮 / 多人匹配 / 副本系统未接线（不在范围内）。
 - 浏览器进程总内存与 Canvas / 解码图片 / 音频 buffer 单独占用未实测（JS 堆与 Node RSS 已分别实测）。
+
+## 12. 出手反馈优化（2026-11-28，本轮，未提交）
+
+### 12.1 需求与实测起点
+
+- 用户要求：优化战斗美术（「轮到你出手」提示）、确认技能点击与战斗音频、
+  出手时间放宽到一分钟、找倒计时音频。
+- 起始状态：倒计时硬性写在 `dist/js/config.js` 与 `dist/js/engine/constants.js` 的 30 秒，
+  且 `showCountdown` 每次 beginTurn 被重置为 false（服务端 debug 关闭时无法开启），
+  回合提示只是 20px 高的小胶囊；技能点击已接 008 原版音但未被本轮实测波形。
+
+### 12.2 改动
+
+- `dist/js/engine/constants.js`：`COUNTDOWN_SECONDS` 30 → 60。
+- `dist/js/engine/actions.js`：每回合重置改用 `COUNTDOWN_SECONDS`，
+  不再把 `showCountdown` 强制关掉，而是跟随持久开关 `countdownEnabled`。
+- `dist/js/engine/match.js`：默认 `countdownEnabled = true`、`showCountdown = true`，
+  服务端关闭 debug 也能看到；debug 命令仍可关。
+- `dist/js/config.js` / `dist/index.html`：展示值与默认开关同步为 60 秒/开启。
+- `dist/js/main.js`：原版文案「轮到你出手啦!!!」；倒计时起始 067（延迟 900 ms
+  错开 016），最后 10 秒每秒 014；`is-urgent` 红色脉冲；帮助文案同步。
+- `dist/styles.css`：多层描边/投影的大字弹入动画；倒计时胶囊与紧急态。
+- `docs/AUDIO_MAPPING.md`（及 `dist/docs/` 同步）：标注 067/014 复用来源与「非战斗专属」。
+- 新增 `tests/server/turn-feedback.mjs`：独立端口 + 临时库，不碰用户存档。
+
+### 12.3 验收结果（真实浏览器）
+
+`node tests/server/turn-feedback.mjs` **8/8 通过**：
+
+1. 回合提示文案与字号（`轮到你出手啦!!!`、64px、描边 `rgb(214,43,0)`）。
+2. 开战过场截图与正常战斗截图各一张。
+3. 服务端模式默认显示倒计时，读数 58.x s、显示 59s（60 秒配置生效）。
+4. 玩家回合音 016 与倒计时起始音 067 均为原版采样且有波形。
+5. 技能点击原版 008 即时触发且有波形（点击后经 analyser 260ms 窗口测得）。
+6. 最后 10 秒原版 014 滴答触发 2 次且有波形。
+7. 水果篮开炮 114 / 爆炸 102 原版采样与波形正常。
+8. 页面无 JS 错误。
+
+其他：`npm run typecheck:server` 0 错误；`npm test` 62/62。
+
+### 12.4 取舍与剩余项
+
+- 大字用 CSS 描边仿原版 HUD 观感，不把用户截图切成素材冒充原版导出。
+- 067/014 原版调用点是翻牌倒计时；战斗回合没有找到专属 SoundID，本轮明确复用并标注。
+- 到时只显示「超时」，不自动开炮；若需要严格强制 60 秒回合，应另做服务端超时与防重放，
+  属范围外改动。

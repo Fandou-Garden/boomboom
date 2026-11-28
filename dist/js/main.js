@@ -92,6 +92,7 @@ let modalMode = 'help';
 let toastTimer = 0;
 let displayTipTimer = 0;
 let flashTimer = 0;
+let countdownIntroTimer = 0;
 let resultCardTimer = 0;
 // RemoteMatch replaces every actor object on each snapshot, so the death
 // animation clock cannot live on the actor. Keep one age per actor index here
@@ -115,7 +116,7 @@ function newMatchId() {
 const uiCache = {
   phase: '', angle: null, forcePct: null, wind: null, hp: [null, null], distance: null,
   elevation: null, note: '', disabled: null, charging: null, round: null, turn: '',
-  fireLabel: '', countdown: null, lastPower: undefined, recommendKey: '',
+  fireLabel: '', countdown: null, countdownSecond: null, lastPower: undefined, recommendKey: '',
   selectedSkill: undefined, skillUses: '', powSelected: null, powPct: null,
   stamina: null, energy: null, healDisabled: null, healCount: null, manualPan: null,
   weapon: null, weaponLocked: null, aimStatus: '', aimBad: null,
@@ -1115,8 +1116,18 @@ function syncUI() {
     const seconds = Math.max(0, Math.ceil(game.countdown));
     setText(els.countdown, seconds > 0 ? `${seconds}s` : '超时');
     els.countdown.classList.toggle('expired', seconds <= 0);
+    els.countdown.classList.toggle('is-urgent', seconds > 0 && seconds <= 10);
+    if (seconds !== uiCache.countdownSecond) {
+      const previous = uiCache.countdownSecond;
+      uiCache.countdownSecond = seconds;
+      // 067 / 014 是原版 CardCountDown.as 的倒计时采样（见 docs/AUDIO_EVIDENCE.md）。
+      // 这里复用为出手倒计时：最后 10 秒每秒一次 014 滴答，60 秒全程不吵。
+      if (seconds > 0 && seconds <= 10 && previous != null && previous > seconds) sound.play('014');
+    }
   } else {
     els.countdown.hidden = true;
+    els.countdown.classList.remove('is-urgent');
+    uiCache.countdownSecond = null;
   }
 
   const panning = camera?.hasManualPan() || false;
@@ -1160,12 +1171,14 @@ function hideDisplayTip() {
 
 function showTurnFlash(turn) {
   clearTimeout(flashTimer);
-  els.turnFlash.textContent = turn === 0 ? '你的回合' : '电脑回合';
+  // 文案按原版战斗过场截图（art-source/REFERENCE_CHECK.md 的 01-battle.png）：
+  // 玩家出手时中央弹出「轮到你出手啦!!!」，敌方回合用较短的对应提示。
+  els.turnFlash.textContent = turn === 0 ? '轮到你出手啦!!!' : '电脑出手';
   els.turnFlash.classList.toggle('enemy', turn === 1);
   els.turnFlash.classList.remove('show');
   void els.turnFlash.offsetWidth;
   els.turnFlash.classList.add('show');
-  flashTimer = window.setTimeout(() => els.turnFlash.classList.remove('show'), 1120);
+  flashTimer = window.setTimeout(() => els.turnFlash.classList.remove('show'), 1600);
 }
 
 function skillName(skill) {
@@ -1179,6 +1192,7 @@ function handleEvent(type, data = {}) {
     sound.play(data.name, data.weapon);
   } else if (type === 'reset') {
     lastTurnKey = '';
+    clearTimeout(countdownIntroTimer);
     camera?.reset();
     camera?.clearPan();
     input?.cancelAll('reset');
@@ -1186,6 +1200,7 @@ function handleEvent(type, data = {}) {
     const key = `${data.turn}:${data.round}`;
     if (key !== lastTurnKey) {
       lastTurnKey = key;
+      clearTimeout(countdownIntroTimer);
       input?.cancelAll('turn-change');
       camera?.clearPan();
       showTurnFlash(data.turn);
@@ -1196,6 +1211,12 @@ function handleEvent(type, data = {}) {
           : `电脑回合 · 风力 ${windText}`, { duration: 2600 });
       }
       sound.play(data.turn === 0 ? 'turn-self' : 'turn-enemy');
+      // 067 是原版倒计时起始提示，错开 016 回合音，避免两个采样叠在一起。
+      if (data.turn === 0 && game?.showCountdown) {
+        countdownIntroTimer = window.setTimeout(() => {
+          if (game?.phase === 'player' && game.showCountdown) sound.play('067');
+        }, 900);
+      }
     }
   } else if (type === 'heal') {
     showToast(`自我治疗 +${data.amount} · ${data.hp} / ${data.maxHp}，本回合行动已消耗`, { duration: 2600 });
@@ -1284,7 +1305,7 @@ function openHelp() {
       <dt>武器</dt><dd>开局可在石斧、弓箭、AK-48、黄金枪、烈火、轰天、风神、雷霆、司马砸缸、水果篮、手术刀、马桶、黑白家电之间切换；第一发炮弹出手后锁定，重开后可再选。十三种武器的角度、武器外观与飞行炮弹均按原版 XML/SWF 对应资源接入。</dd>
       <dt>POW</dt><dd>POW 对应 R 键，也只负责选择（再按一次取消），不会自动开炮。能量满 ${BATTLE.energyMax}% 才亮；不足时按 R 会提示能量不足并保留当前技能。选中后蓝色主键发射，伤害、爆炸半径与弹坑更大。</dd>
       <dt>标记</dt><dd>你出手后，地图上以世界坐标标出上一发的站位“起”和实际落点“落”；镜头移动不会让标记漂移。电脑的落点不会覆盖你的记录。</dd>
-      <dt>倒计时</dt><dd>右上时钟按钮可开启练习计时；默认关闭，单机练习不会催你。计时只显示，不自动出手。</dd>
+      <dt>倒计时</dt><dd>默认开启 60 秒出手倒计时，右上时钟按钮可关闭；最后 10 秒播放原版倒计时采样，到时只提示，不替你自动出手。</dd>
       <dt>全屏</dt><dd>${displayHelp}</dd>
       <dt>音效</dt><dd>首次点技能、按空格或按发射键时会自动尝试解锁音频，不需要先点空白处；静音、解锁失败或素材加载失败都不会阻断蓄力与开炮。开炮与爆炸按 <code>BombConfig.xml</code>/<code>BallList.xml</code> 的 Common 弹体逐武器取原版音：烈火 025/087、轰天 023/087、水果篮 114/102、黑白家电 110/100、风神 029/089；道具/POW 039、阵亡 042、选道具 008、回合 016/038、胜负 063/064 同样来自 <code>audio.swf</code> 离线提取。原版没有独立受击音，受击反馈由爆炸声承担，不再合成替代。完整映射见 <a href="docs/AUDIO_MAPPING.md" target="_blank" rel="noopener"><code>docs/AUDIO_MAPPING.md</code></a>。</dd>
     </dl>

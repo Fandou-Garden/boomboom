@@ -116,7 +116,10 @@ export class Match {
     this.pendingWinner = null;
     this.stats = emptyStats();
     this.countdown = COUNTDOWN_SECONDS;
-    this.showCountdown = false;
+    // 出手倒计时默认显示（含服务端模式，服务端关闭 debug 命令也能看到）。
+    // countdownEnabled 是玩家开关，beginTurn 只重置本回合读数，不覆盖开关。
+    this.countdownEnabled = true;
+    this.showCountdown = true;
     this.moveDir = 0;
     this.aiPlan = null;
     this.aiPending = false;
@@ -409,7 +412,8 @@ export class Match {
       }
       case 'debug_set_countdown': {
         if (!this.allowDebug) return 'debug command disabled';
-        this.showCountdown = !!c.enabled;
+        this.countdownEnabled = !!c.enabled;
+        this.showCountdown = this.countdownEnabled;
         if (c.seconds > 0) this.countdown = c.seconds;
         return '';
       }

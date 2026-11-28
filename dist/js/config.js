@@ -128,8 +128,9 @@ export const BATTLE = Object.freeze({
     boost20: { label: '伤害增幅 20%', kind: 'boost', badge: '20', damageBonus: 0.2, staminaCost: 250 },
     boost10: { label: '伤害增幅 10%', kind: 'boost', badge: '10', damageBonus: 0.1, staminaCost: 200 },
   },
-  countdownSeconds: 30,
-  countdownDefault: false,
+  // 出手倒计时 60 秒，默认显示；到时只提示，不替玩家自动出手。
+  countdownSeconds: 60,
+  countdownDefault: true,
 });
 
 export const COMBAT = Object.freeze({

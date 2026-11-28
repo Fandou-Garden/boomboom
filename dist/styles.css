@@ -217,8 +217,27 @@ svg { display: block; }
 .turn-line > i { width: 1px; height: 8px; background: rgba(204, 240, 248, 0.24); }
 .turn-line b { color: var(--cream); font-size: 9px; }
 .turn-line b.enemy-turn { color: #ffc288; }
-.countdown { color: #ffe29a; font-variant-numeric: tabular-nums; }
+.countdown {
+  color: #ffe29a;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 7px;
+  border: 1px solid rgba(126, 238, 250, 0.25);
+  border-radius: 9px;
+  background: rgba(8, 38, 50, 0.72);
+}
+.countdown.is-urgent {
+  color: #ffe2d6;
+  border-color: rgba(255, 122, 88, 0.65);
+  background: rgba(104, 22, 10, 0.78);
+  animation: countdownPulse 1s ease-in-out infinite;
+}
 .countdown.expired { color: #ff9b8a; }
+@keyframes countdownPulse {
+  50% { transform: scale(1.1); box-shadow: 0 0 10px rgba(255, 116, 72, 0.55); }
+}
 
 .utilities {
   position: absolute;
@@ -399,29 +418,46 @@ svg { display: block; }
   pointer-events: none;
 }
 .portrait-hint[hidden] { display: none; }
+/* 原版截图里的「轮到你出手啦!!!」是红黄描边大字，不是小胶囊。
+   这里用 CSS 多层描边/投影还原观感，避免把截图切图冒充原版素材。 */
 .turn-flash {
   position: absolute;
-  top: 32%;
+  top: 27%;
   left: 50%;
   z-index: 18;
-  padding: 8px 22px;
-  border: 1px solid rgba(126, 238, 250, 0.35);
-  border-radius: 20px;
-  background: rgba(4, 28, 38, 0.62);
-  color: #fff;
-  font-size: clamp(14px, 2.4vw, 20px);
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  max-width: 92vw;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: #fff6dc;
+  font-size: clamp(28px, 5.4vw, 64px);
+  font-weight: 1000;
+  line-height: 1.05;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  -webkit-text-stroke: 2px #d62b00;
+  text-shadow:
+    0 2px 0 #8e1600, 0 5px 0 #ff6a00, 0 8px 0 #8e1600,
+    0 14px 18px rgba(24, 6, 0, 0.65);
   opacity: 0;
-  transform: translate(-50%, 10px) scale(0.94);
+  transform: translate(-50%, 14px) scale(0.78) rotate(-4deg);
   pointer-events: none;
 }
-.turn-flash.enemy { border-color: rgba(255, 183, 122, 0.4); color: #ffe0bd; }
-.turn-flash.show { animation: turnFlash 1100ms ease both; }
+.turn-flash.enemy {
+  color: #e7f8ff;
+  -webkit-text-stroke-color: #1c5a72;
+  text-shadow:
+    0 2px 0 #0a2a3a, 0 5px 0 #2289a8, 0 8px 0 #0a2a3a,
+    0 14px 18px rgba(0, 18, 28, 0.65);
+}
+.turn-flash.show { animation: turnFlash 1600ms cubic-bezier(0.2, 0.9, 0.2, 1) both; }
 @keyframes turnFlash {
-  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.92); }
-  18%, 72% { opacity: 1; transform: translate(-50%, 0) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, -7px) scale(1.03); }
+  0% { opacity: 0; transform: translate(-50%, 16px) scale(0.7) rotate(-6deg); }
+  16% { opacity: 1; transform: translate(-50%, 0) scale(1.12) rotate(-3deg); }
+  28% { transform: translate(-50%, 0) scale(0.98) rotate(-3deg); }
+  38%, 78% { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(-3deg); }
+  100% { opacity: 0; transform: translate(-50%, -10px) scale(1.06) rotate(-3deg); }
 }
 
 /* ---------- Bottom controls ---------- */

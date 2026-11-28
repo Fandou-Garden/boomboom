@@ -9,7 +9,7 @@
  * readable next to their Go counterparts.
  */
 import {
-  BLAST_RADIUS, CRITICAL_LUCKY, CRITICAL_REDUCE, ENERGY_MAX, ENERGY_PER_HIT,
+  BLAST_RADIUS, COUNTDOWN_SECONDS, CRITICAL_LUCKY, CRITICAL_REDUCE, ENERGY_MAX, ENERGY_PER_HIT,
   ENERGY_PER_VOLLEY, ENERGY_PER_HEAL, FORCE_MAX, GROUND_BOTTOM, HEAL_AMOUNT,
   HEAL_DELAY, HEALS_PER_ROUND, MAX_FLIGHT_SECONDS, PHYSICS_DT, RESOLVE_DELAY,
   SKILL_DEFS, SKILL_ORDER, SKILL_USES_PER_ROUND, STAMINA_MAX,
@@ -438,8 +438,8 @@ export function beginTurnLocked(m, index, rollWind) {
     m.actors[0].aimAngle = m.angle;
     m.actors[0].weapon = pw.id;
     m.actors[1].weapon = m.enemyWeapon().id;
-    m.countdown = 30.0;
-    m.showCountdown = false;
+    m.countdown = COUNTDOWN_SECONDS;
+    m.showCountdown = m.countdownEnabled !== false;
     m.emit('turn', { turn: 0, round: m.round });
     m.emit('toast', { text: '你的回合：瞄准、蓄力、开炮' });
   } else {
@@ -450,7 +450,7 @@ export function beginTurnLocked(m, index, rollWind) {
     m.emit('turn', { turn: 1, round: m.round });
     m.emit('toast', { text: '电脑的回合' });
   }
-  m.showCountdown = false;
+  m.showCountdown = m.countdownEnabled !== false;
 }
 
 export function canHealLocked(m) {

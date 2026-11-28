@@ -41,6 +41,8 @@
 | 角色阵亡 | `GamePlayer.die()` | 042 | `sound-042-death.mp3` |
 | 玩家回合开始 | `ChangePlayerAction`（本地玩家分支） | 016 | `sound-016-turn-self.mp3` |
 | 敌方回合开始 | `ChangePlayerAction`（敌方分支） | 038 | `sound-038-turn-enemy.mp3` |
+| 出手倒计时起始（**复用**原版采样） | 原版战斗回合未找到专属 SoundID；采样取自 `CardCountDown.as` | 067 | `sound-067-countdown.mp3` |
+| 出手倒计时最后 10 秒每秒（**复用**） | 同上，`CardCountDown.as` | 014 | `sound-014-countdown.mp3` |
 | 胜利 | `ExpView` 胜利分支 | 063 | `sound-063-win.mp3` |
 | 失败 | `ExpView` 失败分支 | 064 | `sound-064-lose.mp3` |
 | 受击（仅扣血） | 原版无独立 SoundID | — | **不播放**，爆炸声即受击反馈 |
@@ -56,6 +58,9 @@
 - 选技能 / 选 POW 都只播 `008`（`RightPropBar.as:252`、`PropShortCutView.as:90/97`、`WeaponPropBar.as:61`、`SoulPropBar.as:142`），且在点击瞬间播放，不等引擎回声。
 - POW 真正生效（发射必杀弹 / 道具动画）才播 `039`（`GameLiving.as:1550` `doUseItemAnimation()`）。
 - 凡是有原版 SoundID 的音效，一律只播原版采样；采样尚未解码完成时等待解码，绝不用浏览器合成音假冒。
+- 出手倒计时（60 秒）起始播 067，错开 016 回合音 900 ms；最后 10 秒每秒播 014。
+  **067/014 的原始调用点是原版翻牌倒计时 `CardCountDown.as`，不是战斗回合专属音效**；
+  本项目把它们复用为出手倒计时反馈，音源仍是原版采样，不冒称原版战斗专属 SoundID。
 
 ## 提取与转码
 
