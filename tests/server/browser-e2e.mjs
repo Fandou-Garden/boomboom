@@ -18,21 +18,40 @@ import { DatabaseSync } from 'node:sqlite';
 
 /**
  * 测试配置：浏览器验收只验证 UI 交互闭环，不该依赖随机奖励构成碰运气。
- * 仅在金币/真强化石不足时，于临时测试库补到刚够一次强化的量。
+ * 服务使用独立测试奖励池；若测试库金币/真强化石仍不足，白盒补到刚够多次强化的量。
  * 不改正常掉落规则、不改强化规则、不改生产代码，也不触碰用户存档。
  */
 function ensureForgeTestAssets(dataDir) {
   const db = new DatabaseSync(path.join(dataDir, 'ddt.sqlite'));
   try {
     const coins = db.prepare('SELECT coins FROM players WHERE id = ?').get('local-player');
-    if (!coins || coins.coins < 60) {
-      db.prepare('UPDATE players SET coins = 100 WHERE id = ?').run('local-player');
+    if (!coins || coins.coins < 400) {
+      db.prepare('UPDATE players SET coins = 1500 WHERE id = ?').run('local-player');
     }
     const stock = db.prepare("SELECT quantity FROM inventory WHERE player_id = ? AND item_key = 'strength1'")
       .get('local-player');
-    if (!stock || stock.quantity < 1) {
-      db.prepare(`INSERT INTO inventory (player_id, item_key, quantity) VALUES ('local-player', 'strength1', 1)
-                  ON CONFLICT(player_id, item_key) DO UPDATE SET quantity = 1`).run();
+    if (!stock || stock.quantity < 3) {
+      db.prepare(`INSERT INTO inventory (player_id, item_key, quantity) VALUES ('local-player', 'strength1', 3)
+                  ON CONFLICT(player_id, item_key) DO UPDATE SET quantity = 3`).run();
+    }
+  } finally { db.close(); }
+}
+
+/** 白盒夹具：把测试库置为「金币不足 / 材料不足 / 满级」场景，用于验证 UI 提示。 */
+function setTestScene(dataDir, scene) {
+  const db = new DatabaseSync(path.join(dataDir, 'ddt.sqlite'));
+  try {
+    if (scene === 'no-coins') {
+      db.prepare('UPDATE players SET coins = 0 WHERE id = ?').run('local-player');
+      db.prepare("UPDATE inventory SET quantity = 3 WHERE player_id = ? AND item_key = 'strength1'").run('local-player');
+    } else if (scene === 'no-stones') {
+      db.prepare('UPDATE players SET coins = 1500 WHERE id = ?').run('local-player');
+      db.prepare("UPDATE inventory SET quantity = 0 WHERE player_id = ? AND item_key LIKE 'strength%'").run('local-player');
+    } else if (scene === 'at-max') {
+      db.prepare('UPDATE players SET coins = 1500 WHERE id = ?').run('local-player');
+      db.prepare("UPDATE inventory SET quantity = 3 WHERE player_id = ? AND item_key = 'strength1'").run('local-player');
+      db.prepare("UPDATE weapon_instances SET level = 12, attack = 220, attack_precise = 220 WHERE equipped = 1 AND player_id = ?")
+        .run('local-player');
     }
   } finally { db.close(); }
 }
@@ -56,7 +75,7 @@ async function startServer(port, dataDir) {
     env: {
       ...process.env, DDT_HOST: '127.0.0.1', DDT_PORT: String(port),
       DDT_DATA_DIR: dataDir, DDT_DB_PATH: path.join(dataDir, 'ddt.sqlite'),
-      DDT_DEBUG: '1', DDT_MODE: 'server',
+      DDT_DEBUG: '1', DDT_MODE: 'server', DDT_REWARD_POOL: 'test',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -119,6 +138,10 @@ async function main() {
   assert(fs.existsSync(CHROME), `未找到 Chrome：${CHROME}（可设置 CHROME_PATH）`);
   const port = await freePort();
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ddt-browser-'));
+  // 默认写临时目录；交付时通过 DDT_SCREENSHOT_DIR 指向 docs/screenshots 归档。
+  const shotDir = process.env.DDT_SCREENSHOT_DIR || dataDir;
+  fs.mkdirSync(shotDir, { recursive: true });
+  const shot = (name) => path.join(shotDir, `2026-11-28-stage10-${name}.png`);
   const server = await startServer(port, dataDir);
   const base = server.base;
   let browser;
@@ -134,7 +157,14 @@ async function main() {
     const page = await browser.newPage();
     await page.setViewport({ width: 1366, height: 768 });
     page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
-    page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+    page.on('console', (m) => {
+      if (m.type() !== 'error') return;
+      const text = m.text();
+      // 验收会主动触发 4xx（金币不足 / 材料不足 / 未翻卡等）；浏览器把这类响应
+      // 记成 console error，属预期拒绝而非前端 JS 错误。其余错误全部保留。
+      if (/Failed to load resource/.test(text) && /\b(400|404|409)\b/.test(text)) return;
+      errors.push('console: ' + text);
+    });
 
     await page.goto(base + '/', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForFunction(() => !!document.getElementById('ddtServerLayer'), { timeout: 30000 });
@@ -175,29 +205,58 @@ async function main() {
     await page.waitForFunction(() => document.querySelectorAll('#cardsRow .result-card').length === 9, { timeout: 20000 });
     pass('服务端结算后显示原版 3x3 九宫格');
 
+    // 白盒夹具：从隔离临时库读本局盘面，挑出「1 张金币卡 + 1 张真强化石卡」的卡位。
+    // 测试奖励池 9 张整体洗牌、无固定卡位；这里只选卡位供 UI 点击，不改奖励内容与规则。
+    const boardProbe = new DatabaseSync(path.join(dataDir, 'ddt.sqlite'));
+    let storedCards;
+    try {
+      const row = boardProbe.prepare('SELECT cards_json FROM reward_boards ORDER BY created_at DESC LIMIT 1').get();
+      assert.ok(row?.cards_json, '临时库应已保存本局奖励盘');
+      storedCards = JSON.parse(row.cards_json);
+    } finally { boardProbe.close(); }
+    const coinIdx = storedCards.findIndex((c) => c.kind === 'coin');
+    const itemIdx = storedCards.findIndex((c) => c.kind === 'item');
+    assert(coinIdx >= 0 && itemIdx >= 0, '测试奖励池应强制产生金币卡与真强化石卡');
+    assert.notEqual(coinIdx, itemIdx);
+    const cardSel = (i) => `#cardsRow .result-card[data-card="${i}"]`;
+
     const before = await page.evaluate(() => document.getElementById('walletCoins').textContent);
-    await page.click('#cardsRow .result-card[data-card="0"]');
-    await page.waitForFunction(() => {
-      const c = document.querySelector('#cardsRow .result-card[data-card="0"]');
+    await page.click(cardSel(coinIdx));
+    await page.waitForFunction((i) => {
+      const c = document.querySelector(`#cardsRow .result-card[data-card="${i}"]`);
       return c && c.classList.contains('is-flipped') && c.querySelector('.ddt-card-prize b');
-    }, { timeout: 15000 });
-    const afterFlip = await page.evaluate(() => ({
-      prize: document.querySelector('#cardsRow .result-card[data-card="0"] .ddt-card-prize b')?.textContent,
+    }, { timeout: 15000 }, coinIdx);
+    const afterFlip = await page.evaluate((i) => ({
+      prize: document.querySelector(`#cardsRow .result-card[data-card="${i}"] .ddt-card-prize b`)?.textContent,
       coins: document.getElementById('walletCoins').textContent,
       sum: document.getElementById('rewardSum')?.textContent,
-    }));
-    assert(afterFlip.prize && afterFlip.prize.startsWith('+'), '翻牌奖励显示');
+    }), coinIdx);
+    assert(afterFlip.prize && afterFlip.prize.startsWith('+'), '翻牌金币奖励显示');
     assert(afterFlip.sum.includes('1/3'), '翻牌次数由服务端回传');
     // 原版 cardMc 翻牌序列 420ms 后才切到卡面，验证奖励确实可见。
     await sleep(700);
-    const faceVisible = await page.evaluate(() => {
-      const face = document.querySelector('#cardsRow .result-card[data-card="0"] .card-face');
+    const faceVisible = await page.evaluate((i) => {
+      const face = document.querySelector(`#cardsRow .result-card[data-card="${i}"] .card-face`);
       return !!face && Number(getComputedStyle(face).opacity) > 0.9;
-    });
+    }, coinIdx);
     assert(faceVisible, '翻牌动画结束后应显示卡面奖励');
-    pass(`翻牌后服务端奖励上屏（${afterFlip.prize}，钱包 ${before} -> ${afterFlip.coins}）`);
+    pass(`翻牌获得金币：${afterFlip.prize}，钱包 ${before} -> ${afterFlip.coins}`);
 
-    await page.screenshot({ path: path.join(dataDir, 'settlement.png') });
+    // 第二张翻真强化石卡：确保「翻牌 → 强化」的材料来源在 UI 上真实可见。
+    await page.click(cardSel(itemIdx));
+    await page.waitForFunction((i) => {
+      const c = document.querySelector(`#cardsRow .result-card[data-card="${i}"]`);
+      return c && c.classList.contains('is-flipped') && c.querySelector('.ddt-card-prize b');
+    }, { timeout: 15000 }, itemIdx);
+    const stoneFlip = await page.evaluate((i) => ({
+      text: document.querySelector(`#cardsRow .result-card[data-card="${i}"] .ddt-card-prize`)?.textContent || '',
+      sum: document.getElementById('rewardSum')?.textContent || '',
+    }), itemIdx);
+    assert(stoneFlip.text.length > 0 && stoneFlip.sum.includes('2/3'), '第二张材料卡应真实领取');
+    pass(`翻牌获得真强化石：${stoneFlip.text.trim()}（${stoneFlip.sum}）`);
+
+    await sleep(700); // 等第二张卡的原版 420ms 翻牌序列结束，交付截图要能看到卡面
+    await page.screenshot({ path: shot('settlement') });
 
     // 返回房间：奖励盘保留，出现继续翻牌入口
     await page.click('#claimReward');
@@ -216,27 +275,49 @@ async function main() {
     const forgeUi = await page.evaluate(() => ({
       note: document.querySelector('.ddt-asset-note')?.textContent || '',
       rule: document.getElementById('ddtForgeRuleTop')?.textContent || '',
+      ruleBody: document.getElementById('ddtForgeRule')?.textContent || '',
+      detail: document.getElementById('ddtForgeDetail')?.textContent || '',
       slots: [...document.querySelectorAll('.ddt-slot')].map((el) => ({
         index: Number(el.dataset.slot), accept: el.dataset.accept,
         x: el.style.getPropertyValue('--sx'), y: el.style.getPropertyValue('--sy'),
+        disabled: el.disabled, ariaDisabled: el.getAttribute('aria-disabled'),
+        cls: el.className, title: el.getAttribute('title') || '',
       })),
       bg: document.querySelector('.ddt-strength-bg')?.getAttribute('src') || '',
       rate: document.getElementById('ddtSuccessRate')?.textContent || '',
       bagCount: document.querySelectorAll('.ddt-bag-item').length,
+      disabledBag: document.querySelectorAll('.ddt-bag-item.is-disabled').length,
     }));
     assert(forgeUi.note.includes('原版 store.swf') && forgeUi.note.includes('真实可交互 DOM'),
       '铁匠铺必须标明素材来源与真实交互，不冒充原版强化规则');
-    assert.equal(forgeUi.slots.length, 6, '六个原版槽位齐全');
+    assert(forgeUi.note.includes('单机自定义强化规则') && forgeUi.note.includes('不是原版强化算法'),
+      '界面必须明确「原版素材 + 单机自定义强化规则」');
+    assert.equal(forgeUi.slots.length, 6, '六个原版槽位齐全（其中 4 个按当前规则置灰）');
     assert.deepEqual(forgeUi.slots.map((s) => s.accept),
       ['strength-stone', 'strength-stone', 'strength-stone', 'god-charm', 'lucky-charm', 'weapon'],
       '槽位类型须与 StoreIIStrengthBG.as 的 StoreCell 顺序一致');
     assert.equal(forgeUi.slots[0].x, '106px', 'Strengthpoint0 x 应与 store.xml 一致');
     assert.equal(forgeUi.slots[0].y, '-6px', 'Strengthpoint0 y 应与 store.xml 一致');
+    assert.equal(forgeUi.slots[0].disabled, false, '0 号强化石槽启用');
+    assert.equal(forgeUi.slots[5].disabled, false, '5 号装备槽启用');
+    for (const i of [1, 2, 3, 4]) {
+      assert.equal(forgeUi.slots[i].disabled, true, `${i} 号槽必须禁用`);
+      assert.equal(forgeUi.slots[i].ariaDisabled, 'true', `${i} 号槽须标记 aria-disabled`);
+      assert(forgeUi.slots[i].cls.includes('is-disabled'), `${i} 号槽须有置灰样式`);
+      assert(forgeUi.slots[i].title.includes('已禁用'), `${i} 号槽须说明禁用原因`);
+    }
     assert(forgeUi.bg.includes('store-strength-bg.jpg'), '必须使用导出的原版红金色强化台底图');
-    assert(forgeUi.rate.includes('成功率'), '成功率区域必须真实渲染');
-    assert(forgeUi.rule.includes('LOCAL_RULE'), '界面必须显示当前采用的规则版本');
+    assert(forgeUi.rate.includes('成功率') && forgeUi.rate.includes('100%'), '成功率区固定显示 100%');
+    assert(forgeUi.rule.includes('SIMPLE_LOCAL_V1') && forgeUi.rule.includes('原版素材 + 单机自定义强化规则'),
+      '界面必须显示当前采用的规则版本与标注');
+    assert(forgeUi.ruleBody.includes('中文品质名称待核对'), '翻牌武器名称状态须如实标注');
+    for (const label of ['当前等级', '目标等级', '当前基础伤害', '强化后基础伤害',
+      '未强化基础值', '消耗金币', '消耗材料', '成功率', '上限', '规则版本']) {
+      assert(forgeUi.detail.includes(label), `强化预览应显示「${label}」`);
+    }
     assert(forgeUi.bagCount >= 31, '道具栏应展示全部登记材料');
-    pass('房间内打开原版素材铁匠铺（6 个真实槽位 / 装备栏 / 道具栏 / 成功率区）');
+    assert(forgeUi.disabledBag > 0, '非强化石材料必须置灰且不可点选');
+    pass('房间内打开原版素材铁匠铺：0/5 槽启用、1~4 槽置灰、100% 成功率与完整强化预览');
 
     // 音效场景映射：地图音乐编号不等于地图编号
     const audioMap = await page.evaluate(() => window.__GUNNY_HOOKS__?.audioDebug?.().sceneMap || null);
@@ -245,16 +326,8 @@ async function main() {
     assert.equal(audioMap.mapBackMusic['1049'], '1032', '地图 1049 的 BackMusic 应为 1032');
     pass('原版 BGM 映射按 LoadMapsItems.xml 的 BackMusic，不默认等于地图编号');
 
-    // 先补翻两张卡以保证强化材料充足，再强化
-    const room = await get(base, '/api/server/room');
-    const pending = room.room.pendingReward;
-    if (pending) {
-      for (const idx of [1, 2]) {
-        await post(base, `/api/server/battles/${pending.battleId}/rewards/claim`, {
-          cardIndex: idx, requestId: `browser-${idx}`,
-        });
-      }
-    }
+    // 两张卡由 UI 真实领取（1 金币 + 1 真强化石），第 3 张故意不翻以验证「继续翻牌」入口。
+    // 白盒夹具只兜底补足测试库资产，不改正常掉落规则、不改强化规则。
     ensureForgeTestAssets(dataDir);
     // 刷新铁匠铺数据后，用真实点选把强化石放入 0 号槽，验证交互不是背景截图。
     await page.evaluate(async () => {
@@ -290,25 +363,65 @@ async function main() {
     assert(slotPlaced.rate.includes('成功率'), '放入材料后成功率区仍须渲染');
     pass('点选道具真实放入强化石槽，成功率区同步更新');
 
-    // 拖放：原版 StoreDragInArea / DragManager 的交互路径也必须真实可用。
+    // 拖放：原版 StoreDragInArea / DragManager 交互路径真实可用；
+    // 当前单机规则只有 0 号强化石槽与 5 号装备槽接受拖放，禁用槽必须拒绝。
+    await page.click('.ddt-slot[data-slot="0"]');
+    assert(!(await page.evaluate(() =>
+      document.querySelector('.ddt-slot[data-slot="0"]').classList.contains('is-filled'))),
+    '点击已填充槽位应移除材料');
+
     const dragPlaced = await page.evaluate((key) => {
+      const fire = (item, slot, type) => {
+        const dt = new DataTransfer();
+        item.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+        slot.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+        slot.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+        return dt;
+      };
       const item = document.querySelector(`.ddt-bag-item[data-item="${key}"]`);
-      const slot = document.querySelector('.ddt-slot[data-slot="1"]');
-      if (!item || !slot) return { ok: false, reason: '槽位或道具不存在' };
+      const slot0 = document.querySelector('.ddt-slot[data-slot="0"]');
+      if (!item || !slot0) return { ok: false, reason: '槽位或道具不存在' };
+      const dt = fire(item, slot0);
+      // placeIntoS() 会 renderForge() 重绘槽位，必须重新查询 DOM，不能持有旧节点。
+      const fresh0 = document.querySelector('.ddt-slot[data-slot="0"]');
+      // 重绘后重新取道具节点，确保禁用槽测试走完整的 dragstart → drop 路径。
+      const disabled = document.querySelector('.ddt-slot[data-slot="3"]');
+      fire(document.querySelector(`.ddt-bag-item[data-item="${key}"]`), disabled);
+      const fresh3 = document.querySelector('.ddt-slot[data-slot="3"]');
+      return {
+        ok: !!fresh0 && fresh0.classList.contains('is-filled'),
+        payload: dt.getData('text/plain'),
+        disabledRejected: !!fresh3 && !fresh3.classList.contains('is-filled'),
+      };
+    }, stoneKey);
+    assert(dragPlaced.ok, `拖放道具必须真实放入 0 号强化石槽：${JSON.stringify(dragPlaced)}`);
+    assert(dragPlaced.payload.includes('strength-stone'), '拖放载荷应携带真实道具类型');
+    assert(dragPlaced.disabledRejected, '禁用槽不得接受拖放');
+
+    const weaponDrag = await page.evaluate(() => {
+      const item = document.querySelector('.ddt-forge-weapon.is-active') || document.querySelector('.ddt-forge-weapon');
+      const slot = document.querySelector('.ddt-slot[data-slot="5"]');
+      if (!item || !slot) return { ok: false };
       const dt = new DataTransfer();
       item.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
       slot.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
       slot.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
-      // placeIntoS() 会 renderForge() 重绘槽位，必须重新查询 DOM，不能持有旧节点。
-      const fresh = document.querySelector('.ddt-slot[data-slot="1"]');
+      const fresh = document.querySelector('.ddt-slot[data-slot="5"]');
       return { ok: !!fresh && fresh.classList.contains('is-filled'), payload: dt.getData('text/plain') };
-    }, stoneKey);
-    assert(dragPlaced.ok, `拖放道具必须真实放入 1 号槽：${JSON.stringify(dragPlaced)}`);
-    await page.click('.ddt-slot[data-slot="1"]');
-    assert(!(await page.evaluate(() =>
-      document.querySelector('.ddt-slot[data-slot="1"]').classList.contains('is-filled'))),
-    '点击已填充槽位应移除材料');
-    pass('拖放道具真实放入槽位，点击槽位可移除（交互不依赖背景截图）');
+    });
+    assert(weaponDrag.ok && weaponDrag.payload.includes('weapon'), '装备栏拖放到 5 号装备槽应真实可用');
+    pass('拖放道具/装备真实进入 0、5 号槽，禁用槽拒绝，点击槽位可移除（不依赖背景截图）');
+
+    // 拖放演示结束后把 5 号槽恢复为「已装备武器」，确保后续强化目标与断言对象一致。
+    const equippedWeaponId = await page.evaluate(async () => {
+      const f = (await (await fetch('/api/server/forge', { cache: 'no-store' })).json()).forge;
+      return f.weapons.find((w) => w.equipped)?.id;
+    });
+    assert(equippedWeaponId, '应有已装备武器');
+    await page.click(`.ddt-forge-weapon[data-weapon="${equippedWeaponId}"]`);
+    assert.equal(await page.evaluate(() =>
+      document.querySelector('.ddt-slot[data-slot="5"]')?.classList.contains('is-filled')), true,
+    '恢复装备槽后仍应显示待强化装备');
 
     // 音频资源实际可达，避免把「文件已导出」误当作「运行时能播放」。
     const audioFiles = await page.evaluate(async () => {
@@ -325,6 +438,24 @@ async function main() {
     assert(audioFiles.every((x) => x.ok), `原版 BGM / 倒计时音效必须可访问：${JSON.stringify(audioFiles)}`);
     pass('阶段 9 导出的 BGM 与倒计时音效资源实际可达');
 
+    const beforeForge = await page.evaluate(() => {
+      const f = window.__DDT_FORGE_BEFORE__;
+      const w = f.weapons.find((x) => x.equipped);
+      return {
+        coins: f.wallet.coins, stones: f.wallet.items.reduce((s, i) =>
+          s + (i.kind === 'strength-stone' ? i.quantity : 0), 0),
+        level: w.level, attackPrecise: w.attackPrecise, baseAttack: w.baseAttack,
+        cost: w.cost, ruleSource: f.ruleSource,
+      };
+    });
+    assert.equal(beforeForge.ruleSource, 'SIMPLE_LOCAL_V1');
+    assert.equal(beforeForge.level, 0);
+    assert.equal(beforeForge.baseAttack, 100);
+    assert.equal(beforeForge.cost.coins, 100, '+0→+1 需 100 金币');
+    assert.equal(beforeForge.cost.stones, 1);
+    assert.equal(beforeForge.cost.nextAttackPrecise, 110, '强化后基础伤害预览 = 100 × 1.10');
+    assert(beforeForge.coins >= 100 && beforeForge.stones >= 1, '测试库应具备一次强化所需资产');
+
     await page.click('[data-action="strengthen"]');
     await page.waitForFunction(() => {
       const el = document.getElementById('ddtForgeResult');
@@ -333,18 +464,54 @@ async function main() {
     const forgeResult = await page.evaluate(async () => {
       const r = await fetch('/api/server/forge', { cache: 'no-store' });
       const f = (await r.json()).forge;
+      const w = f.weapons.find((x) => x.equipped);
       return {
         text: document.getElementById('ddtForgeResult').textContent,
-        level: f.weapons.find((w) => w.equipped)?.level,
-        attack: f.weapons.find((w) => w.equipped)?.attack,
+        detail: document.getElementById('ddtForgeDetail').textContent,
+        level: w.level, attack: w.attack, attackPrecise: w.attackPrecise,
+        baseAttack: w.baseAttack, ruleVersion: w.ruleVersion,
+        coins: f.wallet.coins,
+        stones: f.wallet.items.reduce((s, i) => s + (i.kind === 'strength-stone' ? i.quantity : 0), 0),
       };
     });
     assert(forgeResult.text.includes('强化成功'), `强化结果：${forgeResult.text}`);
-    assert.equal(forgeResult.level, 1, '强化等级 +1');
-    assert.equal(forgeResult.attack, 125, '强化后攻击 125');
-    pass('铁匠铺强化成功，等级与攻击属性由服务端更新');
+    assert.equal(forgeResult.level, 1, '等级 +0 → +1');
+    assert.equal(forgeResult.attack, 110, '基础伤害 = 100 × 1.10 = 110');
+    assert.equal(forgeResult.attackPrecise, 110, '精确属性保留');
+    assert.equal(forgeResult.baseAttack, 100, '未强化基础值不变，禁止叠乘');
+    assert.equal(forgeResult.ruleVersion, 'SIMPLE_LOCAL_V1');
+    assert.equal(forgeResult.coins, beforeForge.coins - 100, '金币只扣 100');
+    assert.equal(forgeResult.stones, beforeForge.stones - 1, '真强化石只扣 1 颗');
+    assert(forgeResult.text.includes('100') && forgeResult.text.includes('1 颗'), '结果文案应显示实际扣费');
+    assert(forgeResult.detail.includes('110'), '强化成功后预览立即刷新');
+    pass('铁匠铺强化成功：+1 / 基础伤害 110 / 金币 -100 / 材料 -1 / 背包与装备展示即时更新');
     await sleep(1800); // 结果特效 1.6s 后消失，交付截图需完整展示 6 个槽位
-    await page.screenshot({ path: path.join(dataDir, 'forge.png') });
+    // 侧栏与面板自身可滚动；截图时临时调高视口并展开滚动容器，把顶部规则条、
+    // 6 个槽位与「强化预览 / 规则说明」完整呈现（不改动任何 DOM 内容），截完立即恢复。
+    await page.setViewport({ width: 1366, height: 1200 });
+    await page.evaluate(() => {
+      for (const sel of ['.ddt-forge-side', '.ddt-forge-frame']) {
+        const el = document.querySelector(sel);
+        if (!el) continue;
+        el.dataset.shotMaxHeight = el.style.maxHeight || '';
+        el.dataset.shotOverflow = el.style.overflow || '';
+        el.style.maxHeight = 'none';
+        el.style.overflow = 'visible';
+      }
+    });
+    const forgeFrame = await page.$('.ddt-forge-frame');
+    await forgeFrame.screenshot({ path: shot('forge') });
+    await page.evaluate(() => {
+      for (const sel of ['.ddt-forge-side', '.ddt-forge-frame']) {
+        const el = document.querySelector(sel);
+        if (!el) continue;
+        el.style.maxHeight = el.dataset.shotMaxHeight || '';
+        el.style.overflow = el.dataset.shotOverflow || '';
+        delete el.dataset.shotMaxHeight;
+        delete el.dataset.shotOverflow;
+      }
+    });
+    await page.setViewport({ width: 1366, height: 768 });
 
     // 关闭铁匠铺回到同一个房间
     await page.click('[data-action="close-forge"]');
@@ -364,8 +531,63 @@ async function main() {
     assert(!refreshed.bootError, `刷新后启动错误：${refreshed.bootError}`);
     pass(`刷新页面后强化等级 / 金币 ${refreshed.coins} / 材料 ${refreshed.stones} 保留`);
 
+    await page.screenshot({ path: shot('room-after-reload') });
+
+    // 下一局：同条件攻击实际使用强化后的基础伤害（读服务端权威状态，不靠 UI 文案）。
+    assert.equal((await post(base, '/api/server/room/start', {})).status, 200);
+    const nextState = await get(base, '/api/state');
+    assert.equal(nextState.actors[0].attack, 110, '下一局引擎内实际使用 110 基础伤害');
+    assert.equal(nextState.actors[1].attack, 35, '机器人属性不受强化影响');
+    assert.equal((await post(base, '/api/server/room/leave', {})).status, 200);
+    pass('下一局同条件攻击验证强化增益：玩家 110 / 机器人 35（当前进行中的战斗不受影响）');
+
+    // 重复提交同一 requestId：返回同一结果，金币与材料只扣一次。
+    const forgeBeforeReplay = (await get(base, '/api/server/forge')).forge;
+    const replayW = forgeBeforeReplay.weapons.find((w) => w.equipped);
+    const replayPayload = { weaponInstanceId: replayW.id, requestId: 'browser-replay-fixed' };
+    const replay1 = await (await post(base, '/api/server/forge/strengthen', replayPayload)).json();
+    const replay2 = await (await post(base, '/api/server/forge/strengthen', replayPayload)).json();
+    assert.deepEqual(replay2, replay1, '重复提交必须返回完全相同的已存结果');
+    const forgeAfterReplay = (await get(base, '/api/server/forge')).forge;
+    assert.equal(forgeAfterReplay.wallet.coins,
+      forgeBeforeReplay.wallet.coins - replay1.cost.coins, '金币只扣一次');
+    assert.equal(forgeAfterReplay.weapons.find((w) => w.equipped).level, replayW.level + 1,
+      '武器只升一级');
+    pass('重复提交同一 requestId 不会重复扣费、不会重复升级');
+
+    // 金币不足 / 材料不足 / +12 上限：UI 明确提示原因，服务端同样拒绝。
+    const checkScene = async (scene, expected, clickIt) => {
+      setTestScene(dataDir, scene);
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+      await page.waitForFunction(() => !!document.getElementById('ddtServerLayer')
+        && !document.getElementById('ddtServerLayer').hidden
+        && document.querySelectorAll('.ddt-map').length === 12, { timeout: 30000 });
+      await page.click('[data-action="open-forge"]');
+      await page.waitForFunction(() => !document.getElementById('ddtForge').hidden
+        && document.querySelectorAll('.ddt-slot').length === 6, { timeout: 15000 });
+      const info = await page.evaluate(() => ({
+        reason: document.querySelector('.ddt-reason')?.textContent || '',
+        detail: document.getElementById('ddtForgeDetail')?.textContent || '',
+        btnDisabled: document.getElementById('ddtStrengthBtn')?.disabled,
+      }));
+      assert((info.reason + info.detail).includes(expected),
+        `${scene} 场景须在预览区明确提示「${expected}」：${JSON.stringify(info)}`);
+      if (clickIt) {
+        await page.click('[data-action="strengthen"]');
+        await page.waitForFunction(() =>
+          document.getElementById('ddtForgeResult').textContent.includes('强化未完成'), { timeout: 12000 });
+        const text = await page.evaluate(() => document.getElementById('ddtForgeResult').textContent);
+        assert(text.includes(expected), `${scene} 场景服务端拒绝原因须上屏：${text}`);
+      } else {
+        assert.equal(info.btnDisabled, true, '+12 上限时强化按钮必须禁用');
+      }
+    };
+    await checkScene('no-coins', '金币不足', true);
+    await checkScene('no-stones', '强化石不足', true);
+    await checkScene('at-max', '已达 +12 上限', false);
+    pass('金币不足 / 材料不足 / +12 上限：预览区与服务端拒绝原因均明确提示');
+
     assert.equal(errors.length, 0, `页面出现 JS 错误：\n${errors.join('\n')}`);
-    await page.screenshot({ path: path.join(dataDir, 'room-after-reload.png') });
 
     // 站点版：同一份前端在纯静态托管下必须回退到 offline，且不加载房间层。
     const staticInfo = await startStaticServer();
@@ -398,7 +620,7 @@ async function main() {
     console.log('\n[ddt-browser-e2e] 全部通过：');
     console.log(results.join('\n'));
     console.log(`\n临时数据库：${dataDir}`);
-    console.log(`截图：${dataDir}/settlement.png, forge.png, room-after-reload.png`);
+    console.log(`截图：${shotDir}/2026-11-28-stage10-{settlement,forge,room-after-reload}.png`);
   } catch (error) {
     console.error('\n[ddt-browser-e2e] 失败：', error.message);
     console.error('阶段：', results.at(-1) || '(首个断言前)');

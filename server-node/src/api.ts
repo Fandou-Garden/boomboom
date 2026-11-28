@@ -161,14 +161,18 @@ export function createApiRouter({ store, session }: Deps): Router {
 
   router.post('/api/server/forge/strengthen', handler((req, res) => {
     noStore(res);
+    // 单机自定义规则：前端只允许提交「选哪把武器、哪颗强化石、本次请求 ID」。
+    // 金币 / 等级 / 伤害 / 成功率全部由服务端计算；结果字段与已禁用符咒一律拒绝。
+    const forbidden = ['success', 'level', 'attack', 'coins', 'successRate', 'result',
+      'slots', 'luckyCharm', 'godCharm'].find((k) => req.body?.[k] !== undefined);
+    if (forbidden) {
+      throw new ApiError(400, 'client-cannot-decide-result',
+        `前端不得决定强化结果或使用已禁用的符咒槽（${forbidden}）`);
+    }
     const result = store.strengthen({
       weaponInstanceId: req.body?.weaponInstanceId,
       itemKey: req.body?.itemKey,
       requestId: req.body?.requestId,
-      /** 原版三强化石槽与两个符槽；省略时由服务端按库存自动挑选。 */
-      slots: req.body?.slots,
-      luckyCharm: req.body?.luckyCharm,
-      godCharm: req.body?.godCharm,
     });
     res.json(result);
   }));

@@ -1,5 +1,6 @@
 /**
- * 原版物品与强化规则的逐字段抄录（ORIGINAL / ORIGINAL_ADAPTED / UNCONFIRMED）。
+ * 原版物品与强化链路的逐字段抄录（研究证据存档）。
+ * 交付规则是「原版素材 + 单机自定义强化规则」，本文件不参与运行时强化计算。
  *
  * 唯一数据来源：上游 phucdz2kk4/Gunny @ 057c71a
  * （与 dist/js/engine/constants.js 的 SOURCE_COMMIT 一致）：
@@ -28,7 +29,7 @@
  *   QualityType.QUALITY_STRING 共 8 档（粗糙/普通/优秀/精良/卓越/传说/神器），
  *   无「极」品质档。**无法证明上游 VIP 武器对应中文「极·」系列**，
  *   故本模块只登记「高阶品质武器候选」，使用上游真实名称，
- *   标记 中文品质映射待确认，且不进入正常奖励池。
+ *   标注「中文品质名称待核对」；可作为翻牌武器奖励，使用上游真实名称与属性，不编造模板或素材。
  *
  * 本模块只做数据登记，不含任何随机结果或前端可指定的字段。
  */
@@ -175,9 +176,10 @@ export const GAIN_EQUIP_SAMPLE: Array<{ currentEquip: number; level: number; gai
  *    （QualityType 只用于颜色 QUALITY_COLOR）。
  *
  * 结论：无法证明对应中文「极·」系列。按用户要求：
- *  1) 暂用上游真实名称（nameSource），不写「极·烈火」等推测中文名；
- *  2) 全部标记 mappingStatus='UNCONFIRMED'（中文品质映射待确认）；
- *  3) 不进入正常奖励池，仅测试奖励池可生成，且标注自定义/非官方。
+ *  1) 使用上游真实名称（nameSource），不写「极·烈火」等推测中文名；
+ *  2) 全部标记 mappingStatus='NAME_PENDING_VERIFY'（中文品质名称待核对）；
+ *  3) 可作为翻牌武器奖励（正常池按单机自定义掉率，测试池强制含 1 张），
+ *     沿用已核实的模板 ID / 四维属性 / Pic，不编造模板或素材；中文品质名称待核对不阻塞交付。
  */
 export interface HighQualityWeapon {
   key: string;
@@ -186,7 +188,7 @@ export interface HighQualityWeapon {
   nameSource: string;
   /** 中文展示名：与上游真实名称一致，另附待确认标注 */
   nameZh: string;
-  mappingStatus: 'UNCONFIRMED';
+  mappingStatus: 'NAME_PENDING_VERIFY';
   mappingNote: string;
   /** 项目内用于弹道/表现的基础武器 id（WEAPON_ORDER 中的键） */
   baseWeaponId: string;
@@ -206,15 +208,15 @@ export interface HighQualityWeapon {
 }
 
 export const HIGH_QUALITY_WEAPONS: HighQualityWeapon[] = [
-  { key: 'hq_fire', templateId: 7006, nameSource: 'VIP-Pháo', nameZh: 'VIP-Pháo（中文品质映射待确认）', mappingStatus: 'UNCONFIRMED', mappingNote: '上游无中文「极」命名，无法证明即「极·烈火」', baseWeaponId: 'fire', pic: 'bombpack', attack: 250, defence: 60, agility: 40, luck: 30, quality: 4, templateLevel: 3, normalTemplateId: 7103, gainEquipSample: [70061, 70062, 70064], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
-  { key: 'hq_cannon', templateId: 7007, nameSource: 'VIP-Lựu đạn', nameZh: 'VIP-Lựu đạn（中文品质映射待确认）', mappingStatus: 'UNCONFIRMED', mappingNote: '上游无中文「极」命名，无法证明即「极·轰天」', baseWeaponId: 'cannon', pic: 'bomb', attack: 40, defence: 250, agility: 30, luck: 60, quality: 4, templateLevel: 3, normalTemplateId: 7104, gainEquipSample: [70071, 70072, 70074], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
-  { key: 'hq_wind', templateId: 7008, nameSource: 'VIP-Phi tiêu', nameZh: 'VIP-Phi tiêu（中文品质映射待确认）', mappingStatus: 'UNCONFIRMED', mappingNote: '上游无中文「极」命名，无法证明即「极·神风」', baseWeaponId: 'wind', pic: 'dart', attack: 60, defence: 30, agility: 250, luck: 40, quality: 4, templateLevel: 3, normalTemplateId: 7105, gainEquipSample: [70081, 70082, 70084], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
-  { key: 'hq_thunder', templateId: 7009, nameSource: 'VIP-Sấm sét', nameZh: 'VIP-Sấm sét（中文品质映射待确认）', mappingStatus: 'UNCONFIRMED', mappingNote: '上游无中文「极」命名', baseWeaponId: 'thunder', pic: 'electricbar', attack: 30, defence: 40, agility: 60, luck: 250, quality: 4, templateLevel: 3, normalTemplateId: 7106, gainEquipSample: [70091, 70092], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
-  { key: 'hq_brick', templateId: 7010, nameSource: 'VIP-Lu gạch', nameZh: 'VIP-Lu gạch（中文品质映射待确认）', mappingStatus: 'UNCONFIRMED', mappingNote: '上游无中文「极」命名', baseWeaponId: 'brick', pic: 'brick', attack: 180, defence: 130, agility: 30, luck: 40, quality: 4, templateLevel: 3, normalTemplateId: 7107, gainEquipSample: [70101, 70102], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
-  { key: 'hq_fruit', templateId: 7011, nameSource: 'VIP_ GIỎ ĐỒ', nameZh: 'VIP_ GIỎ ĐỒ（中文品质映射待确认）', mappingStatus: 'UNCONFIRMED', mappingNote: '上游无中文「极」命名', baseWeaponId: 'fruit', pic: 'fruit', attack: 40, defence: 30, agility: 130, luck: 180, quality: 4, templateLevel: 3, normalTemplateId: 7108, gainEquipSample: [70111, 70112], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
-  { key: 'hq_scalpel', templateId: 7012, nameSource: 'VIP-Tủ thuốc', nameZh: 'VIP-Tủ thuốc（中文品质映射待确认）', mappingStatus: 'UNCONFIRMED', mappingNote: '上游无中文「极」命名', baseWeaponId: 'scalpel', pic: 'OPSbox', attack: 130, defence: 30, agility: 180, luck: 40, quality: 4, templateLevel: 3, normalTemplateId: 7109, gainEquipSample: [70121, 70122], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
-  { key: 'hq_toilet', templateId: 7013, nameSource: 'VIP-Túi vũ khí', nameZh: 'VIP-Túi vũ khí（中文品质映射待确认）', mappingStatus: 'UNCONFIRMED', mappingNote: '上游无中文「极」命名', baseWeaponId: 'toilet', pic: 'closestool', attack: 40, defence: 180, agility: 30, luck: 130, quality: 4, templateLevel: 3, normalTemplateId: 7110, gainEquipSample: [70131, 70132], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
-  { key: 'hq_appliance', templateId: 7014, nameSource: 'Vip TV, tủ lạnh', nameZh: 'Vip TV, tủ lạnh（中文品质映射待确认）', mappingStatus: 'UNCONFIRMED', mappingNote: '上游无中文「极」命名', baseWeaponId: 'appliance', pic: 'television', attack: 95, defence: 95, agility: 95, luck: 95, quality: 4, templateLevel: 3, normalTemplateId: 7111, gainEquipSample: [70141, 70142], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
+  { key: 'hq_fire', templateId: 7006, nameSource: 'VIP-Pháo', nameZh: 'VIP-Pháo（中文品质名称待核对）', mappingStatus: 'NAME_PENDING_VERIFY', mappingNote: '上游无中文「极」命名，无法证明即「极·烈火」', baseWeaponId: 'fire', pic: 'bombpack', attack: 250, defence: 60, agility: 40, luck: 30, quality: 4, templateLevel: 3, normalTemplateId: 7103, gainEquipSample: [70061, 70062, 70064], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
+  { key: 'hq_cannon', templateId: 7007, nameSource: 'VIP-Lựu đạn', nameZh: 'VIP-Lựu đạn（中文品质名称待核对）', mappingStatus: 'NAME_PENDING_VERIFY', mappingNote: '上游无中文「极」命名，无法证明即「极·轰天」', baseWeaponId: 'cannon', pic: 'bomb', attack: 40, defence: 250, agility: 30, luck: 60, quality: 4, templateLevel: 3, normalTemplateId: 7104, gainEquipSample: [70071, 70072, 70074], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
+  { key: 'hq_wind', templateId: 7008, nameSource: 'VIP-Phi tiêu', nameZh: 'VIP-Phi tiêu（中文品质名称待核对）', mappingStatus: 'NAME_PENDING_VERIFY', mappingNote: '上游无中文「极」命名，无法证明即「极·神风」', baseWeaponId: 'wind', pic: 'dart', attack: 60, defence: 30, agility: 250, luck: 40, quality: 4, templateLevel: 3, normalTemplateId: 7105, gainEquipSample: [70081, 70082, 70084], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
+  { key: 'hq_thunder', templateId: 7009, nameSource: 'VIP-Sấm sét', nameZh: 'VIP-Sấm sét（中文品质名称待核对）', mappingStatus: 'NAME_PENDING_VERIFY', mappingNote: '上游无中文「极」命名', baseWeaponId: 'thunder', pic: 'electricbar', attack: 30, defence: 40, agility: 60, luck: 250, quality: 4, templateLevel: 3, normalTemplateId: 7106, gainEquipSample: [70091, 70092], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
+  { key: 'hq_brick', templateId: 7010, nameSource: 'VIP-Lu gạch', nameZh: 'VIP-Lu gạch（中文品质名称待核对）', mappingStatus: 'NAME_PENDING_VERIFY', mappingNote: '上游无中文「极」命名', baseWeaponId: 'brick', pic: 'brick', attack: 180, defence: 130, agility: 30, luck: 40, quality: 4, templateLevel: 3, normalTemplateId: 7107, gainEquipSample: [70101, 70102], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
+  { key: 'hq_fruit', templateId: 7011, nameSource: 'VIP_ GIỎ ĐỒ', nameZh: 'VIP_ GIỎ ĐỒ（中文品质名称待核对）', mappingStatus: 'NAME_PENDING_VERIFY', mappingNote: '上游无中文「极」命名', baseWeaponId: 'fruit', pic: 'fruit', attack: 40, defence: 30, agility: 130, luck: 180, quality: 4, templateLevel: 3, normalTemplateId: 7108, gainEquipSample: [70111, 70112], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
+  { key: 'hq_scalpel', templateId: 7012, nameSource: 'VIP-Tủ thuốc', nameZh: 'VIP-Tủ thuốc（中文品质名称待核对）', mappingStatus: 'NAME_PENDING_VERIFY', mappingNote: '上游无中文「极」命名', baseWeaponId: 'scalpel', pic: 'OPSbox', attack: 130, defence: 30, agility: 180, luck: 40, quality: 4, templateLevel: 3, normalTemplateId: 7109, gainEquipSample: [70121, 70122], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
+  { key: 'hq_toilet', templateId: 7013, nameSource: 'VIP-Túi vũ khí', nameZh: 'VIP-Túi vũ khí（中文品质名称待核对）', mappingStatus: 'NAME_PENDING_VERIFY', mappingNote: '上游无中文「极」命名', baseWeaponId: 'toilet', pic: 'closestool', attack: 40, defence: 180, agility: 30, luck: 130, quality: 4, templateLevel: 3, normalTemplateId: 7110, gainEquipSample: [70131, 70132], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
+  { key: 'hq_appliance', templateId: 7014, nameSource: 'Vip TV, tủ lạnh', nameZh: 'Vip TV, tủ lạnh（中文品质名称待核对）', mappingStatus: 'NAME_PENDING_VERIFY', mappingNote: '上游无中文「极」命名', baseWeaponId: 'appliance', pic: 'television', attack: 95, defence: 95, agility: 95, luck: 95, quality: 4, templateLevel: 3, normalTemplateId: 7111, gainEquipSample: [70141, 70142], ruleSource: 'ORIGINAL_DATA_UNCONFIRMED_MAPPING' },
 ];
 
 export function highQualityWeaponByKey(key: string): HighQualityWeapon | undefined {

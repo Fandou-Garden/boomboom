@@ -38,6 +38,9 @@ async function startServer(port, dataDir) {
       DDT_HOST: '127.0.0.1', DDT_PORT: String(port),
       DDT_DATA_DIR: dataDir, DDT_DB_PATH: path.join(dataDir, 'ddt.sqlite'),
       DDT_DEBUG: '1', DDT_MODE: 'server',
+      // 主闭环使用独立测试奖励池（强制 2 金币 + 1 强化石 + 1 武器，仍整体洗牌），
+      // 确保「翻牌 → 强化」不靠碰概率；正常奖励池在 forge-rules.test.mjs 单独验证。
+      DDT_REWARD_POOL: 'test',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -205,17 +208,24 @@ test('服务端版完整业务闭环 + 事务防重 + 重启存档', async (t) =
   }
   assert.equal(storedCards.length, 9, '服务端奖励盘应为 9 张');
   const itemIndex = storedCards.findIndex((c) => c.kind === 'item');
-  const coinIndex = storedCards.findIndex((c) => c.kind === 'coin');
-  assert.ok(itemIndex >= 0 && coinIndex >= 0, '保底规则应同时产生材料卡与金币卡');
-  const picked = [itemIndex, coinIndex, ...storedCards.map((_, i) => i)
-    .filter((i) => i !== itemIndex && i !== coinIndex)].slice(0, 3);
+  assert.ok(itemIndex >= 0, '测试奖励池应强制产生真强化石卡');
+  // 取金额最大的 2 张金币卡：测试池强制 2 张，赢局每张 ≥80，合计 ≥160 > +1 的 100 金币。
+  const coinIndices = storedCards.map((c, i) => ({ c, i }))
+    .filter(({ c }) => c.kind === 'coin')
+    .sort((a, b) => Number(b.c.amount) - Number(a.c.amount))
+    .map(({ i }) => i);
+  assert.ok(coinIndices.length >= 2, '测试奖励池应强制产生至少 2 张金币卡');
+  assert.ok(storedCards.some((c) => c.kind === 'weapon'), '测试奖励池应强制产生 1 张武器卡');
+  const picked = [itemIndex, coinIndices[0], coinIndices[1]];
   const unclaimed = storedCards.map((_, i) => i).find((i) => !picked.includes(i));
   const expectedCoins = picked.reduce((s, i) =>
     s + (storedCards[i].kind === 'coin' ? Number(storedCards[i].amount) : 0), 0);
   const expectedStones = picked.reduce((s, i) =>
     s + (storedCards[i].kind === 'item' ? Number(storedCards[i].amount) : 0), 0);
-  assert.ok(expectedCoins >= 60, '夹具所选金币卡须足够一次强化，保证闭环不靠碰概率');
+  assert.ok(expectedCoins >= 100, '夹具所选金币卡须足够支付 +0→+1 的 100 金币');
   assert.ok(expectedStones >= 1, '夹具所选卡位须含材料卡，保证强化材料闭环');
+  assert.equal(board.poolMode, 'test', '主闭环使用独立测试奖励池');
+  assert.equal(board.poolVersion, config.body.rules.rewards.poolVersion, '奖励盘记录生成时的配置版本');
 
   const req1 = 'e2e-request-1';
   const pick1 = await api.post(`/api/server/battles/${battleId}/rewards/claim`, { cardIndex: picked[0], requestId: req1 });
@@ -259,9 +269,29 @@ test('服务端版完整业务闭环 + 事务防重 + 重启存档', async (t) =
 
   // --- 6. 铁匠铺强化：单事务 + requestId 防重放 ---
   let forge = (await api.get('/api/server/forge')).body.forge;
+  assert.equal(forge.ruleSource, 'SIMPLE_LOCAL_V1', '交付规则为单机自定义强化规则');
+  assert.equal(forge.maxLevel, 12);
+  assert.equal(forge.successRate, 1);
+  assert.deepEqual(forge.slots, { strength: [0], disabledStrength: [1, 2], god: 3, lucky: 4, equip: 5 });
   const equipped = forge.weapons.find((w) => w.equipped);
   assert.equal(equipped.level, 0);
-  assert.equal(equipped.cost.successRate, 1, '首级保底成功，保证闭环可验证');
+  assert.equal(equipped.baseAttack, 100, '未强化基础伤害');
+  assert.equal(equipped.cost.coins, 100, '+0→+1 金币 = 100 × 目标等级 1');
+  assert.equal(equipped.cost.stones, 1, '每次仅消耗 1 颗真强化石');
+  assert.equal(equipped.cost.successRate, 1, '成功率 100%');
+  assert.equal(equipped.cost.nextAttackPrecise, 110, '100 × 1.10 = 110');
+
+  // 前端不能提交强化结果，也不能使用已禁用的符咒槽。
+  const clientResult = await api.post('/api/server/forge/strengthen', {
+    weaponInstanceId: equipped.id, requestId: 'e2e-forbidden-result', success: true, level: 12,
+  });
+  assert.equal(clientResult.status, 400, '前端不得决定强化结果');
+  assert.equal(clientResult.body.code, 'client-cannot-decide-result');
+  const clientCharm = await api.post('/api/server/forge/strengthen', {
+    weaponInstanceId: equipped.id, requestId: 'e2e-forbidden-charm', luckyCharm: 'lucky1',
+  });
+  assert.equal(clientCharm.status, 400, '幸运符 / 神恩符不参与当前单机规则');
+  assert.equal(clientCharm.body.code, 'client-cannot-decide-result');
 
   const forgeReq = 'e2e-forge-request-1';
   const strengthened = await api.post('/api/server/forge/strengthen', {
@@ -270,7 +300,12 @@ test('服务端版完整业务闭环 + 事务防重 + 重启存档', async (t) =
   assert.equal(strengthened.status, 200, `强化失败：${JSON.stringify(strengthened.body)}`);
   assert.equal(strengthened.body.success, true);
   assert.equal(strengthened.body.weapon.levelAfter, 1);
-  assert.equal(strengthened.body.weapon.attackAfter, 125);
+  assert.equal(strengthened.body.weapon.attackAfter, 110, '100 × 1.10 = 110，不是旧规则 +25');
+  assert.equal(strengthened.body.weapon.attackPreciseAfter, 110);
+  assert.equal(strengthened.body.weapon.baseAttack, 100, '始终从未强化基础值重算');
+  assert.equal(strengthened.body.cost.coins, 100);
+  assert.equal(strengthened.body.cost.stones, 1);
+  assert.equal(strengthened.body.ruleSource, 'SIMPLE_LOCAL_V1');
 
   const forgeReplay = await api.post('/api/server/forge/strengthen', {
     weaponInstanceId: equipped.id, requestId: forgeReq,
@@ -281,9 +316,15 @@ test('服务端版完整业务闭环 + 事务防重 + 重启存档', async (t) =
   forge = (await api.get('/api/server/forge')).body.forge;
   const after = forge.weapons.find((w) => w.id === equipped.id);
   assert.equal(after.level, 1, '重放不能二次升级');
-  assert.equal(after.attack, 125);
+  assert.equal(after.attack, 110);
+  assert.equal(after.attackPrecise, 110);
+  assert.equal(after.baseAttack, 100, '强化等级与属性属于武器实例，不修改共享模板');
   const walletAfterForge = forge.wallet;
-  assert.equal(walletAfterForge.coins, walletAfterCards.coins - equipped.cost.coins, '金币只扣一次');
+  assert.equal(walletAfterForge.coins, walletAfterCards.coins - 100, '金币只扣一次');
+  assert.equal(
+    walletAfterForge.items.reduce((s, i) => s + i.quantity, 0), expectedStones - 1,
+    '真强化石只扣 1 颗；合成石 / 符咒数量不变',
+  );
 
   // --- 7. 下一局使用强化属性 ---
   await api.post('/api/server/room/leave', {});
@@ -291,7 +332,7 @@ test('服务端版完整业务闭环 + 事务防重 + 重启存档', async (t) =
   assert.equal(second.status, 200);
   assert.notEqual(second.body.battleId, battleId);
   const state2 = (await api.get('/api/state')).body;
-  assert.equal(state2.actors[0].attack, 125, '下一场战斗实际应用强化后的攻击属性');
+  assert.equal(state2.actors[0].attack, 110, '下一场战斗实际应用强化后的基础伤害');
   assert.equal(state2.actors[1].attack, 35, '机器人倍率不变');
 
   // 战斗中禁止改装备（本局属性已冻结）
@@ -324,7 +365,11 @@ test('服务端版完整业务闭环 + 事务防重 + 重启存档', async (t) =
     '重启后材料保留',
   );
   const forgeRestart = (await api.get('/api/server/forge')).body.forge;
-  assert.equal(forgeRestart.weapons.find((w) => w.id === equipped.id).level, 1, '重启后强化等级保留');
+  const weaponRestart = forgeRestart.weapons.find((w) => w.id === equipped.id);
+  assert.equal(weaponRestart.level, 1, '重启后强化等级保留');
+  assert.equal(weaponRestart.attack, 110, '重启后基础伤害保留');
+  assert.equal(weaponRestart.baseAttack, 100, '重启后未强化基础值保留，不会二次叠乘');
+  assert.equal(weaponRestart.ruleVersion, 'SIMPLE_LOCAL_V1', '重启后规则版本保留');
   const roomRestart = (await api.get('/api/server/room')).body.room;
   assert.equal(roomRestart.mapId, '1001', '重启后房间地图选择保留');
   assert.ok(roomRestart.lastResult, '重启后战斗结算记录保留');

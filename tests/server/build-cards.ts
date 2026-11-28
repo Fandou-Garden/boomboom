@@ -7,6 +7,9 @@ const cards = buildRewardCards(seed, true);
 console.log(JSON.stringify({
   poolMode: config.rewards.poolMode,
   poolVersion: config.rewards.poolVersion,
-  extremeChance: config.rewards.extremeChance,
+  weaponChance: config.rewards.weaponChance,
+  stoneChance: config.rewards.stoneChance,
+  guaranteedStoneCards: config.rewards.guaranteedItemCards,
+  forgeRule: config.forge.ruleSource,
   cards,
 }));

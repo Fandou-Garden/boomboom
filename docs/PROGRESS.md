@@ -474,3 +474,116 @@ fine-grained PAT 不返回 `X-OAuth-Scopes` 头，写权限只能以实际非强
 - 强化成功 / 失败原版音效 SoundID —— 未确认（`StoreTips` 源码缺失）。
 - 手机横屏控件遮挡检查、多局连续资源 / 事件监听 / WebSocket / 计时器增长观测 —— 未实测。
 - `art-source/` 已导出的 `lightFrame` / `starMc` / `VersusAnimation` / `GameMode_*` 逐帧序列 —— 未接入。
+
+## 10. 阶段 10（2026-11-28）：用户授权简化强化规则，收尾交付稳定可玩版本
+
+### 10.1 需求调整（本阶段最高优先级）
+
+用户明确调整目标：**不再追求强化规则 100% 还原，采用简单、明确的单机强化规则；
+原版铁匠铺 UI、武器素材、强化动画和音效仍然保留**。
+
+- 停止追查 `ItemStrengthenData.xml`、原版属性成长公式与「极·」品质映射，不再因此阻塞交付。
+- 已有研究证据保留，不继续扩大搜索范围。
+- 文档统一标注「**原版素材 + 单机自定义强化规则**」，不能称为原版强化算法。
+- **「原版强化完整规则缺失」不再列为阻塞项**；本轮目标是收尾并交付稳定可玩版本。
+
+### 10.2 统一规则 `SIMPLE_LOCAL_V1`（服务端权威）
+
+| 项 | 值 |
+| --- | --- |
+| 规则标注 | 原版素材 + 单机自定义强化规则（界面 / 武器素材 / 动画 / 音效来自原版，算法不是原版） |
+| 初始 / 上限 | `+0` / `+12` |
+| 每次消耗 | 1 颗**真强化石**（`Đá cường hóa 1..6`，所有已确认等级统一一次机会）+ `100 × 目标等级` 金币 |
+| 成功率 / 等级变化 | 100% / `+1`；不降级、不损毁 |
+| 基础伤害 | `未强化基础伤害 × (1 + 0.10 × 强化等级)`；`+1`=110%，`+12`=220% |
+| 精度 | 始终从 `base_attack` 重算，`attack_precise` 保留 6 位小数；最终伤害取整沿用战斗引擎 |
+| 符咒 / 合成石 | 幸运符 / 神恩符不参与计算、槽位置灰、物品保留；四圣兽合成石仍禁止作为材料 |
+| 影响范围 | 仅武器基础伤害；不改弹道 / 风力 / 爆炸范围 / 角度范围 |
+| 并发与幂等 | `requestId` 防重放 + `version` 条件更新防并发重复扣费；单事务完成扣金币、扣材料、更新武器、写操作记录 |
+
+`config.ts` 中删除了 `DDT_FORGE_RULES` / `DDT_FORGE_RANDOM` 与 `ORIGINAL_PARTIAL` 运行时分支；
+`services.ts` 删除 `forgeRoll()`、`originalRuleFor()`，新增 `simpleForgeCost()` /
+`attackForLevel()` / `baseAttackOf()`；`api.ts` 拒绝 `success/level/attack/coins/slots/luckyCharm/godCharm`
+等任何结果或已废弃字段（400 `client-cannot-decide-result`）。
+
+### 10.3 004 迁移：旧存档备份 + 派生属性一次性重算
+
+- 新增 `server-node/migrations/004_simple_forge.sql`、`legacy_weapon_backup` 表、
+  `weapon_instances.base_attack / attack_precise`、`battles.weapon_attack_precise`。
+- 旧规则 `attack = 基础值 + 25×level` 反推基础值，再按新公式重算一次；
+  `UPDATE` 只处理 `rule_version <> 'SIMPLE_LOCAL_V1'`，重复执行不二次加成。
+- `level > 12` 钳制到 12；无法反推基础值时以当前 `attack` 为基础并标记
+  `UNKNOWN_BASE_ASSUMED_CURRENT`；两种情况都保留实例与原始数值，不静默删除。
+- 002 的材料分类纠错原则不变：保留玄武石数量，只改为合成石，不兑换、不补发、不删除。
+- 已生成奖励盘保留原 `cards_json` 与 `pool_version`，规则变更不重抽。
+- 验证见 `docs/MIGRATION_VERIFICATION.md` 与 `tests/server/migration.test.mjs`。
+
+### 10.4 前端与翻牌
+
+- 红金铁匠铺保留 `store.swf` 素材与 6 个真实 DOM 槽位；按新规则只有 **0 号强化石槽与
+  5 号装备槽启用**，1/2 强化石槽、3 神恩符槽、4 幸运符槽 `disabled` + 置灰 + 说明原因。
+- 强化预览显示当前等级、目标等级、当前/强化后基础伤害、未强化基础值、金币消耗（含持有量）、
+  材料消耗（含持有量）、成功率 100%、上限 +12、规则版本；金币 / 材料不足时显示 `.ddt-reason`。
+- 强化成功后立即刷新背包与装备展示；进行中的战斗不受影响，下一局才应用新属性。
+- 翻牌正常池产出金币、真强化石与**已核实上游名称与属性**的武器（标注「中文品质名称待核对」），
+  9 张整体洗牌、无固定卡位；独立测试池强制 2 金币 + 1 真强化石 + 1 武器，
+  仅用于验证闭环，不改变正常掉落规则。
+
+### 10.5 本阶段代码与文档改动
+
+| 文件 | 改动 |
+| --- | --- |
+| `server-node/migrations/004_simple_forge.sql` | 新建：备份表、加列、一次性重算、异常数据处理 |
+| `server-node/src/config.ts` | `SIMPLE_LOCAL_V1` 规则、奖励池 `v4-2026-11-28-simple-forge`、`weaponChance` |
+| `server-node/src/services.ts` | 重写 `strengthen()` / `forge()` / `buildRewardCards()`，精度规整，重放绑定武器 |
+| `server-node/src/api.ts` | 只接受 3 个意图字段，拒绝结果字段与符咒 |
+| `server-node/src/original-data.ts` | 标注「中文品质名称待核对」、`NAME_PENDING_VERIFY`，明确不参与运行时计算 |
+| `server-node/src/index.ts` | 启动日志显示当前规则与「不是原版强化算法」 |
+| `dist/js/server-mode.js` / `dist/styles.css` | 禁用槽位样式、完整预览、拒绝原因、room 显示精确伤害 |
+| `tests/server/{e2e,forge-rules,migration}.test.mjs`、`build-cards.ts`、`browser-e2e.mjs` | 按新规则重写；新增 004 迁移、上限、幂等、并发、精度、UI 提示验收 |
+| `docs/{RULE_EVIDENCE,FORGE_UI_EVIDENCE,WEAPON_MAPPING_EVIDENCE,MIGRATION_VERIFICATION,ASSET_MANIFEST}.md` | 统一标注「原版素材 + 单机自定义强化规则」，研究证据改为存档 |
+| `README-SERVER.md` / `docs/PROGRESS.md` / `.env.example` | 运行说明、环境变量、剩余问题与交付记录同步 |
+
+### 10.6 阶段 10 全量验证（2026-11-28 实测）
+
+| 项目 | 结果 |
+| --- | --- |
+| `npm run typecheck:server` | 通过，0 错误 |
+| `npm test` | **61 / 61 通过**（镜头断言未被删除） |
+| `npm run test:server` | **7 / 7 通过**：业务闭环、公式与消耗、三类不足/上限、幂等与并发、+0→+12 全程、奖励池与武器发放、004 迁移幂等 |
+| `npm run test:server:browser` | **19 项全通过**：翻牌真实拿到金币 + 真强化石、6 槽启用/禁用、100% 成功率、完整预览、拖放与禁用槽拒绝、强化成功 +1/110、下一局 110、重复提交不重复扣费、三类提示、刷新保留、offline 回退，页面无 JS 错误 |
+| `npm run test:server:perf` | 通过；Node 空闲 RSS **109.14 MB**（heap 12.31 MB）、战斗中 **121.53 MB**（heap 16.65 MB）；浏览器 JS 堆 **2.07 MB**、DOM 1525、监听 177；首屏 177 请求 / encoded **3.14 MB** / transfer **3.16 MB**；`dist/` **41.13 MB**、CSS **83.2 KB**。**收尾复测**：Node 空闲 RSS 107.97 MB（heap 12.37 MB）/ 战斗中 95.56 MB（heap 16.94 MB）、浏览器 JS 堆 2.05 MB / DOM 1506 / 监听 177、`dist/` 41.14 MB；两次差异来自 GC 与进程采样时机，均如实记录，不取最好值 |
+| 迁移实测 | `旧金币=1234 新金币=1234 背包=[xuanwu1:3, xuanwu3:2] 旧武器 attack=175 → 130 (base=100, Lv3) 超限 Lv15 → 12 幂等=true` |
+
+性能报告仍明确区分 Node 进程 RSS / 浏览器 JS 堆 / 首屏传输 / 静态资源总体积；
+浏览器进程总内存与 Canvas / 解码图片 / 音频 buffer 占用**尚未单独测量**，如实列为剩余问题。
+
+`SOURCE_MANIFEST.sha256` 重生成到 **744 条**，全量 `shasum -a 256 -c` 返回 **744 OK**；
+此前 314 条是增量维护、遗漏了 `server-node/` 与 `art-source/`，本阶段起改为覆盖全仓
+tracked 文件（清单自身除外）。凭证模式扫描 staged 文件 **0 命中**。
+
+### 10.7 真实截图
+
+- `docs/screenshots/2026-11-28-stage10-settlement.png` —— 两张卡面均已翻开（金币 + 真强化石），统计 `已翻开 2/3`。
+- `docs/screenshots/2026-11-28-stage10-forge.png` —— 红金底纹、0/5 槽启用、1~4 置灰、成功率 `100%`、装备栏/道具栏、完整强化预览与规则说明、底部强化成功文案。
+- `docs/screenshots/2026-11-28-stage10-room-after-reload.png` —— 刷新后 `+1`、金币与材料保留。
+
+为完整呈现可滚动侧栏内的预览区，铁匠铺截图时临时调高视口并展开滚动容器
+（DOM 内容不变，截完立即恢复），因此左侧下方有留白；正常使用时侧栏可滚动。
+
+### 10.8 阶段 10 之后仍未完成（如实标注，不冒充原版还原）
+
+- 原版强化算法**不实现**（已获授权）：属性成长公式、模板进阶、失败损毁、VIP/公会/开孔/绑定等研究证据仅存档。
+- 中文「极·」品质名称待核对：使用上游真实名称，不编造模板 / 属性 / 素材；不阻塞交付。
+- 强化成功 / 失败原版音效 SoundID 未确认（`StoreTips` 源码缺失），暂用站点版 `win`。
+- 铁匠铺购买按钮、商城 / 公会 / 多人匹配 / 副本系统未接线（明确不在范围内）。
+- 手机横屏遮挡检查、多局连续资源 / 事件监听 / WebSocket / 计时器增长观测、浏览器进程总内存与
+  Canvas / 图片 / 音频 buffer 单独占用：**尚未实测**。
+- `art-source/` 的 `lightFrame` / `starMc` / `VersusAnimation` / `GameMode_*` 逐帧序列未接入。
+
+### 10.9 提交与推送状态
+
+阶段 10 使用用户已配置的凭证**非强制推送** `feat/node-server-mode`，并用 `git ls-remote`
+校验远程 SHA 与本地 HEAD 一致；不自动合并 `main`。
+实际提交 SHA、推送结果与校验值在推送完成后补记于本节末尾。
+

@@ -2,6 +2,12 @@
 
 > 本文件按《源码实现路径.md》第四节「音频与素材追踪入口」与交付要求整理。
 > 只记录**实际读取/核对过**的内容；未读取、未导出、未匹配的项明确标注。
+>
+> **阶段 10 交付规则声明**：界面 / 武器素材 / 动画 / 音效来自原版，
+> 强化算法是本项目自定的**单机自定义强化规则**（`SIMPLE_LOCAL_V1`），
+> 统一标注「原版素材 + 单机自定义强化规则」，**不是原版强化算法**。
+> 用户已授权简化，不再追查原版属性成长公式与「极·」品质映射；
+> 本文件第 6 节的原版机制核对仅作研究证据存档，不参与运行时计算。
 
 ## 1. 参考仓库与提交（2026-11-28 实测）
 
@@ -103,19 +109,22 @@
 - 另有 `StrengthenMgr.cs`、`ItemStrengthenHandler.cs`、`StrengThenExpMgr.cs`、
   `StrengthenDataAnalyzer.as` 等共同决定成功率、经验与消耗
 
-本轮**未完整移植**这套机制：它跨多个版本与服务端/客户端配置，直接拼装会把不同版本规则混在一起
-（《源码实现路径.md》明确禁止）。因此铁匠铺使用 `server-node/src/config.ts` 中
-`ruleSource: 'LOCAL_RULE'` 的**单机临时规则**，界面上写明「不代表原版成功率与消耗」，
-并在 `docs/PROGRESS.md` 记录差异。原版配置可作为后续替换入口的数据源。
+本项目**未移植**这套机制：它跨多个版本与服务端/客户端配置，直接拼装会把不同版本规则混在一起
+（《源码实现路径.md》明确禁止）。阶段 8 曾以 `ORIGINAL_PARTIAL` 局部实现并明确标注未还原项；
+**阶段 10 按用户授权彻底简化**，运行时统一为 `server-node/src/config.ts` 的
+`SIMPLE_LOCAL_V1`（+0~+12、1 颗真强化石 + 100×目标等级金币、100% 成功、
+基础伤害 = 未强化基础值 ×(1+0.10×等级)），界面写明「原版素材 + 单机自定义强化规则，
+不是原版强化算法」。本节的源码核对结果保留为研究证据，见 `docs/RULE_EVIDENCE.md`。
 
 ## 7. 缺失项与可替换入口（不冒充原版）
 
-> **阶段 9 更新（2026-11-28）**：下表前两行与 BGM 行的状态已变化，以本节为准；
+> **阶段 9 / 阶段 10 更新（2026-11-28）**：下表状态已变化，以本节为准；
 > 原始历史状态保留在 `docs/PROGRESS.md` 的阶段 8 记录中，不回写。
+> 阶段 10 的规则标注统一为「原版素材 + 单机自定义强化规则」，不再列「原版规则缺失」为阻塞项。
 
-| 缺失项 | 状态（阶段 9 复核） | 替换入口 / 证据 |
+| 缺失项 | 状态（阶段 10 复核） | 替换入口 / 证据 |
 | --- | --- | --- |
-| 原版铁匠铺 UI（`StoreIIStrengthBG`、`StreangthItemCell`、`StrengthStone` 等） | **已从 `store.swf` 导出并按 `store.xml` 布局接入**（红金色 `strengthBG` 底纹 + 6 个真实槽位 + 装备栏 + 道具栏 + 成功率区，支持点选与拖放）。**不等于原版规则已还原**：强化仍按 `LOCAL_RULE` / `ORIGINAL_PARTIAL` 分离显示 | `dist/assets/forge/`（24 个素材 + `SOURCE_MANIFEST.json`）、`dist/js/server-mode.js`、`docs/FORGE_UI_EVIDENCE.md` |
+| 原版铁匠铺 UI（`StoreIIStrengthBG`、`StreangthItemCell`、`StrengthStone` 等） | **已从 `store.swf` 导出并按 `store.xml` 布局接入**（红金色 `strengthBG` 底纹 + 6 个真实槽位 + 装备栏 + 道具栏 + 成功率区，支持点选与拖放）。阶段 10 按单机规则只启用 0 号强化石槽与 5 号装备槽，其余置灰。**界面素材是原版，强化规则不是原版** | `dist/assets/forge/`（23 个素材 + `SOURCE_MANIFEST.json`）、`dist/js/server-mode.js`、`docs/FORGE_UI_EVIDENCE.md` |
 | 原版强化成功 / 失败音效 | **未确认**：结果音封装在上游 `StoreTips`，本次检出无该 AS 源码，无法确认 SoundID | 暂用站点版既有 `win` / `lose`；`docs/AUDIO_EVIDENCE.md` |
 | `lightFrame` / `vipCardMc` / `starMc` / `Hexagram` / `VersusAnimation` / `GameMode_*` 逐帧序列 | 已在 `art-source/` 导出，`dist/` **未接入** | `art-source/README.md` 帧清单 + `dist/styles.css` 动画 |
 | 房间 / 大厅 / 地图 BGM 与 014 / 067 倒计时音效 | **已接线**：14 条原版长音乐 + 2 条短音效，从 `Resource/sound/*.flv` 与 `audio.swf` 导出 | `dist/assets/audio/`、`dist/js/audio-scenes.js`、`docs/AUDIO_MAPPING.md` |
@@ -135,9 +144,16 @@
 逐项证据见 `docs/FORGE_UI_EVIDENCE.md`。**上游 UI 与用户提供的红金色截图差异、
 以及未确认项，均在该文档中如实标注，未写成「原版界面已完全还原」。**
 
-## 9. 规则配置入口
+## 9. 规则配置入口（阶段 10）
 
-- 机器人 / 翻牌 / 强化数值：`server-node/src/config.ts`（全部服务端权威）
-- 物品登记：`server-node/migrations/001_init.sql` 与 `server-node/src/services.ts` 的 `ITEM_SEED`
-- 前端模式切换：`dist/js/data-api.js`（offline / server 统一接口）
-- 音效事件映射：`docs/AUDIO_MAPPING.md`
+- 强化 / 翻牌 / 机器人数值：`server-node/src/config.ts` 的 `forge` / `rewards` / `bot`，
+  全部服务端权威；当前规则 `SIMPLE_LOCAL_V1`「原版素材 + 单机自定义强化规则」。
+- 强化执行、消耗、精度与防重：`server-node/src/services.ts` 的 `strengthen()` /
+  `attackForLevel()` / `simpleForgeCost()`。
+- 旧存档迁移：`server-node/migrations/004_simple_forge.sql`（逐件备份 + 一次性重算，
+  验证见 `docs/MIGRATION_VERIFICATION.md`）。
+- 物品登记：`server-node/migrations/001_init.sql`、`002_item_classification.sql`
+  与 `server-node/src/services.ts` 的 `ensurePlayer()` / `original-data.ts`。
+- 前端模式切换：`dist/js/data-api.js`（offline / server 统一接口）。
+- 音效事件映射：`docs/AUDIO_MAPPING.md`；铁匠铺 UI 证据：`docs/FORGE_UI_EVIDENCE.md`；
+  原版强化链路研究证据（不参与运行时）：`docs/RULE_EVIDENCE.md`。

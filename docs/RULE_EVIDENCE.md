@@ -2,7 +2,23 @@
 
 > 核对日期：2026-11-28 · 上游 `phucdz2kk4/Gunny @ 057c71a`
 > 旧版对照 `dk-khoado/Gunny-3.0` 仅用于素材对照，**规则以下列上游 C#/AS/XML 为准**。
-> **本轮不报告「原版强化已还原」**：属性计算未找到、模板进阶/损毁/VIP/公会/开孔/绑定未接线。
+
+> ## ⚠️ 阶段 10 交付规则声明（2026-11-28，用户授权简化）
+>
+> **当前交付 =「原版素材 + 单机自定义强化规则」(`SIMPLE_LOCAL_V1`)，不是原版强化算法。**
+> 用户已明确授权：不再追求强化规则 100% 还原，停止追查 `ItemStrengthenData.xml`、
+> 原版属性成长公式与「极·」品质映射；已有研究证据保留、不继续扩大搜索范围。
+>
+> - 本文件第 1 节的**物品分类映射仍然有效且是运行时依据**（真强化石 / 合成石 / 符咒的区分）。
+> - 第 2 节及以下的原版执行链、`ORIGINAL_PARTIAL` / `LOCAL_RULE` 两套规则、
+>   `DDT_FORGE_RULES` / `DDT_FORGE_RANDOM`、可注入随机源、概率公式、失败降级等
+>   **全部是研究证据存档，已从运行时代码移除，不再生效**。
+> - 运行时规则集中在 `server-node/src/config.ts` 的 `forge` 与 `server-node/src/services.ts`
+>   的 `strengthen()`：+0 起、上限 +12、每次 1 颗真强化石 + `100×目标等级` 金币、
+>   成功率 100%、等级 +1、不降级不损毁、基础伤害 = 未强化基础值 ×(1+0.10×等级)。
+> - 幸运符 / 神恩符不参与计算，槽位置灰，物品保留；四圣兽合成石仍禁止作为强化材料。
+> - **「原版强化完整规则缺失」不再列为交付阻塞项**，也不得把本项目规则写成「原版已还原」。
+> - 现行测试见 `tests/server/forge-rules.test.mjs`（已按 `SIMPLE_LOCAL_V1` 整体重写）。
 
 ## 1. 物品分类映射（模板ID → 名称 → 类别 → 用途 → Pic → 图标路径 → 处理方法）
 
@@ -84,55 +100,71 @@ num8        = RandomSafe.Next(10000)                            // 服务端随�
 成功        = num7 > num8
 → 成功率 ≈ (probability + num2) / Rock
 ```
-本项目 `originalRuleFor()` 返回 `rock / probability / luckyContribution / successRate`，
-`successRate = min(1, (probability + luckyContribution) / rock)`，随机源由服务端 `forgeRoll()` 提供。
+阶段 8 曾有 `originalRuleFor()` 返回 `rock / probability / luckyContribution / successRate`、
+并由服务端 `forgeRoll()` 提供随机源；**该实现已在阶段 10 从运行时移除**，此处仅保留公式推导记录。
+现行规则成功率恒为 100%，不使用随机源。
 
-## 3. 两套规则分离与界面显示
+## 3. 历史两套规则（阶段 8，已下线，仅存档）
 
-| 配置 | 默认 | 启用方式 | 标记 |
-| --- | --- | --- | --- |
-| 单机临时规则 | **是** | `DDT_FORGE_RULES=local`（默认） | `LOCAL_RULE` |
-| 原版核心链路 | 否 | `DDT_FORGE_RULES=original` | `ORIGINAL_PARTIAL` |
+| 配置 | 阶段 8 默认 | 当时启用方式 | 标记 | 阶段 10 状态 |
+| --- | --- | --- | --- | --- |
+| 单机临时规则 | 是 | `DDT_FORGE_RULES=local` | `LOCAL_RULE` | **已移除** |
+| 原版核心链路 | 否 | `DDT_FORGE_RULES=original` | `ORIGINAL_PARTIAL` | **已移除** |
 
-- 默认走 `LOCAL_RULE`，因为原版完整链路尚未还原；**不能默认启用并报告「原版强化完成」**。
-- `ORIGINAL_PARTIAL` 已实现：三槽、幸运符、神恩符、概率公式、等级表(1..15)、失败保护/降级、无金币扣费。
-- 明确未接线：`VIP num3`、`公会 num4`、`isPlayerWarrior`、`GainEquip 模板进阶`、
+- 阶段 8 曾实现三槽、幸运符、神恩符、概率公式、等级表(1..15)、失败降级、无金币扣费；
+  明确未接线：`VIP num3`、`公会 num4`、`isPlayerWarrior`、`GainEquip 模板进阶`、
   `失败 Count-- 损毁`、`OpenHole 开孔`、`IsBinds 绑定`、`StoneLevelMin 服务端校验`、
-  `武器属性成长公式`。
-- 属性成长：两套规则目前都用 `LOCAL_ATTACK_PER_LEVEL=25`，但 `original` 分支在
-  `originalDetail.attackGrowth` 与响应 `attackGrowthSource` 中明确标注
-  `LOCAL_RULE_SUPPLEMENT（原版属性成长未还原）`，**不声称是原版数值**。
-- 界面：铁匠铺顶部摘要始终显示「当前规则 / 规则来源 / 属性成长 / 未还原项数 / 武器映射」，
-  材料列下方列出逐项证据；右栏显示武器的 `ruleVersion`。
-  `GET /api/server/rules` 与 `GET /api/server/forge` 也返回同一份信息。
-- 可注入随机源 `DDT_FORGE_RANDOM`：`always-success` / `always-fail` / `fixed:<0..1>` /
-  `sequence:a,b,c`，**仅用于自动化测试**，未设置时用单局种子。
+  `武器属性成长公式`。这些结论作为研究证据保留。
+- 属性成长当时用 `LOCAL_ATTACK_PER_LEVEL=25`（并标注 `LOCAL_RULE_SUPPLEMENT`）；
+  004 迁移据此反推旧存档的未强化基础值，**迁移完成后不再使用该值**。
+- 界面当时显示「当前规则 / 规则来源 / 属性成长 / 未还原项数 / 武器映射」；
+  阶段 10 改为显示 `SIMPLE_LOCAL_V1`、上限、成功率 100%、每次 1 颗真强化石、
+  金币 / 材料 / 伤害预览与禁用槽位说明。
+- `DDT_FORGE_RANDOM` 可注入随机源（`always-success` / `always-fail` / `fixed` / `sequence`）
+  **已从运行时移除**；现行规则成功率 100%，测试改为精确断言而非碰概率。
 
-## 4. 测试覆盖（`tests/server/forge-rules.test.mjs`）
+## 4. 阶段 10 现行规则与测试覆盖
+
+运行时规则（`server-node/src/config.ts` → `forge`）：
+
+| 项 | 值 |
+| --- | --- |
+| 规则名 / 标注 | `SIMPLE_LOCAL_V1` / 原版素材 + 单机自定义强化规则 |
+| 初始 / 上限 | `+0` / `+12` |
+| 每次消耗 | 1 颗真强化石（所有已确认等级统一一次机会）+ `100 × 目标等级` 金币 |
+| 成功率 / 等级变化 | 100% / `+1`，不降级、不损毁 |
+| 基础伤害 | 未强化基础值 × `(1 + 0.10 × 强化等级)`；`+1`=110%，`+12`=220% |
+| 精度 | `weapon_instances.attack_precise` 保留 6 位小数，最终伤害取整沿用战斗引擎 |
+| 符咒 / 合成石 | 不参与计算、槽位置灰、物品保留；服务端拒绝作为材料 |
+| 影响范围 | 仅武器基础伤害；不改弹道 / 风力 / 爆炸范围 / 角度范围 |
+
+`tests/server/forge-rules.test.mjs`（已整体重写）覆盖：
 
 | 要求 | 覆盖 |
 | --- | --- |
-| 材料数量与槽位校验 | 重复槽 400、合成石 409、>3 槽截断为 3、成功按槽各扣 1 |
-| 幸运符生效 | `luckyContribution` 0 / 0.75 / 1.75 递增，归一化概率分子递增 |
-| 神恩符生效 | `Template.Level=3` 且 Lv6 武器：无符失败降 1 级、有符不降级 |
-| 成功 / 失败 / 上限 / 金币不足 / 材料不足 | `always-success` / `always-fail` / Lv15 409 / `LOCAL_RULE` 金币 0 → 409 / 只有玄武石 → 409 |
-| 同一请求重复执行与并发 | 重放 deepEqual、同 requestId 并发只升 1 级、不同 requestId 并发各升 1 级不丢失更新 |
-| 旧存档迁移 / 重启恢复 | `tests/server/migration.test.mjs`、`tests/server/e2e.test.mjs` |
-| 装备后下一场属性与表现 | `/api/state` 的 `actors[0].attack`、`battles.weapon_attack/weapon_id/variant` |
-| 随机不碰概率 | 全部通过 `DDT_FORGE_RANDOM` 注入 |
+| 公式不叠乘 | +0→+1→+2→+3 断言 100/110/120/130，`base_attack` 恒为 100 |
+| 消耗与预览 | 金币 100/200/300、材料恒 1 颗、成功率 100%、伤害预览 |
+| 金币 / 材料不足 / 合成石 | 409 + 明确文案；`forge()` 的 `reason` 同步给出原因 |
+| `+12` 上限 | 从 +0 连续强化 12 次到 220%，第 13 次 409 `max-level` |
+| 前端不得决定结果 | `success/level/attack/coins/slots/luckyCharm/godCharm` 一律 400 |
+| 幂等 / 并发 | 同 `requestId` 重放 deepEqual、跨武器复用 409、并发不丢失更新、重复点击不重复扣费 |
+| 旧存档 / 重启 | `tests/server/migration.test.mjs`（004）、`tests/server/e2e.test.mjs` |
+| 装备后下一局 | `/api/state` 的 `actors[0].attack`、`battles.weapon_attack_precise/variant`、小数精度保留 |
 
-## 5. 仍未还原 / 未完成
+## 5. 研究证据中仍未还原项（**不再列为交付阻塞**）
 
-> **阶段 9 更新（2026-11-28）**：下面前两条的 UI 与 BGM 已由阶段 9 实现/接入
-> （见 `docs/FORGE_UI_EVIDENCE.md`、`docs/AUDIO_EVIDENCE.md`）；**规则本身仍未还原**，
-> 本清单的「未接线」项保持有效，不能据此写成「原版强化已完成」。
+> 阶段 10 更新：用户已授权简化强化算法，以下「未还原」是**对上游原版的研究结论**，
+> 不是本项目交付缺口，也不再阻塞交付。阶段 9 已接入原版铁匠铺 UI 与原版音乐音效。
 
 - 原版铁匠铺红金色 UI（三强化石槽 / 幸运符槽 / 神恩符槽 / 装备栏 / 道具栏 / 成功率区域）、
-  点选 / 拖放交互：**阶段 9 已实现**（`store.swf` 素材 + `store.xml` 点位 + 真实 DOM）。
+  点选 / 拖放交互：**阶段 9 已实现**（`store.swf` 素材 + `store.xml` 点位 + 真实 DOM）；
+  阶段 10 按单机规则只启用 0 号强化石槽与 5 号装备槽，其余置灰并说明原因。
   原版强化结果音效仍**未确认**（`StoreTips` 源码缺失）。
 - 原版音乐与音效（房间 065、大厅 062、翻牌 048、倒计时 067/014、胜负 063/064、
   地图 `BackMusic`）：**阶段 9 已接入**；铁匠铺无独立 BGM，战前加载无独立音乐调用证据。
-  见 `docs/AUDIO_MAPPING.md`。
-- 模板进阶、损毁、开孔、绑定、VIP/公会加成、武器属性成长公式：**未接线**。
-- 「神武石」：`unmatched`。
-- 中文「极·」武器映射：`UNCONFIRMED`，见 `docs/WEAPON_MAPPING_EVIDENCE.md`。
+  见 `docs/AUDIO_MAPPING.md`、`docs/AUDIO_EVIDENCE.md`。
+- 上游原版未接线/未导出：模板进阶、损毁、开孔、绑定、VIP/公会加成、武器属性成长公式。
+  本项目不实现这些机制，也不声称还原。
+- 「神武石」：`unmatched`（上游无此物品，未编造 ID）。
+- 中文「极·」品质映射：无法证明，改用**上游真实名称 + 「中文品质名称待核对」**标注；
+  不阻塞交付，可作为翻牌武器奖励。见 `docs/WEAPON_MAPPING_EVIDENCE.md`。

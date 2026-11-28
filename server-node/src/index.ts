@@ -57,7 +57,9 @@ server.listen(config.port, config.host, () => {
   console.log(`  数据库      ${config.dbPath} (WAL, 外键开启)`);
   console.log(`  模式        ${config.mode}  调试=${config.debug}  步长=${config.tickMs}ms`);
   console.log(`  机器人      固定角度 ${config.bot.angle}° / 力度 ${config.bot.force} / 攻击倍率 ${config.bot.attackScale}`);
-  console.log('  提示        翻牌与强化规则为服务端配置；原版配置未导出项已标注为单机临时规则');
+  console.log(`  强化规则    ${config.forge.ruleLabel} (${config.forge.ruleSource})`);
+  console.log(`              +0 ~ +${config.forge.maxLevel} · 每次 1 颗真强化石 + ${config.forge.coinCostPerTargetLevel}×目标等级金币 · 成功率 100%`);
+  console.log('  提示        铁匠铺界面 / 武器素材 / 动画 / 音效来自原版 store.swf；强化算法为单机自定义规则，不是原版强化算法');
   console.log('');
 });
 

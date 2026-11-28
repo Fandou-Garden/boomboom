@@ -2,7 +2,12 @@
 
 > 核对日期：2026-11-28 · 上游 `phucdz2kk4/Gunny @ 057c71a`（与 `dist/js/engine/constants.js` 的 `SOURCE_COMMIT` 一致）
 > 旧版对照：`dk-khoado/Gunny-3.0`
-> **结论：中文「极·」品质映射未证实，全部标记 `UNCONFIRMED`（中文品质映射待确认），不进入正常奖励池。**
+> **结论：中文「极·」品质映射未证实，全部标记 `NAME_PENDING_VERIFY`（中文品质名称待核对）。**
+>
+> **阶段 10 更新（用户授权）**：不再追查「极·」品质映射，也不再因此阻塞交付。
+> 使用**已核实的上游真实名称、模板 ID、四维属性与 Pic 素材**，标注「中文品质名称待核对」；
+> 不编造中文「极·」名称、模板、属性或专属素材。这些武器已验证可正常装备、强化与战斗，
+> 因此可作为翻牌武器奖励（正常池按单机自定义掉率，测试池强制含 1 张）。
 
 ## 1. 为什么不能凭 Quality / VIP- / 模板编号 / 属性倍率判定
 
@@ -17,7 +22,8 @@
 
 因此本轮只登记「高阶品质武器候选」，展示**上游真实名称**（`VIP-Pháo` 等），
 代码中为 `server-node/src/original-data.ts` 的 `HIGH_QUALITY_WEAPONS`，
-每项 `mappingStatus: 'UNCONFIRMED'`。
+每项 `mappingStatus: 'NAME_PENDING_VERIFY'`（中文品质名称待核对），
+`nameZh` 形如 `VIP-Pháo（中文品质名称待核对）`。
 
 ## 2. 逐件映射证据表
 
@@ -46,7 +52,7 @@
 
 | 项目 | 上游路径 | 本轮导出到 | 状态 |
 | --- | --- | --- | --- |
-| 持武图标（9 把候选） | `Resource/v1.1/image/arm/<Pic>/1/icon.png` | `dist/assets/items/extreme-<baseWeaponId>.png` | 已导出（仅测试池展示用） |
+| 持武图标（9 把候选） | `Resource/v1.1/image/arm/<Pic>/1/icon.png` | `dist/assets/items/extreme-<baseWeaponId>.png` | 已导出；正常池与测试池翻牌奖励均使用（名称标注待核对） |
 | 进阶形态系列 | `Resource/v1.1/image/arm/{bombpack,bomb,dart}2/3/6/00.png` | 未接入 | 未接线（模板进阶未实现） |
 | 弹丸 / 爆炸 / 持武逐帧 | `Resource/v1.1/image/arm/S<Pic>/`、`SS<Pic>/` | 复用站点版既有 13 把经典武器弹道表现 | 通过 `base_weapon_id` 复用，未导入新序列 |
 | 旧版对照 `inetpub/wwwroot/Resource/image/unfrightprop/strength*` | 与武器图标无关（材料图标） | — | 见 `RULE_EVIDENCE.md` |
@@ -63,26 +69,33 @@
 - 本轮 `weapon_instances.template_level` 按此登记：基础武器 2、候选武器 3。
 - 模板进阶 `GainEquip` **未接线**，见 `RULE_EVIDENCE.md` 的 NOT_PORTED 清单。
 
-## 5. 奖励池策略（按验收要求）
+## 5. 阶段 10 奖励池策略
 
 | 池 | 是否含候选武器卡 | 说明 |
 | --- | --- | --- |
-| `normal`（默认） | **否**，`extremeChance` 固定 0 | 中文品质映射待确认，不把推测武器加入正常掉落 |
-| `test`（`DDT_REWARD_POOL=test`） | 是，固定 1 张 | 仅用于验证「翻出 → 独立武器实例 → 永久入库 → 防重」，**自定义测试配置，不代表任何官方概率** |
+| `normal`（默认） | **是**，按 `DDT_REWARD_WEAPON_CHANCE=0.12` 的**单机自定义掉率** | 使用上游真实名称 +「中文品质名称待核对」标注；沿用已核实模板 ID / 属性 / Pic，不编造「极」字或素材；9 张整体洗牌，**不强制固定卡位发奖** |
+| `test`（`DDT_REWARD_POOL=test`） | 是，强制含 1 张 | 独立测试奖励池：强制 2 张金币 + 1 张真强化石 + 1 张武器，用于稳定验证「翻牌 → 独立实例 → 永久入库 → 防重 → 强化」闭环；**自定义测试配置，不代表任何官方概率，也不改变正常掉落规则** |
 
-9 张卡在服务端整体 Fisher-Yates 洗牌后落位，**无固定卡位、不按领取次序派发**。
-奖励盘生成时写入 `pool_version` / `rules_version`，旧盘永不重抽。
+9 张卡在服务端整体 Fisher-Yates 洗牌后落位，**无固定卡位、不按领取次序派发**；
+「至少 2 张真强化石卡」只是盘面构成保底，不约束位置。
+奖励盘生成时写入 `pool_version`（阶段 10 为 `v4-2026-11-28-simple-forge`）与
+`rules_version`，旧盘永不重抽。
 
-## 6. 已验证的功能（不等于映射已确认）
+## 6. 已验证的功能（不等于中文品质映射已确认）
 
-`tests/server/forge-rules.test.mjs` 验证：测试池翻出后创建**独立武器实例**、
+`tests/server/forge-rules.test.mjs` 验证：翻出后创建**独立武器实例**、
 同一 `requestId` 重复/重启返回**同一实例**、`weapon_grants` 唯一约束、
-房间可装备、铁匠铺可选择、下一局 `battles.weapon_attack` 与引擎 `actors[0].attack` 使用该实例属性、
+房间可装备、铁匠铺可选择并可按 `SIMPLE_LOCAL_V1` 强化、
+下一局 `battles.weapon_attack_precise` 与引擎 `actors[0].attack` 使用该实例属性、
 `base_weapon_id` 复用经典武器弹道。
 
-## 7. 仍未确认 / 未完成
+## 7. 仍未确认 / 不实现（**不再列为交付阻塞**）
 
 - 中文「极·」命名与上游 `VIP-` 模板的对应关系：**未确认**，需中文官服物品表或客户端资源证据。
-- 进阶换模板（GainEquip）、进阶后属性重算：**未接线**。
-- 候选武器的持武逐帧、弹丸、爆炸专属素材：**未导入**，当前复用基础武器表现。
-- 候选武器**不在**正常奖励池，正式掉率未配置（也不应配置，直到映射被证实）。
+  按用户授权停止追查，UI 与奖励如实标注「中文品质名称待核对」，不推测、不翻译、不冒充。
+- 进阶换模板（GainEquip）、进阶后属性重算、失败损毁/VIP/公会等上游机制：**不实现**
+  （交付规则是本项目自定的单机规则，见 `docs/RULE_EVIDENCE.md`）。
+- 候选武器的持武逐帧、弹丸、爆炸专属素材：**未导入**，当前复用基础武器表现
+  （`base_weapon_id`），不编造专属素材。
+- 正式掉率：当前 `weaponChance=0.12` 是**单机自定义概率**，不代表官方概率，
+  可通过 `DDT_REWARD_WEAPON_CHANCE` 调整。
