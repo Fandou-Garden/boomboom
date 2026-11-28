@@ -354,10 +354,15 @@ npm run start:server
 - 手机横屏遮挡检查、多局连续资源 / 事件监听 / WebSocket / 计时器增长观测、
   浏览器进程总内存与 Canvas / 图片 / 音频 buffer 单独占用：**尚未实测**。
 
-### 12.7 提交与推送
+### 12.7 提交与推送（已核验）
 
-阶段 10 使用用户已配置的凭证**非强制推送** `feat/node-server-mode`，
-`git ls-remote` 校验远程 SHA 与本地 HEAD 一致，不自动合并 `main`；
-Token 未写入远程 URL、源码、文档、命令行参数或日志。
-实际提交 SHA 与校验结果在推送完成后补记于 `docs/PROGRESS.md` 10.9。
+- 开发分支 `feat/node-server-mode`；**阶段 10 主体提交**
+  `db5b892849e6abf667d4b4acf9fbdbe238187340`。
+- 非强制推送 `ad8d6d3..db5b892` 成功；`git ls-remote` 返回
+  `db5b892849e6abf667d4b4acf9fbdbe238187340`，与推送时本地 HEAD 一致。
+- `main` 未合并、未改动：`cbfe149bed07f0568680bf20af89843aaea71305`。
+- Token 未写入远程 URL、源码、文档、命令行参数或日志；经临时 `GIT_ASKPASS` 注入，
+  临时文件推送后已删除。凭证有效性以 `/user` 与仓库 `permissions.push` 实测判定，
+  首次交互提示未归因于账号无权限。详细记录见 `docs/PROGRESS.md` 10.9。
+- 本节 SHA 补记为追加文档提交（其 SHA 无法自引用），分支 tip 以最终交付说明为准。
 

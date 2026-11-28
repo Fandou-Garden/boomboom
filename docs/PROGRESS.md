@@ -581,9 +581,23 @@ tracked 文件（清单自身除外）。凭证模式扫描 staged 文件 **0 �
   Canvas / 图片 / 音频 buffer 单独占用：**尚未实测**。
 - `art-source/` 的 `lightFrame` / `starMc` / `VersusAnimation` / `GameMode_*` 逐帧序列未接入。
 
-### 10.9 提交与推送状态
+### 10.9 提交与推送状态（已核验）
 
-阶段 10 使用用户已配置的凭证**非强制推送** `feat/node-server-mode`，并用 `git ls-remote`
-校验远程 SHA 与本地 HEAD 一致；不自动合并 `main`。
-实际提交 SHA、推送结果与校验值在推送完成后补记于本节末尾。
+- **开发分支**：`feat/node-server-mode`（不自动合并 `main`）。
+- **阶段 10 主体提交**：`db5b892849e6abf667d4b4acf9fbdbe238187340`，
+  25 个文件、+2356 / -1048，含 `004_simple_forge.sql` 与 3 张阶段 10 真实截图。
+- **非强制推送**：`git push origin feat/node-server-mode:feat/node-server-mode`，
+  结果 `ad8d6d3..db5b892`，无 `--force` / `--force-with-lease`。
+- **独立校验**：`git ls-remote origin refs/heads/feat/node-server-mode` 返回
+  `db5b892849e6abf667d4b4acf9fbdbe238187340`，与推送时本地 HEAD 一致（`MATCH`）。
+- **`main` 未改动**：远程仍为 `cbfe149bed07f0568680bf20af89843aaea71305`，未合并。
+- **凭证**：使用用户提供的 fine-grained PAT（`/user` → `200 / Orlandoo24`；
+  `/repos/Fandou-Garden/boomboom` → `200 / permissions.push=true`）。
+  Token **未**写入远程 URL、源码、文档、命令行参数或日志；推送时经临时
+  `GIT_ASKPASS` 从权限 `0600` 的临时文件读取，结束后临时文件已删除。
+  首次 `git push` 因 `credential.helper=store` 中没有 github.com 记录而进入交互式
+  用户名提示并被终止（exit 137）；补齐凭证注入后一次推送成功，
+  **未**把该现象归因于账号无权限，也未做强制推送。
+- 本节为推送完成后的**追加文档提交**，其自身 SHA 无法自引用；分支 tip 以
+  `git rev-parse HEAD` / `git ls-remote` 与最终交付说明为准。
 
